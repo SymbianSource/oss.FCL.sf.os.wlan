@@ -1,0 +1,90 @@
+//
+// Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+// All rights reserved.
+// This component and the accompanying materials are made available
+// under the terms of "Eclipse Public License v1.0"
+// which accompanies this distribution, and is available
+// at the URL "http://www.eclipse.org/legal/epl-v10.html".
+//
+// Initial Contributors:
+// Nokia Corporation - initial contribution.
+//
+// Contributors:
+//
+// Description: 
+//
+//
+//! @file
+//! @SYMTestSuiteName networking-wlan-validation-automated-instantiate
+//! @SYMScriptTestEnvironment This test script requires a basic ROM.
+//
+// Tests all public elements of the RConnection, RSocket, RSocketServ, CWLanMgmtClient, CWLanScanInfo, CComsDataBase, CComsDbTableView
+// classes as a means of confidence that the APIs work as expected.
+// 
+// The purpose is to provide a regression test suite of PublishedAll
+// APIs for: RConnection, RSocket, RSocketServ, CWLanMgmtClient, CWLanScanInfo, CComsDataBase, CComsDbTableView
+// The tests are fully automated.
+//
+
+
+
+LOAD_SUITE T_Wlan
+
+
+
+
+
+START_TESTCASE NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0001
+
+//!@SYMTestCaseID		NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0001
+//!@SYMAPI
+//!                REComSession::CreateImplementationL(TUid, TUid{ref});
+//!                REComSession::DestroyedImplementation(TUid);
+//!@SYMAuthor			alavariega
+//!@SYMCreationDate		23/06/2008
+//!@SYMTestCaseDesc		Instantiate ScanInfo
+//!@SYMTestActions
+//!                1.- Instantiate WLAN Scan Info: NewL ( WlanScanUid = {UID, Uid} )
+//!                2.- Destroy Scan Info: ~
+//!@SYMTestStatus		Verified
+//!@SYMTestPriority		Normal
+//!@SYMTestExpectedResults
+//!                Instantiate WLAN Scan Info with no errors
+//!@SYMTestType			CIT
+
+	START_TEST_BLOCK	100	T_Wlan	\nt\wlan\networking-wlan-validation-automated-instantiate.ini
+		CREATE_OBJECT	WlanScanInfo		wlansinf
+		COMMAND		wlansinf		NewL			NETWORKING-Wlan-Instantiate-0001-0001-NewL_command01
+		COMMAND		wlansinf		~
+	END_TEST_BLOCK
+END_TESTCASE NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0001
+
+
+
+
+START_TESTCASE NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0002
+
+//!@SYMTestCaseID		NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0002
+//!@SYMAPI
+//!                CWlanMgmtClient::NewL();
+//!                
+//!@SYMAuthor			alavariega
+//!@SYMCreationDate		23/06/2008
+//!@SYMTestCaseDesc		Instantiate WlanMgmtClient
+//!@SYMTestActions
+//!                1.- Instantiate WLAN Mgmt Client: NewL
+//!                2.- Destroy Mgmt Client: ~
+//!@SYMTestStatus		Verified
+//!@SYMTestPriority		Normal
+//!@SYMTestExpectedResults
+//!                Instantiate WLAN Management Client with no errors
+//!@SYMTestType			CIT
+
+	START_TEST_BLOCK	100	T_Wlan	\nt\wlan\networking-wlan-validation-automated-instantiate.ini
+		CREATE_OBJECT	WlanMgmtClient		wmgmtcnt
+		COMMAND		wmgmtcnt		NewL
+		COMMAND		wmgmtcnt		~
+	END_TEST_BLOCK
+END_TESTCASE NETWORKING-WLAN-VALIDATION-AUTOMATED-INSTANTIATE-0002
+
+DELAY 10000

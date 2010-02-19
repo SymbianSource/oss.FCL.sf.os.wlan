@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 38 %
+*/
 
 #ifndef WLMDRIVERIF_H
 #define WLMDRIVERIF_H
@@ -140,6 +143,7 @@ public: // Functions from base classes
      * @param is_pairwise_key_invalidated Whether the pairwise key should be invalidated.
      * @param is_group_key_invalidated Whether the group key should be invalidated
      * @param is_radio_measurement_supported Whether the radio measurement is supported
+     * @param pairwise_key Pairwise key to set before association. NULL if none.
      */
     void connect(
         u32_t request_id,
@@ -156,7 +160,8 @@ public: // Functions from base classes
         const u8_t* scan_frame,
         bool_t is_pairwise_key_invalidated,
         bool_t is_group_key_invalidated,
-        bool_t is_radio_measurement_supported );
+        bool_t is_radio_measurement_supported,
+        const core_cipher_key_s* pairwise_key );
 
     /**
      * Disconnect from the current network.

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 75 %
+* %version: 76 %
 */
 
 #include "core_operation_roam.h"
@@ -328,7 +328,8 @@ core_error_e core_operation_roam_c::next_state()
                     assoc_ie_list_m,
                     is_ibss_mode ? NULL : &assoc_resp_m,
                     true_t,    // ignored, pairwise key not used
-                    true_t );  // ignored, group key not used
+                    true_t,    // ignored, group key not used
+                    NULL );
 
                 return run_sub_operation( operation );
                 }
@@ -813,9 +814,10 @@ core_connect_status_e core_operation_roam_c::connect_status(
                     return core_connect_wep_shared_authentication_unsupported;
                     }
                 }
-            else if ( iap_data.authentication_mode() == core_authentication_mode_shared &&            
+            else if ( iap_data.authentication_mode() == core_authentication_mode_shared &&
                       ( management_status == core_management_status_auth_challenge_failure ||
                         management_status == core_management_status_auth_frame_out_of_sequence ||
+                        management_status == core_management_status_unspecified_failure ||
                         request_status == core_error_timeout ) )
                 {
                 DEBUG( "core_operation_roam_c::connect_status() - shared authentication failed (WEP)" );

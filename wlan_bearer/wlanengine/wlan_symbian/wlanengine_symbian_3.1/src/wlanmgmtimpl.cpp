@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 29 %
+* %version: 30 %
 */
 
 // INCLUDE FILES
@@ -787,6 +787,17 @@ void CWlanMgmtImpl::ProtectedSetupComplete(
     delete iProtectedSetupRequest;
     iProtectedSetupRequest = NULL;
     iPendingProtectedSetupStatus = NULL;
+    }
+
+// ---------------------------------------------------------
+// CWlanMgmtImpl::StartAggressiveBgScan
+// ---------------------------------------------------------
+//
+TInt CWlanMgmtImpl::StartAggressiveBgScan(
+    TUint aInterval )
+    {
+    TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::StartAggressiveBgScan()" ) ) );
+    return iServer.StartAggressiveBgScan( aInterval );
     }
 
 // ---------------------------------------------------------

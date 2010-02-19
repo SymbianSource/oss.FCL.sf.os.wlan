@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 12 %
+*/
 
 // INCLUDE FILES
 #include <e32base.h>
@@ -93,6 +96,16 @@ void CWlmPlatformData::ConstructL()
         }
     User::LeaveIfError( iPsIndicator.Attach( KPSUidWlan,
        KPSWlanIndicator, EOwnerThread ) );
+       
+    // Create PubSub property for publishing WLAN BG scan interval
+    ret = RProperty::Define( KPSWlanBgScanInterval, KPSWlanBgScanIntervalType,
+        KWlmPSReadPolicy, KWlmPSWritePolicy );
+    if( ret != KErrAlreadyExists )
+        {
+        User::LeaveIfError( ret );
+        }
+    User::LeaveIfError( iPsBgScanInterval.Attach( KPSUidWlan,
+        KPSWlanBgScanInterval, EOwnerThread ) );
     }
 
 // ---------------------------------------------------------
@@ -120,6 +133,8 @@ CWlmPlatformData::~CWlmPlatformData()
     RProperty::Delete( KPSUidWlan, KPSWlanIndicator );
     iPsMacAddress.Close();
     RProperty::Delete( KPSUidWlan, KPSWlanMacAddress );
+    iPsBgScanInterval.Close();
+    RProperty::Delete( KPSUidWlan, KPSWlanBgScanInterval );
     delete iPropertySystemState;
     delete iBtConnections;
     delete iEmergencyCall;    
@@ -379,4 +394,17 @@ TInt CWlmPlatformData::PublishMacAddress( TMacAddress& aMacAddr )
 
     TPtrC8 mac( aMacAddr.iMacAddress, KPSWlanMacAddressLength );
     return iPsMacAddress.Set( mac );
+    }
+
+// ---------------------------------------------------------
+// CWlmPlatformData::PublishBgScanInterval
+// Status : Draft
+// ---------------------------------------------------------
+//
+TInt CWlmPlatformData::PublishBgScanInterval( TUint32& aInterval )
+    {
+    DEBUG1( "CWlmPlatformData::PublishBgScanInterval( %u )",
+        aInterval );
+    
+    return iPsBgScanInterval.Set( aInterval );
     }

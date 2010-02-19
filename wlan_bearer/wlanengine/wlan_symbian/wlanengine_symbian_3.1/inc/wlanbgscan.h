@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 7 %
+* %version: 9 %
 */
 
 #ifndef WLANBGSCAN_H
@@ -25,8 +25,12 @@
 #include "awsinterface.h"
 #include "awsenginebase.h"
 #include "wlanscanproviderinterface.h"
-#include "wlantimerservices.h"
-#include "wlanbgscanawscomms.h"
+#include "wlantimerserviceinterface.h"
+#include "wlanbgscanawscommsinterface.h"
+#include "wlanbgscancommandlistener.h"
+#include "wlanbgscanstates.h"
+
+
 
 /**
  *  WLAN Background Scan
@@ -37,22 +41,12 @@
 NONSHARABLE_CLASS( CWlanBgScan ) :
     public MWlanBgScanProvider,
     public MWlanTimerServiceCallback,
-    public MWlanBgScanCommandListener
+    public MWlanBgScanCommandListener,
+    public CWlanBgScanStates
     {
 
 public:
-        
-    /**
-     * States for WLAN Background Scan.
-     */
-    enum TWlanBgScanState
-        {
-        EBgScanOff = 0,
-        EBgScanOn,
-        EBgScanAuto,
-        EBgScanAutoAws
-        };
-    
+            
     /**
      * States for Auto period.
      */
@@ -72,11 +66,21 @@ public:
         EInsideRange,
         EGreater
         };
+    
+    /**
+     * Possible statuses for AWS presence.
+     */
+    enum TAwsPresence
+        {
+        EAwsPresent,
+        EAwsNotPresent,
+        EAwsStarting
+        };
 
     /**
      * Two-phased constructor.
      */
-    static CWlanBgScan* NewL( MWlanScanResultProvider& aProvider, CWlanTimerServices& aTimerServices );
+    static CWlanBgScan* NewL( MWlanScanResultProvider& aProvider, MWlanTimerServices& aTimerServices );
     
     /**
     * Destructor.
@@ -86,18 +90,6 @@ public:
     /**
      * From MWlanBgScanProvider.
      * Called when Scan has been completed.
-     * 
-     * \msc
-     * ScanResultProvider,CWlanBgScan;
-     * --- [label="Scan is done"];
-     * ScanResultProvider=>CWlanBgScan [label="ScanComplete()"];
-     * ScanResultProvider<=CWlanBgScan [label="Scan()"];
-     * --- [label="New scan request is placed to queue or"];
-     * --- [label="existing request's scan time is updated"];
-     * ScanResultProvider>>CWlanBgScan [label="return"];
-     * ScanResultProvider<<CWlanBgScan [label="return"];
-     * \endmsc
-     * 
      *
      * @since S60 v5.2
      */
@@ -106,15 +98,6 @@ public:
     /**
      * From MWlanBgScanProvider.
      * Issued when WLAN is disconnected.
-     *
-     * \msc
-     * ScanResultProvider,CWlanBgScan;
-     * --- [label="WLAN is disconnected"];
-     * ScanResultProvider=>CWlanBgScan [label="NotConnected()"];
-     * ScanResultProvider<=CWlanBgScan [label="Scan( aMaxDelay=0 )"];
-     * ScanResultProvider>>CWlanBgScan [label="return"];
-     * ScanResultProvider<<CWlanBgScan [label="return"];
-     * \endmsc
      *
      * @since S60 v5.2
      */
@@ -144,7 +127,7 @@ public:
      * From MAwsBgScanProvider.
      * Set new background scan interval.
      * Asynchronous method to set new background scan interval, executed in
-     * AWS thread.
+     * AWS thread context.
      *
      * @since S60 v5.2
      * @param aNewInterval new interval to be taken into use
@@ -172,61 +155,44 @@ public:
      */
     void DoSetInterval( TUint32 aNewInterval );
     
-private:
+    /**
+     * This method is called by the command queue when
+     * AWS startup has been completed.
+     * 
+     * @since S60 v5.2
+     */
+    void AwsStartupComplete( TInt aStatus );
     
     /**
-     * Constructor.
+     * This method is called by the command queue when
+     * AWS command has been completed.
+     * 
+     * @param aCommand completed command
+     * @param aStatus completion code of the command
+     * 
+     * @since S60 v5.2
      */
-    CWlanBgScan( MWlanScanResultProvider& aProvider, CWlanTimerServices& aTimerServices  );
+    void AwsCommandComplete( MWlanBgScanAwsComms::TAwsCommand& aCommand, TInt aStatus );
     
     /**
-     * Two-phased constructor.
-     */
-    void ConstructL();
-        
-    /**
-     * Main state machine
-     *
+     * Send AWS command
+     * 
+     * @param aCommand command to be sent
+     * 
      * @since S60 v5.2
-     * @param aNewBgScanSetting new background scan setting to be taken into use
      */
-    void NextState( TUint32 aNewBgScanSetting );
+    void AwsCommand( MWlanBgScanAwsComms::TAwsMessage& aCommand );
     
     /**
-     * State machine for Off state
+     * AWS presence status.
      *
      * @since S60 v5.2
-     * @param aState reference to state
-     * @param aNewInterval new background scan setting to be taken into use
+     * @return EAwsPresent if AWS is available,
+     *         EAwsNotPresent if AWS is not available,
+     *         EAwsStarting if AWS is still starting up 
+     *         
      */
-    void InStateOff( TWlanBgScanState& aState, TUint32 aNewBgScanSetting );
-    
-    /**
-     * State machine for On state
-     *
-     * @since S60 v5.2
-     * @param aState reference to state
-     * @param aNewBgScanSetting new background scan setting to be taken into use
-     */
-    void InStateOn( TWlanBgScanState& aState, TUint32 aNewBgScanSetting );
-
-    /**
-     * State machine for Auto state
-     *
-     * @since S60 v5.2
-     * @param aState reference to state
-     * @param aNewBgScanSetting new background scan setting to be taken into use
-     */
-    void InStateAuto( TWlanBgScanState& aState, TUint32 aNewBgScanSetting );
-    
-    /**
-     * State machine for Auto with AWS state
-     *
-     * @since S60 v5.2
-     * @param aState reference to state
-     * @param aNewBgScanSetting new background scan setting to be taken into use
-     */
-    void InStateAutoAws( TWlanBgScanState& aState, TUint32 aNewBgScanSetting );
+    CWlanBgScan::TAwsPresence AwsPresence();
     
     /**
      * Request callback when interval change should take place.
@@ -243,23 +209,33 @@ private:
      * @return interval
      */
     TUint32 CurrentAutoInterval();
-    
+  
     /**
-     * Get current interval.
+     * Start aggressive background scanning.
      *
      * @since S60 v5.2
-     * @return current interval in use
+     * @param aInterval scan interval for aggressive mode, in seconds
+     * @param aTimeout aggressive mode duration, in microseconds
      */
-    TUint32 GetInterval();
+    void StartAggressiveBgScan( TUint32& aInterval, TUint32& aTimeout );
+
+private:
     
     /**
-     * Set current interval.
-     *
-     * @param aInterval interval to take into use
-     * @since S60 v5.2
+     * Constructor.
      */
-    void SetInterval( TUint32 aInterval );
+    CWlanBgScan( MWlanScanResultProvider& aProvider, MWlanTimerServices& aTimerServices );
     
+    /**
+     * Default constructor, no implementation.
+     */
+    CWlanBgScan();
+    
+    /**
+     * Two-phased constructor.
+     */
+    void ConstructL();
+        
     /**
      * Get next time when to change Auto interval.
      *
@@ -279,24 +255,6 @@ private:
      * @since S60 v5.2
      */
     TRelation TimeRelationToRange( const TTime& aTime, TUint aRangeStart, TUint aRangeEnd ) const;
-    
-    /**
-     * Deliver new background interval.
-     *
-     * @since S60 v5.2
-     * 
-     * @param aNewInterval new interval to be taken into use
-     */
-    void IntervalChanged( TUint32 aNewInterval );
-    
-    /**
-     * Is AWS present in system.
-     *
-     * @since S60 v5.2
-     * @return ETrue if background scan is enabled,
-     *         EFalse otherwise.
-     */
-    TBool IsAwsPresent();
     
     /**
      * Check the proposed settings are valid.
@@ -327,19 +285,9 @@ private: // data
     MWlanScanResultProvider& iProvider;
     
     /**
-     * Actually used interval for backgroundscan. 
+     * Interface to AWS comms object. 
      */
-    TUint32 iCurrentBgScanInterval;
-    
-    /**
-     * Reference to BgScan <-> AWS communications object. 
-     */
-    CWlanBgScanAwsComms* iAwsComms;
-    
-    /**
-     * Current background scan state. 
-     */
-    TWlanBgScanState iBgScanState;
+    MWlanBgScanAwsComms* iAwsComms;
     
     /**
      * Current Auto period. 
@@ -347,36 +295,15 @@ private: // data
     TWlanBgScanAutoPeriod iAutoPeriod;
     
     /**
-     * Reference to WLAN Timer services. 
+     * Whether AWS is ok or not. 
      */
-    CWlanTimerServices& iTimerServices;
-
-    /**
-     * Id of the timer service request regarding 
-     * background scan interval change.
-     */
-    TUint iIntervalChangeRequestId;
-
-    /**
-     * Background scan peak start time.
-     */
-    TUint iBgScanPeakStartTime;
+    TBool iAwsOk;
     
     /**
-     * Background scan peak end time.
+     * Current PSM server mode. 
      */
-    TUint iBgScanPeakEndTime;
-    
-    /**
-     * Peak time interval.
-     */
-    TUint iBgScanIntervalPeak;
-    
-    /**
-     * Off-peak time interval.
-     */
-    TUint iBgScanIntervalOffPeak;
-        
+    TUint iCurrentPsmServerMode;
+            
     };
 
 #endif // WLANBGSCAN_H

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2006 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 18 %
+* %version: 19 %
 */
 
 #ifndef WLANDOT11SYNCHRONIZE_H
@@ -81,6 +81,7 @@ protected:
         EISSUEJOIN,                 // issue join command
         ESETHTBLOCKACKCONF,         // configure HT Block Ack configure mib
         ERESETHTBLOCKACKCONF,       // reset HT Block Ack configure mib
+        ESETPAIRWISEKEY,            // set pairwise key
         ECONTINUEDOT11TRAVERSE,     // continue dot11 fsm traversal
         ESTATEMAX                   // defined as an upper bound                       
         }; 
@@ -153,9 +154,37 @@ protected:
     * @param aCtxImpl statemachine context
     */
     void SetHtBlockAckConfiguration( WlanContextImpl& aCtxImpl );
+
+    /**
+     * Sets pairwise key according to the used cipher suite
+     *
+     * @param aCtxImpl global statemachine context
+     */
+    void SetPtk( WlanContextImpl& aCtxImpl );
+
+    /**
+     * Sets CCMP key
+     *
+     * @param aCtxImpl global statemachine context
+     */
+    TBool SetCcmpPtk( WlanContextImpl& aCtxImpl );
+
+    /**
+     * Sets TKIP key
+     *
+     * @param aCtxImpl global statemachine context
+     */
+    TBool SetTkipPtk( WlanContextImpl& aCtxImpl );
+
+    /**
+     * Sets WEP key
+     *
+     * @param aCtxImpl global statemachine context
+     */
+    TBool SetWepKey( WlanContextImpl& aCtxImpl );
     
 #ifndef NDEBUG 
-        virtual const TInt8* GetStateName( TUint8& aLength ) const;
+    virtual const TInt8* GetStateName( TUint8& aLength ) const;
 #endif // !NDEBUG 
 
     void Entry( WlanContextImpl& aCtxImpl );

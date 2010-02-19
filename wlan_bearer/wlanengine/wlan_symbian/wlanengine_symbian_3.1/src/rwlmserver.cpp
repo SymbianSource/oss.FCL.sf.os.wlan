@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 27 %
+* %version: 28 %
 */
 
 #include <in_sock.h>
@@ -828,6 +828,21 @@ EXPORT_C void RWLMServer::CancelDirectedRoam()
 
     // Send the command
     SendReceive( ECancelDirectedRoam );
+    }
+
+// ---------------------------------------------------------
+// ---------------------------------------------------------
+//
+EXPORT_C TInt RWLMServer::StartAggressiveBgScan(
+    TUint aInterval )
+    {
+    DEBUG1( "RWLMServer::StartAggressiveBgScan( %u )",
+        aInterval );
+    
+    TIpcArgs params( aInterval );
+    
+    // Send the command as a "blind" request
+    return Send( EStartAggressiveBgScan, params );
     }
 
 // ---------------------------------------------------------

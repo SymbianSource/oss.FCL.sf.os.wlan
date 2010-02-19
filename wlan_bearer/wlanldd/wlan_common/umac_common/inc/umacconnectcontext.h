@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 21 %
+* %version: 22 %
 */
 
 #ifndef WLANCONNECTCONTEXT_H
@@ -96,6 +96,8 @@ public: // Data
     TBool                   iRadioMeasurement;
     /** adhoc or infrastructure mode */
     WHA::TOperationMode     iOperationMode;
+    /** roaming pairwise cipher key data context. Not own */
+    const TPairwiseKeyData* iRoamingPairwiseKey;
     /** items from Connect mgmt command; end */
     
     /** group key type inserted */

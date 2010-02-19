@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 40 %
+* %version: 41 %
 */
 
 #ifndef WLMCLIENTSERVER_H
@@ -219,7 +219,9 @@ enum TWLMCommands
     /** Initiate a roam to the given BSSID. */
     EDirectedRoam,
     /** Cancel a pending directed roam request. */
-    ECancelDirectedRoam
+    ECancelDirectedRoam,
+    /** Request entry to aggressive background scan mode. */
+    EStartAggressiveBgScan
     };
 
 /**

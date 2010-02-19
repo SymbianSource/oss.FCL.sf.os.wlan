@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 32 %
+* %version: 33 %
 */
 
 #ifndef WLANCONVERSIONUTIL_H
@@ -622,6 +622,13 @@ class TWlanConversionUtil
          */
         static u32_t ConvertTxRate(
             TWlanRate aRate );
+
+        /**
+         * Convert cipher key data.
+         */
+        static void ConvertCipherKey(
+            TPairwiseKeyData& aAmKey,
+            const core_cipher_key_s& aCoreKey );
 
     };
 

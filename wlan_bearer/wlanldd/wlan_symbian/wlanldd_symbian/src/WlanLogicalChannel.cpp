@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 56 %
+* %version: 57 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -196,6 +196,12 @@ DWlanLogicalChannel::~DWlanLogicalChannel()
     if ( iEthernetFrameMemMngr )
         {
         TraceDump(INIT_LEVEL, ("WLANLDD: deallocate ethernet frame memory pool"));
+        
+        // normally the user side client will do this, but just to be on 
+        // the safe side, make sure it really is done before proceeding with
+        // frame memory mgr destruction
+        OnReleaseEthernetFrameBuffers();
+        
         TraceDump(MEMORY, (("WLANLDD: delete DEthernetFrameMemMngr: 0x%08x"), 
         reinterpret_cast<TUint32>(iEthernetFrameMemMngr)));        
     
@@ -844,7 +850,8 @@ TBool DWlanLogicalChannel::ProtocolStackSideClientReady() const
 //
 void DWlanLogicalChannel::UserDataReEnabled()
     {
-    if ( !( iFlags & KTxTriggerArmed ) )
+    if ( ProtocolStackSideClientReady() &&
+         !( iFlags & KTxTriggerArmed ) )
         {
         iFlags |= KTxTriggerArmed;
         iTxTriggerDfc.Enque();
@@ -935,7 +942,8 @@ void DWlanLogicalChannel::OnOtherTxDataComplete()
     // someone else than the Protocol Stack Side Client unblocks the WHA Tx
     // pipeline and
     // b) to avoid the Tx pipe from getting stuck even temporarily
-    if ( !( iFlags & KTxTriggerArmed ) )
+    if ( ProtocolStackSideClientReady() &&
+         !( iFlags & KTxTriggerArmed ) )
         {
         iFlags |= KTxTriggerArmed;
         iTxTriggerDfc.Enque(); // we do this via a DFC
@@ -957,7 +965,8 @@ void DWlanLogicalChannel::OnTxDataSent()
     // makes a WHA Txqueue - for which there are packets pending in our Tx 
     // queues - non-full
     // b) to avoid the Tx pipe from getting stuck even temporarily
-    if ( !( iFlags & KTxTriggerArmed ) )
+    if ( ProtocolStackSideClientReady() &&
+         !( iFlags & KTxTriggerArmed ) )
         {
         iFlags |= KTxTriggerArmed;
         iTxTriggerDfc.Enque(); // we do this via a DFC
@@ -1001,7 +1010,7 @@ void DWlanLogicalChannel::TxProtocolStackData()
         TBool morePackets ( EFalse );
         iTxActive = ETrue;
         
-        while ( iUmac.TxPermitted( txQueueState ) )
+        while ( iUmac.TxPermitted( txQueueState ) && iEthernetFrameMemMngr )
             {
             TDataBuffer* metaHeader = 
                 iEthernetFrameMemMngr->GetTxFrame( txQueueState, morePackets );
@@ -1603,7 +1612,7 @@ void DWlanLogicalChannel::OnReleaseEthernetFrameBuffers()
     {
     if ( iEthernetFrameMemMngr )
         {
-        iEthernetFrameMemMngr->OnReleaseMemory();    
+        iEthernetFrameMemMngr->OnReleaseMemory( *iClient );    
         }
     }
 

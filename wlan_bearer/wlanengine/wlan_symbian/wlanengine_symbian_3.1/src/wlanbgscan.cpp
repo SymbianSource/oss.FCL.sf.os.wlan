@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 14 %
 */
 
 #include <e32base.h>
@@ -26,7 +26,8 @@
 #include "awsinterface.h"
 #include "awsenginebase.h"
 #include "wlancbwaiter.h"
-#include "wlanbgscanawscomms.h"
+#include "wlanbgscanawscommsinterface.h"
+#include "wlanbgscanstates.h"
 #include "wlanbgscan.h"
 #include "wlandevicesettings.h" // default values in case invalid data is passed in NotifyChangedSettings
 #include "am_debug.h"
@@ -60,7 +61,8 @@ const TInt KWlanBgScanMaxInterval = 1800;
 /**
  * Formatting of date time debug string.
  */
-_LIT( KWlanBgScanDateTimeFormat, "%F %*E %*N %D %H:%T:%S" );
+_LIT( KWlanBgScanDateTimeFormat, "%F %*E %*N %Y %H:%T:%S" );
+_LIT( KWlanBgScanDateTimeFormat2, "%H%T" );
 
 /**
  * Maximun length for date time debug string.
@@ -68,24 +70,20 @@ _LIT( KWlanBgScanDateTimeFormat, "%F %*E %*N %D %H:%T:%S" );
 const TInt KWlanBgScanMaxDateTimeStrLen = 50;
 #endif
 
+
 // ======== MEMBER FUNCTIONS ========
 
 // ---------------------------------------------------------------------------
 // CWlanBgScan::CWlanBgScan
 // ---------------------------------------------------------------------------
 //
-CWlanBgScan::CWlanBgScan( MWlanScanResultProvider& aProvider, CWlanTimerServices& aTimerServices ) :
+CWlanBgScan::CWlanBgScan( MWlanScanResultProvider& aProvider, MWlanTimerServices& aTimerServices ) :
+    CWlanBgScanStates( *this, aProvider, aTimerServices ),
     iProvider ( aProvider ),
-    iCurrentBgScanInterval( 0 ),
     iAwsComms( NULL ),
-    iBgScanState( EBgScanOff ),
     iAutoPeriod( EAutoPeriodNone ),
-    iTimerServices( aTimerServices ),
-    iIntervalChangeRequestId( 0 ),
-    iBgScanPeakStartTime( 0 ),
-    iBgScanPeakEndTime( 0 ),
-    iBgScanIntervalPeak( 0 ),
-    iBgScanIntervalOffPeak( 0 )
+    iAwsOk( EFalse ),
+    iCurrentPsmServerMode( 0 )
     {
     DEBUG( "CWlanBgScan::CWlanBgScan()" );
     }
@@ -99,21 +97,21 @@ void CWlanBgScan::ConstructL()
     DEBUG( "CWlanBgScan::ConstructL()" );
     
     // create AWS comms interface
-    TRAPD( err, iAwsComms = CWlanBgScanAwsComms::NewL( *this ) );
+    TRAPD( err, iAwsComms = CWlanBgScanAwsCommsFactory::InstanceL( *this ) );
     if( err != KErrNone )
         {
-        if( iAwsComms )
-            {
-            delete iAwsComms;
-            iAwsComms = NULL;
-            }
         DEBUG1( "CWlanBgScan::ConstructL() - AWS comms creation failed with code %i", err );
+
+        delete iAwsComms;
+        iAwsComms = NULL;
         }
     else
         {
         DEBUG( "CWlanBgScan::ConstructL() - AWS comms creation successful" );
         }
-        
+    
+    CWlanBgScanStates::ConstructL();
+            
     DEBUG( "CWlanBgScan::ConstructL() - done" );    
     }
 
@@ -121,7 +119,7 @@ void CWlanBgScan::ConstructL()
 // CWlanBgScan::NewL
 // ---------------------------------------------------------------------------
 //
-CWlanBgScan* CWlanBgScan::NewL( MWlanScanResultProvider& aProvider, CWlanTimerServices& aTimerServices )
+CWlanBgScan* CWlanBgScan::NewL( MWlanScanResultProvider& aProvider, MWlanTimerServices& aTimerServices )
     {
     DEBUG( "CWlanBgScan::NewL()" );
     CWlanBgScan* self = new ( ELeave ) CWlanBgScan( aProvider, aTimerServices );
@@ -137,7 +135,9 @@ CWlanBgScan* CWlanBgScan::NewL( MWlanScanResultProvider& aProvider, CWlanTimerSe
 //
 CWlanBgScan::~CWlanBgScan()
     {
-    DEBUG( "CWlanBgScan::CWlanBgScan()" );
+    DEBUG1( "CWlanBgScan::~CWlanBgScan() - deallocating iAwsComms @ 0x%08X", iAwsComms );
+    delete iAwsComms;
+    iAwsComms = NULL;
     }
 
 // ---------------------------------------------------------------------------
@@ -147,29 +147,13 @@ CWlanBgScan::~CWlanBgScan()
 //
 void CWlanBgScan::ScanComplete()
     {
-    DEBUG1( "CWlanBgScan::ScanComplete() - current interval %us", GetInterval() );
+    DEBUG1( "CWlanBgScan::ScanComplete() - current interval %us", GetBgInterval() );
 
-    if ( GetInterval() != KWlanBgScanIntervalNever )
+    if ( GetBgInterval() != KWlanBgScanIntervalNever )
         {
-        DEBUG1( "CWlanBgScan::ScanComplete() - issue a new request with %us as expiry", GetInterval() );
-        iProvider.Scan( GetInterval() );
+        DEBUG1( "CWlanBgScan::ScanComplete() - issue a new request with %us as expiry", GetBgInterval() );
+        iProvider.Scan( GetBgInterval() );
         }
-    }
-
-// ---------------------------------------------------------------------------
-// From class MWlanBgScanProvider.
-// CWlanBgScan::IntervalChanged
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::IntervalChanged( TUint32 aNewInterval )
-    {
-    DEBUG1( "CWlanBgScan::IntervalChanged() - aNewInterval %u", aNewInterval );
-
-    NextState( aNewInterval );
-            
-    DEBUG2( "CWlanBgScan::IntervalChanged() - current interval %u, current state %u",
-            GetInterval(),
-            iBgScanState );
     }
 
 // ---------------------------------------------------------------------------
@@ -179,9 +163,9 @@ void CWlanBgScan::IntervalChanged( TUint32 aNewInterval )
 //
 void CWlanBgScan::NotConnected()
     {
-    DEBUG1( "CWlanBgScan::NotConnected() - current interval %us", GetInterval() );
+    DEBUG1( "CWlanBgScan::NotConnected() - current interval %us", GetBgInterval() );
         
-    if ( GetInterval() != KWlanBgScanIntervalNever )
+    if ( GetBgInterval() != KWlanBgScanIntervalNever )
         {
         DEBUG( "CWlanBgScan::NotConnected() - issue a new request with immediate expiry" );
         iProvider.Scan( KWlanBgScanMaxDelayExpireImmediately );
@@ -198,9 +182,9 @@ TBool CWlanBgScan::IsBgScanEnabled()
     // If ( interval != never )                              -> Return True
     // Otherwise                                             -> return False
     DEBUG1( "CWlanBgScan::IsBgScanEnabled() - returning %u", 
-           ( GetInterval() != KWlanBgScanIntervalNever ) ? 1 : 0 );
+           ( GetBgInterval() != KWlanBgScanIntervalNever ) ? 1 : 0 );
         
-    return ( GetInterval() != KWlanBgScanIntervalNever );
+    return ( GetBgInterval() != KWlanBgScanIntervalNever );
     }
 
 // ---------------------------------------------------------------------------
@@ -218,21 +202,28 @@ void CWlanBgScan::NotifyChangedSettings( MWlanBgScanProvider::TWlanBgScanSetting
             aSettings.bgScanIntervalPeak,
             aSettings.bgScanIntervalOffPeak);
     
+    // validate settings and use default values if needed
     MWlanBgScanProvider::TWlanBgScanSettings settingsToUse;
-    CheckSettings( settingsToUse, aSettings );
+    CheckSettings( settingsToUse, aSettings ); // Note: Any PSM server mode value is allowed.
     
-    iBgScanPeakStartTime = settingsToUse.bgScanPeakStartTime;
-    iBgScanPeakEndTime = settingsToUse.bgScanPeakEndTime;
-    iBgScanIntervalPeak = settingsToUse.bgScanIntervalPeak;
-    iBgScanIntervalOffPeak = settingsToUse.bgScanIntervalOffPeak;
+    // store settings for later use
+    iBgScanSettings = settingsToUse;
     
-    IntervalChanged( settingsToUse.backgroundScanInterval );
-        
-    if( IsAwsPresent() )
+    IntervalChanged();
+    
+    if( iCurrentPsmServerMode != iBgScanSettings.psmServerMode )
         {
-        CWlanBgScanAwsComms::TAwsMessage msg = { CWlanBgScanAwsComms::ESetPowerSaveMode, aSettings.psmServerMode };
-        iAwsComms->SendOrQueueAwsCommand( msg );
+        if( AwsPresence() == CWlanBgScan::EAwsPresent )
+            {
+            DEBUG( "CWlanBgScan::NotifyChangedSettings() - sending power mode command to AWS" );
+            MWlanBgScanAwsComms::TAwsMessage msg = { MWlanBgScanAwsComms::ESetPowerSaveMode, iBgScanSettings.psmServerMode };
+            iAwsComms->SendOrQueueAwsCommand( msg );
+            }
+        
+        // remember current psm server mode
+        iCurrentPsmServerMode = iBgScanSettings.psmServerMode;
         }
+    
     }
 
 // ---------------------------------------------------------------------------
@@ -269,24 +260,6 @@ void CWlanBgScan::CheckSettings(
     }
 
 // ---------------------------------------------------------------------------
-// CWlanBgScan::GetInterval
-// ---------------------------------------------------------------------------
-//
-TUint32 CWlanBgScan::GetInterval()
-    {
-    return iCurrentBgScanInterval;
-    }
-
-// ---------------------------------------------------------------------------
-// CWlanBgScan::SetInterval
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::SetInterval( TUint32 aInterval )
-    {
-    iCurrentBgScanInterval = aInterval;
-    }
-
-// ---------------------------------------------------------------------------
 // CWlanBgScan::IsIntervalChangeNeeded
 // ---------------------------------------------------------------------------
 //
@@ -295,7 +268,7 @@ TBool CWlanBgScan::IsIntervalChangeNeeded()
     TBool ret( ETrue );
     
     // no need to change interval if both peak and off-peak intervals are the same
-    if( iBgScanPeakStartTime == iBgScanPeakEndTime )
+    if( iBgScanSettings.bgScanPeakStartTime == iBgScanSettings.bgScanPeakEndTime )
         {
         ret = EFalse;
         }
@@ -343,23 +316,30 @@ TTime CWlanBgScan::AutoIntervalChangeAt()
     currentTime.HomeTime();
     TDateTime change_time( currentTime.DateTime() );
     
-    switch( TimeRelationToRange( currentTime, iBgScanPeakStartTime, iBgScanPeakEndTime ) )
+#ifdef _DEBUG
+    change_time = currentTime.DateTime();
+    TBuf<KWlanBgScanMaxDateTimeStrLen> timeNow;
+    TRAP_IGNORE( currentTime.FormatL( timeNow, KWlanBgScanDateTimeFormat ) );
+    DEBUG1( "CWlanBgScan::AutoIntervalChangeAt() - time now: %S", &timeNow );
+#endif
+    
+    switch( TimeRelationToRange( currentTime, iBgScanSettings.bgScanPeakStartTime, iBgScanSettings.bgScanPeakEndTime ) )
         {
         case ESmaller:
             {
-            change_time.SetHour( iBgScanPeakStartTime / KGetHours );
-            change_time.SetMinute( iBgScanPeakStartTime % KGetHours );
+            change_time.SetHour( iBgScanSettings.bgScanPeakStartTime / KGetHours );
+            change_time.SetMinute( iBgScanSettings.bgScanPeakStartTime % KGetHours );
             change_time.SetSecond( KZeroSeconds );
             currentTime = change_time;
             break;
             }
         case EInsideRange:
             {
-            change_time.SetHour( iBgScanPeakEndTime / KGetHours );
-            change_time.SetMinute( iBgScanPeakEndTime % KGetHours );
+            change_time.SetHour( iBgScanSettings.bgScanPeakEndTime / KGetHours );
+            change_time.SetMinute( iBgScanSettings.bgScanPeakEndTime % KGetHours );
             change_time.SetSecond( KZeroSeconds );
             currentTime = change_time;
-            if( iBgScanPeakStartTime > iBgScanPeakEndTime )
+            if( iBgScanSettings.bgScanPeakStartTime > iBgScanSettings.bgScanPeakEndTime )
                 {
                 DEBUG( "CWlanBgScan::AutoIntervalChangeAt() - peak end happens tomorrow" );
                 currentTime += TTimeIntervalDays( KAddOneDay );
@@ -372,8 +352,8 @@ TTime CWlanBgScan::AutoIntervalChangeAt()
             }
         case EGreater:
             {
-            change_time.SetHour( iBgScanPeakStartTime / KGetHours );
-            change_time.SetMinute( iBgScanPeakStartTime % KGetHours );
+            change_time.SetHour( iBgScanSettings.bgScanPeakStartTime / KGetHours );
+            change_time.SetMinute( iBgScanSettings.bgScanPeakEndTime % KGetHours );
             change_time.SetSecond( KZeroSeconds );
             currentTime = change_time;
             currentTime += TTimeIntervalDays( KAddOneDay );
@@ -399,64 +379,57 @@ CWlanBgScan::TRelation CWlanBgScan::TimeRelationToRange( const TTime& aTime, TUi
     {
 #ifdef _DEBUG
     TBuf<KWlanBgScanMaxDateTimeStrLen> dbgString;
-    TRAP_IGNORE( aTime.FormatL( dbgString, KWlanBgScanDateTimeFormat ) );
+    TRAP_IGNORE( aTime.FormatL( dbgString, KWlanBgScanDateTimeFormat2 ) );
     DEBUG1( "CWlanBgScan::TimeRelationToRange() - time:  %S", &dbgString );
 #endif
-    
-    TTime time( aTime );
-    
-    TDateTime start_time( aTime.DateTime() );
-    start_time.SetHour( aRangeStart / KGetHours );
-    start_time.SetMinute( aRangeStart % KGetHours );
-    start_time.SetSecond( KZeroSeconds );
-    
-    if( aRangeStart > aRangeEnd )
-        {
-        DEBUG( "CWlanBgScan::TimeRelationToRange() - end time of range must to be tomorrow" );
-        if( time.DayNoInMonth() == ( time.DaysInMonth() - 1 ) )
-            {
-            DEBUG( "CWlanBgScan::TimeRelationToRange() - last day of the month, move to next month" );
-            time += TTimeIntervalMonths( 1 );
-            DEBUG( "CWlanBgScan::TimeRelationToRange() - move to first day of the month" );
-            TDateTime new_time( time.DateTime() );
-            new_time.SetDay( 0 );
-
-            time = TTime( new_time );
-            }
-        else
-            {
-            DEBUG( "CWlanBgScan::TimeRelationToRange() - add one day to end time" );
-            time += TTimeIntervalDays( KAddOneDay );
-            }
-        }
-    
-    TDateTime end_time( time.DateTime() );
-    end_time.SetHour( aRangeEnd / KGetHours );
-    end_time.SetMinute( aRangeEnd % KGetHours );
-    end_time.SetSecond( KZeroSeconds );
         
-#ifdef _DEBUG
-    TBuf<KWlanBgScanMaxDateTimeStrLen> rngStart, rngEnd;
-    TRAP_IGNORE( TTime( start_time ).FormatL( rngStart, KWlanBgScanDateTimeFormat ) );
-    TRAP_IGNORE( TTime( end_time ).FormatL( rngEnd, KWlanBgScanDateTimeFormat ) );
-    DEBUG2( "CWlanBgScan::TimeRelationToRange() - range: %S - %S", &rngStart, &rngEnd );
-#endif
+    TDateTime dateTime( aTime.DateTime() );
     
+    TUint timeToCheck = ( dateTime.Hour() * KGetHours ) + dateTime.Minute();
+
+    DEBUG2( "CWlanBgScan::TimeRelationToRange() - range: %04u - %04u", aRangeStart, aRangeEnd );
+
     CWlanBgScan::TRelation relation( ESmaller );
-    if( aTime < TTime( start_time ) )
-        {
-        DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: ESmaller" );
-        relation = ESmaller;
-        }
-    else if( aTime >= TTime( start_time ) && aTime < TTime( end_time ) )
-        {
-        DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EInsideRange" );
-        relation = EInsideRange;
-        }
-    else
+    
+    if( aRangeStart == aRangeEnd )
         {
         DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EGreater" );
         relation = EGreater;
+        }
+    else if( aRangeStart > aRangeEnd )
+        {
+        DEBUG( "CWlanBgScan::TimeRelationToRange() - range crosses the midnight" );
+        /**
+         * As range crosses midnight, there is no way for the relation to be ESmaller.
+         */
+        if( timeToCheck < aRangeEnd || timeToCheck >= aRangeStart )
+            {
+            DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EInsideRange" );
+            relation = EInsideRange;
+            }
+        else
+            {
+            DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EGreater" );
+            relation = EGreater;
+            }
+        }
+    else
+        {
+        if( timeToCheck < aRangeStart )
+            {
+            DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: ESmaller" );
+            relation = ESmaller;
+            }
+        else if( timeToCheck >= aRangeStart && timeToCheck < aRangeEnd )
+            {
+            DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EInsideRange" );
+            relation = EInsideRange;
+            }
+        else
+            {
+            DEBUG( "CWlanBgScan::TimeRelationToRange() - returning: EGreater" );
+            relation = EGreater;
+            }
         }
     
     return relation;
@@ -472,13 +445,13 @@ TUint32 CWlanBgScan::CurrentAutoInterval()
     TTime currentTime;
     currentTime.HomeTime();
 
-    if( TimeRelationToRange( currentTime, iBgScanPeakStartTime, iBgScanPeakEndTime ) == CWlanBgScan::EInsideRange )
+    if( TimeRelationToRange( currentTime, iBgScanSettings.bgScanPeakStartTime, iBgScanSettings.bgScanPeakEndTime ) == CWlanBgScan::EInsideRange )
         {
-        interval = iBgScanIntervalPeak;
+        interval = iBgScanSettings.bgScanIntervalPeak;
         }
     else
         {       
-        interval = iBgScanIntervalOffPeak;
+        interval = iBgScanSettings.bgScanIntervalOffPeak;
         }
     
     DEBUG1( "CWlanBgScan::CurrentAutoInterval() - current interval: %u", interval );
@@ -487,304 +460,23 @@ TUint32 CWlanBgScan::CurrentAutoInterval()
     }
 
 // ---------------------------------------------------------------------------
-// CWlanBgScan::NextState
+// CWlanBgScan::StartAggressiveBgScan
 // ---------------------------------------------------------------------------
 //
-void CWlanBgScan::NextState( TUint32 aNewBgScanSetting )
+void CWlanBgScan::StartAggressiveBgScan( TUint32& aInterval, TUint32& aTimeout )
     {
-    DEBUG1( "CWlanBgScan::NextState() - aNewBgScanSetting %u", aNewBgScanSetting );
+    CWlanBgScanStates::StartAggressiveBgScan( aInterval, aTimeout );
+    }
     
-    switch ( iBgScanState )
-        {
-        case EBgScanOff:
-            {
-            InStateOff( iBgScanState, aNewBgScanSetting );
-            break;
-            }
-        case EBgScanOn:
-            {
-            InStateOn( iBgScanState, aNewBgScanSetting );
-            break;
-            }
-        case EBgScanAuto:
-            {
-            InStateAuto( iBgScanState, aNewBgScanSetting );
-            break;
-            }
-        case EBgScanAutoAws:
-            {
-            InStateAutoAws( iBgScanState, aNewBgScanSetting );
-            break;
-            }
-        default:
-            {
-            ASSERT( 0 );
-            break;
-            }
-        }
-    }
-
 // ---------------------------------------------------------------------------
-// CWlanBgScan::InStateOff
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::InStateOff( TWlanBgScanState& aState, TUint32 aNewBgScanSetting )
-    {
-    switch( aNewBgScanSetting )
-        {
-        case KWlanBgScanIntervalNever:
-            {
-            DEBUG( "CWlanBgScan::InStateOff() - no change in the interval" );
-            aState = EBgScanOff;
-            break;
-            }
-        case KWlanBgScanIntervalAutomatic:
-            {
-            if ( IsAwsPresent() )
-                {
-                DEBUG( "CWlanBgScan::InStateOff() - state change Off to AutoAws" );
-
-                aState = EBgScanAutoAws;
-                DEBUG( "CWlanBgScan::InStateOff() - calling SendOrQueueAwsCommand()" );
-                CWlanBgScanAwsComms::TAwsMessage msg = { CWlanBgScanAwsComms::EStart, 0 };
-                iAwsComms->SendOrQueueAwsCommand( msg );
-                DEBUG( "CWlanBgScan::InStateOff() - SendOrQueueAwsCommand() returned" );
-                }
-            else
-                {
-                DEBUG( "CWlanBgScan::InStateOff() - state change Off to Auto" );
-                DEBUG( "CWlanBgScan::InStateOff() - * determine next interval change time and request callback" );
-                ScheduleAutoIntervalChange();
-                SetInterval( CurrentAutoInterval() );
-                if( GetInterval() != KWlanBgScanIntervalNever )
-                    {
-                    DEBUG( "CWlanBgScan::InStateOff() - * cause immediate background scan" );
-                    NotConnected();
-                    }
-                else
-                    {
-                    DEBUG( "CWlanBgScan::InStateOff() - Auto interval zero, background scanning is off" );
-                    }
-                aState = EBgScanAuto;
-                }
-            break;
-            }
-        default:
-            {
-            DEBUG1( "CWlanBgScan::InStateOff() - state change Off to On (interval: %u)", aNewBgScanSetting );
-            SetInterval( aNewBgScanSetting );
-            // cause immediate background scan
-            NotConnected();
-            aState = EBgScanOn;
-            }
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// CWlanBgScan::InStateOn
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::InStateOn( TWlanBgScanState& aState, TUint32 aNewBgScanSetting )
-    {
-    switch( aNewBgScanSetting )
-        {
-        case KWlanBgScanIntervalNever:
-            {
-            DEBUG( "CWlanBgScan::InStateOn() - state change On to Off" );
-            SetInterval( KWlanBgScanIntervalNever );
-            iProvider.CancelScan();
-            aState = EBgScanOff;
-            break;
-            }
-        case KWlanBgScanIntervalAutomatic:
-            {
-            DEBUG( "CWlanBgScan::InStateOn() - state change On to Auto" );
-            SetInterval( KWlanBgScanIntervalNever );
-            iProvider.CancelScan();
-            if ( IsAwsPresent() )
-                {
-                aState = EBgScanAutoAws;
-                DEBUG( "CWlanBgScan::InStateOn() - calling SendOrQueueAwsCommand()" );
-                CWlanBgScanAwsComms::TAwsMessage msg = { CWlanBgScanAwsComms::EStart, 0 };
-                iAwsComms->SendOrQueueAwsCommand( msg );
-                DEBUG( "CWlanBgScan::InStateOn() - SendOrQueueAwsCommand() returned" );
-                }
-            else
-                {
-                DEBUG( "CWlanBgScan::InStateOn() - * determine next interval change time and request callback" );
-                ScheduleAutoIntervalChange();
-                SetInterval( CurrentAutoInterval() );
-                if( GetInterval() != KWlanBgScanIntervalNever )
-                    {
-                    DEBUG( "CWlanBgScan::InStateOn() - * cause immediate background scan" );
-                    NotConnected();
-                    }
-                else
-                    {
-                    DEBUG( "CWlanBgScan::InStateOn() - Auto interval zero, background scanning is off" );
-                    }
-                aState = EBgScanAuto;
-                }
-            break;
-            }
-        default:
-            {
-            DEBUG( "CWlanBgScan::InStateOn() - state change On to On" );
-            if ( GetInterval() == aNewBgScanSetting ) 
-                {
-                DEBUG( "CWlanBgScan::InStateOn() - no change in the interval" );
-                }
-            else if ( GetInterval() > aNewBgScanSetting )
-                {
-                DEBUG( "CWlanBgScan::InStateOn() - current interval greater than the new interval" );
-                DEBUG( "CWlanBgScan::InStateOn() - * cancel scan and cause immediate background scan" );
-                iProvider.CancelScan();
-                SetInterval( aNewBgScanSetting );
-                NotConnected();
-                }
-            else
-                {
-                DEBUG( "CWlanBgScan::InStateOn() - current interval smaller than the new interval" );
-                DEBUG( "CWlanBgScan::InStateOn() - * cancel scan and issue new with interval as expiry" );
-                iProvider.CancelScan();
-                SetInterval( aNewBgScanSetting );
-                ScanComplete();
-                }
-            aState = EBgScanOn;
-            }
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// CWlanBgScan::InStateAuto
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::InStateAuto( TWlanBgScanState& aState, TUint32 aNewBgScanSetting )
-    {
-    switch( aNewBgScanSetting )
-        {
-        case KWlanBgScanIntervalNever:
-            {
-            DEBUG( "CWlanBgScan::InStateAuto() - state change Auto to Off" );
-            SetInterval( KWlanBgScanIntervalNever );
-            iTimerServices.StopTimer( iIntervalChangeRequestId );
-            iIntervalChangeRequestId = 0;
-            iProvider.CancelScan();
-            aState = EBgScanOff;
-            break;
-            }
-        case KWlanBgScanIntervalAutomatic:
-            {
-            DEBUG( "CWlanBgScan::InStateAuto() - state still Auto" );
-            
-            ScheduleAutoIntervalChange();
-
-            TUint32 currentInterval = GetInterval();
-            
-            TUint32 autoInterval = CurrentAutoInterval();
-                        
-            if ( autoInterval == KWlanBgScanIntervalNever ) 
-                {
-                DEBUG( "CWlanBgScan::InStateAuto() - Auto interval zero, background scanning is off" );
-                DEBUG( "CWlanBgScan::InStateAuto() - * cancel scan" );
-                iProvider.CancelScan();
-                SetInterval( autoInterval );
-                }
-            else if ( currentInterval == autoInterval ) 
-                {
-                DEBUG( "CWlanBgScan::InStateAuto() - no change in the Auto interval" );
-                }
-            else if ( currentInterval > autoInterval )
-                {
-                DEBUG( "CWlanBgScan::InStateAuto() - current Auto interval greater than the new Auto interval" );
-                DEBUG( "CWlanBgScan::InStateAuto() - * cancel scan and issue new with immediate expiry" );
-                iProvider.CancelScan();
-                SetInterval( autoInterval );
-                NotConnected();
-                }
-            else
-                {
-                DEBUG( "CWlanBgScan::InStateAuto() - current Auto interval smaller than the new Auto interval" );
-                DEBUG( "CWlanBgScan::InStateAuto() - * cancel scan and issue new with interval expiry" );
-                iProvider.CancelScan();
-                SetInterval( autoInterval );
-                ScanComplete();
-                }
-            
-            aState = EBgScanAuto;
-            break;
-            }
-        default:
-            {
-            DEBUG( "CWlanBgScan::InStateAuto() - state change Auto to On" );
-            SetInterval( aNewBgScanSetting );
-            iTimerServices.StopTimer( iIntervalChangeRequestId );
-            iIntervalChangeRequestId = 0;
-            // need to issue new scan request as it is possible that currently there is
-            // no scan requested
-            iProvider.CancelScan();
-            NotConnected();
-            aState = EBgScanOn;
-            }
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// CWlanBgScan::InStateAutoAws
-// ---------------------------------------------------------------------------
-//
-void CWlanBgScan::InStateAutoAws( TWlanBgScanState& aState, TUint32 aNewBgScanSetting )
-    {
-    switch( aNewBgScanSetting )
-        {
-        case KWlanBgScanIntervalNever:
-            {
-            DEBUG( "CWlanBgScan::InStateAutoAws() - state change Auto to Off" );
-            SetInterval( KWlanBgScanIntervalNever );
-            aState = EBgScanOff;
-            DEBUG( "CWlanBgScan::InStateAutoAws() - calling SendOrQueueAwsCommand()" );
-            CWlanBgScanAwsComms::TAwsMessage msg = { CWlanBgScanAwsComms::EStop, 0 };
-            iAwsComms->SendOrQueueAwsCommand( msg );
-            DEBUG( "CWlanBgScan::InStateAutoAws() - SendOrQueueAwsCommand() returned" );
-            iProvider.CancelScan();
-			break;
-            }
-        case KWlanBgScanIntervalAutomatic:
-            {
-            DEBUG( "CWlanBgScan::InStateAutoAws() - no change in the interval" );
-            aState = EBgScanAutoAws;
-            break;
-            }
-        default:
-            {
-            DEBUG( "CWlanBgScan::InStateAutoAws() - state change Auto to On" );
-            SetInterval( aNewBgScanSetting );
-            aState = EBgScanOn;
-            // need to issue new scan request as it is possible that currently there is
-            // no scan requested
-            DEBUG( "CWlanBgScan::InStateAutoAws() - calling SendAwsCommand()" );
-            CWlanBgScanAwsComms::TAwsMessage msg = { CWlanBgScanAwsComms::EStop, 0 };
-            iAwsComms->SendOrQueueAwsCommand( msg );
-            DEBUG( "CWlanBgScan::InStateAutoAws() - SendAwsCommand() returned" );
-            iProvider.CancelScan();
-            NotConnected();
-            }
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// CWlanBgScan::Timeout
+// CWlanBgScan::OnTimeout
 // ---------------------------------------------------------------------------
 //
 void CWlanBgScan::OnTimeout()
     {
     DEBUG( "CWlanBgScan::OnTimeout()" );
-
-    // by design, OnTimeout should only happen
-    // in Auto state
-    ASSERT( iBgScanState == EBgScanAuto );
     
-    NextState( KWlanBgScanIntervalAutomatic );
+    NextState( CWlanBgScanStates::EBgScanEventIntervalChanged );
     
     }
 
@@ -795,60 +487,88 @@ void CWlanBgScan::OnTimeout()
 void CWlanBgScan::DoSetInterval( TUint32 aNewInterval )
     {
     DEBUG1( "CWlanBgScan::DoSetInterval( aNewInterval: %u )", aNewInterval );
-    
-    if( iBgScanState != EBgScanAutoAws )
-        {
-        DEBUG( "CWlanBgScan::DoSetInterval() - state not AutoAws, ignoring request" );
-        return;
-        }
-    
-    TUint32 currentInterval( GetInterval() );
         
-    if ( ( currentInterval == 0 ) && ( aNewInterval != 0 ) )
+    SetAutoInterval( aNewInterval );
+    DEBUG( "CWlanBgScan::DoSetInterval() - interval stored, giving event to state machine" );
+    
+    NextState( CWlanBgScanStates::EBgScanEventAwsIntervalChanged );
+
+    }
+
+// ---------------------------------------------------------------------------
+// CWlanBgScan::AwsPresence
+// --------------------------------------------------------------------------
+//
+CWlanBgScan::TAwsPresence CWlanBgScan::AwsPresence()
+    {
+    CWlanBgScan::TAwsPresence ret( CWlanBgScan::EAwsPresent );
+    
+    // If ( ( iAwsOk == EFalse ) And ( iAwsComms == NULL ) )  -> Return EAwsNotPresent
+    // If ( ( iAwsOk == EFalse ) And ( iAwsComms != NULL ) )  -> Return EAwsStarting
+    // Otherwise                                              -> return EAwsPresent
+    
+    if( iAwsOk == EFalse && iAwsComms == NULL )
         {
-        DEBUG( "CWlanBgScan::DoSetInterval() - current interval is zero and new interval is non-zero" );
-        DEBUG( "CWlanBgScan::DoSetInterval() - cancel scan and issue new with immediate expiry" );
-        iProvider.CancelScan();
-        SetInterval( aNewInterval );
-        NotConnected();
+        ret = CWlanBgScan::EAwsNotPresent;
         }
-    else if ( currentInterval == aNewInterval ) 
+    if( iAwsOk == EFalse && iAwsComms != NULL )
         {
-        DEBUG( "CWlanBgScan::DoSetInterval() - no change in the interval" );
+        ret = CWlanBgScan::EAwsStarting;
         }
-    else if ( currentInterval > aNewInterval )
+    
+    DEBUG1( "CWlanBgScan::AwsStatus() - returning %i", ret );
+    
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// CWlanBgScan::AwsStartupComplete
+// --------------------------------------------------------------------------
+//
+void CWlanBgScan::AwsStartupComplete( TInt aStatus )
+    {
+    DEBUG1( "CWlanBgScan::AwsStartupComplete( aStatus: %d )", aStatus );
+    
+    SetAwsStartupStatus( aStatus );
+
+    if( aStatus == KErrNone )
         {
-        // if current interval greater than new interval -> cancel scan and 
-        // issue new with immediate expiry
-        DEBUG( "CWlanBgScan::DoSetInterval() - current interval greater than the new interval" );
-        DEBUG( "CWlanBgScan::DoSetInterval() - cancel scan and issue new with immediate expiry" );
-        iProvider.CancelScan();
-        SetInterval( aNewInterval );
-        NotConnected();
+        // AWS is ok
+        iAwsOk = ETrue;
         }
+#ifdef _DEBUG
     else
         {
-        DEBUG( "CWlanBgScan::DoSetInterval() - current interval smaller than the new interval" );
-        DEBUG( "CWlanBgScan::DoSetInterval() - take new interval into use after currently pending scan is completed" );
-        SetInterval( aNewInterval );
+        DEBUG( "CWlanBgScan::AwsStartupComplete() - error: AWS startup completed with error status, AWS not in use" );
         }
+#endif
+    
+    NextState( CWlanBgScanStates::EBgScanEventAwsStartupComplete );
     
     }
 
 // ---------------------------------------------------------------------------
-// CWlanBgScan::IsAwsPresent
+// CWlanBgScan::AwsCommandComplete
 // --------------------------------------------------------------------------
 //
-TBool CWlanBgScan::IsAwsPresent()
+void CWlanBgScan::AwsCommandComplete( MWlanBgScanAwsComms::TAwsCommand& aCommand, TInt aStatus )
     {
-    TBool ret( ETrue );
+    DEBUG2( "CWlanBgScan::AwsCommandComplete( aCommand: %d, aStatus: %d )", aCommand, aStatus );
     
-    if( iAwsComms == NULL || !iAwsComms->IsAwsPresent() )
-        {
-        ret = EFalse;
-        }
+    SetAwsCmdStatus( aCommand, aStatus );
 
-    DEBUG1( "CWlanBgScan::IsAwsPresent() - returning %i", ret );
+    NextState( CWlanBgScanStates::EBgScanEventAwsCmdComplete );
     
-    return ret;
     }
+
+// ---------------------------------------------------------------------------
+// CWlanBgScan::AwsCommand
+// --------------------------------------------------------------------------
+//
+void CWlanBgScan::AwsCommand( MWlanBgScanAwsComms::TAwsMessage& aCommand )
+    {
+    DEBUG( "CWlanBgScan::AwsCommand() - calling SendOrQueueAwsCommand()" );
+    iAwsComms->SendOrQueueAwsCommand( aCommand );
+    
+    }
+

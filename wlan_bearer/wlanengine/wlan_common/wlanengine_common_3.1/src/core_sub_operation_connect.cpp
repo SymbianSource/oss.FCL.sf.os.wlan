@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 29 %
+*/
 
 #include "core_sub_operation_connect.h"
 #include "core_operation_update_tx_rate_policies.h"
@@ -45,7 +48,8 @@ core_sub_operation_connect_c::core_sub_operation_connect_c(
     core_type_list_c<core_frame_dot11_ie_c>& assoc_ie_list,
     core_frame_assoc_resp_c** assoc_resp,
     bool_t is_pairwise_key_invalidated,
-    bool_t is_group_key_invalidated ) :
+    bool_t is_group_key_invalidated,
+    const core_cipher_key_s* pairwise_key ) :
     core_operation_base_c( core_operation_unspecified, request_id, server, drivers, adaptation,
         core_base_flag_drivers_needed ),
     is_connected_m( is_connected ),
@@ -60,7 +64,8 @@ core_sub_operation_connect_c::core_sub_operation_connect_c(
     assoc_ie_data_m( NULL ),
     assoc_resp_m( assoc_resp ),
     is_pairwise_key_invalidated_m( is_pairwise_key_invalidated ),
-    is_group_key_invalidated_m( is_group_key_invalidated )
+    is_group_key_invalidated_m( is_group_key_invalidated ),
+    pairwise_key_m( pairwise_key )
     {
     DEBUG( "core_sub_operation_connect_c::core_sub_operation_connect_c()" );
     }
@@ -75,6 +80,7 @@ core_sub_operation_connect_c::~core_sub_operation_connect_c()
     server_m->unregister_frame_handler( this );
     delete[] assoc_ie_data_m;   
     assoc_resp_m = NULL;
+    pairwise_key_m = NULL;
     }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +248,8 @@ core_error_e core_sub_operation_connect_c::next_state()
                 ap_data_m.frame()->payload_data(),
                 is_pairwise_key_invalidated_m,
                 is_group_key_invalidated_m,
-                ap_data_m.is_radio_measurement_supported() );
+                ap_data_m.is_radio_measurement_supported(),
+                pairwise_key_m );
 
             break;    
             }

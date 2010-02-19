@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 20 %
+* %version: 21 %
 */
 
 #ifndef WLANMGMTIMPL_H
@@ -452,6 +452,14 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
          */
         void ProtectedSetupComplete(
             TInt aStatus );
+
+        /**
+         * Start aggressive background scanning.
+         * @param aInterval Scan interval for aggressive mode (in seconds).
+         *                  Valid range: 1-120 seconds.
+         */
+        virtual TInt StartAggressiveBgScan(
+            TUint aInterval );
 
 	protected: // Methods
 

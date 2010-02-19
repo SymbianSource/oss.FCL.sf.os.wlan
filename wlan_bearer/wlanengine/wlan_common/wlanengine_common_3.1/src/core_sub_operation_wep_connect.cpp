@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 6 %
+*/
 
 #include "core_sub_operation_wep_connect.h"
 #include "core_sub_operation_connect.h"
@@ -101,7 +104,8 @@ core_error_e core_sub_operation_wep_connect_c::next_state()
                 assoc_ie_list_m,
                 assoc_resp_m,
                 true_t,    // ignored, pairwise key not used
-                false_t );
+                false_t,
+                NULL );
 
             return run_sub_operation( operation, core_state_connect );
             }

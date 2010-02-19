@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 15 %
+* %version: 16 %
 */
 
 // -----------------------------------------------------------------------------
@@ -34,6 +34,7 @@ inline WlanConnectContext::WlanConnectContext() :
     iPairwiseCipher( EWlanCipherSuiteNone ),
     iRadioMeasurement( EFalse ),
     iOperationMode( WHA::EBSS ),
+    iRoamingPairwiseKey( NULL ),
     iGroupKeyType( WHA::EKeyNone ), 
     iPairWiseKeyType( WHA::EKeyNone ),
     iNwsaMinBasicRate( 0 ), 
@@ -114,4 +115,5 @@ WlanConnectContext::~WlanConnectContext()
     {
     iScanResponseFrameBody = NULL;
     iIeData = NULL;
+    iRoamingPairwiseKey = NULL;
     }

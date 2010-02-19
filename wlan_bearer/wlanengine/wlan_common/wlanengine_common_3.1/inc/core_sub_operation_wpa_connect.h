@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 28 %
+*/
 
 #ifndef CORE_SUB_OPERATION_WPA_CONNECT_H
 #define CORE_SUB_OPERATION_WPA_CONNECT_H
@@ -268,6 +271,11 @@ private: // data
      * Whether the connection attempt uses a proactive key caching.
      */
     bool_t is_key_caching_used_m;
+
+    /**
+     * Pairwise key to set before association. CIPHER_KEY_NOT_DEFINED if none.
+     */
+    core_cipher_key_s pairwise_key_m;
 
     };
 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 29 %
 */
 
 #include "config.h"
@@ -25,6 +25,7 @@
 #include "UmacWsaWriteMib.h"
 #include "UmacWsaJoin.h"
 #include "umacconfiguretxqueueparams.h"
+#include "UmacWsaAddKey.h"
 #include "wha_mibDefaultvalues.h"
 
 #ifndef NDEBUG
@@ -45,6 +46,7 @@ const TUint8 WlanDot11Synchronize::iStateName
         {"EISSUEJOIN"}, 
         {"ESETHTBLOCKACKCONF"},
         {"ERESETHTBLOCKACKCONF"},
+        {"ESETPAIRWISEKEY"},
         {"ECONTINUEDOT11TRAVERSE"}
     };
 
@@ -157,6 +159,9 @@ void WlanDot11Synchronize::Fsm(
         case ETXCOMPLETE:
             OnTxCompleteEvent( aCtxImpl );
             break;
+        case EABORT:
+            OnAbortEvent( aCtxImpl );
+            break;
         default:
             OsTracePrint( 
                 KErrorLevel, 
@@ -252,6 +257,9 @@ void WlanDot11Synchronize::OnStateEntryEvent(
         case ERESETHTBLOCKACKCONF:
             ResetHtBlockAckConfiguration( aCtxImpl );            
             break;
+        case ESETPAIRWISEKEY:
+            SetPtk( aCtxImpl );
+            break;
         case ECONTINUEDOT11TRAVERSE:
             ContinueDot11StateTraversal( aCtxImpl );
             break;
@@ -341,14 +349,29 @@ void WlanDot11Synchronize::OnTxCompleteEvent(
                     }
                 else
                     {
-                    ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );                    
+                    if ( aCtxImpl.RoamingPairwiseKey() )
+                        {
+                        ChangeInternalState( aCtxImpl, ESETPAIRWISEKEY );
+                        }
+                    else
+                        {
+                        ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );
+                        }
                     }
                 }
             break;
         case ESETHTBLOCKACKCONF:
-            ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );
-            break;
         case ERESETHTBLOCKACKCONF:
+            if ( aCtxImpl.RoamingPairwiseKey() )
+                {
+                ChangeInternalState( aCtxImpl, ESETPAIRWISEKEY );
+                }
+            else
+                {
+                ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );
+                }
+            break;
+        case ESETPAIRWISEKEY:
             ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );            
             break;
         default:
@@ -782,6 +805,149 @@ void WlanDot11Synchronize::SetHtBlockAckConfiguration(
 
     // as the parameters have been supplied we can now deallocate
     os_free( mib );
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+void WlanDot11Synchronize::SetPtk( WlanContextImpl& aCtxImpl )
+    {
+    TBool ret( EFalse );
+
+    const TWlanCipherSuite pairwiseCipher( aCtxImpl.PairwiseCipher());
+
+    if ( pairwiseCipher == EWlanCipherSuiteCcmp )
+        {
+        ret = SetCcmpPtk( aCtxImpl );
+        }
+    else if ( pairwiseCipher == EWlanCipherSuiteTkip )
+        {
+        ret = SetTkipPtk( aCtxImpl );
+        }
+    else if ( pairwiseCipher == EWlanCipherSuiteWep )
+        {
+        ret = SetWepKey( aCtxImpl );
+        }
+    else
+        {
+        OsTracePrint( KErrorLevel, (TUint8*)
+            ("UMAC: unsupported cipher: %d"), pairwiseCipher );
+        OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        }
+
+    if ( !ret )
+        {
+        // Alloc failue. Send abort event to fsm. It takes care of the rest
+        Fsm( aCtxImpl, EABORT );
+        }
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TBool WlanDot11Synchronize::SetCcmpPtk( WlanContextImpl& aCtxImpl )
+    {
+    OsTracePrint( KUmacDetails, (TUint8*)
+        ("UMAC: WlanDot11Synchronize::SetCcmpPtk"));
+
+    TBool ret( EFalse );
+
+    const TPairwiseKeyData& keyData( *(aCtxImpl.RoamingPairwiseKey()) );
+    WlanWsaAddKey& wsa_cmd( aCtxImpl.WsaAddKey() );
+    WHA::SAesPairwiseKey* key( CreateAesPtkCtx( 
+            aCtxImpl, 
+            wsa_cmd,
+            keyData.data, 
+            aCtxImpl.GetBssId() ) 
+            );
+
+    if ( key )
+        {
+        ret = ETrue;
+        // change global state: entry procedure triggers action
+        ChangeState( aCtxImpl, 
+            *this,  // prev state
+            wsa_cmd // next state
+            );
+        
+        os_free( key ); // release the memory
+        }
+
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TBool WlanDot11Synchronize::SetTkipPtk( WlanContextImpl& aCtxImpl )
+    {
+    OsTracePrint( KUmacDetails, (TUint8*)
+        ("UMAC: WlanDot11Synchronize::SetTkipPtk"));
+
+    TBool ret( EFalse );
+
+    const TPairwiseKeyData& keyData( *(aCtxImpl.RoamingPairwiseKey()) );
+    WlanWsaAddKey& wsa_cmd( aCtxImpl.WsaAddKey() );    
+    WHA::STkipPairwiseKey* key( CreateTkipPtkCtx( 
+            aCtxImpl, 
+            wsa_cmd,
+            keyData.data, 
+            static_cast<T802Dot11WepKeyId>(keyData.keyIndex),
+            aCtxImpl.GetBssId() ) 
+            );
+
+    if ( key )
+        {
+        ret = ETrue;
+        // change global state: entry procedure triggers action
+        ChangeState( aCtxImpl, 
+            *this,  // prev state
+            wsa_cmd // next state
+            );   
+
+        os_free( key ); // release the memory
+        }
+
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+
+TBool WlanDot11Synchronize::SetWepKey( WlanContextImpl& aCtxImpl )
+    {
+    OsTracePrint( KUmacDetails, (TUint8*)
+        ("UMAC: WlanDot11Synchronize::SetWepPairwiseKey"));
+
+    TBool ret( EFalse );
+
+    const TPairwiseKeyData& keyData( *(aCtxImpl.RoamingPairwiseKey()) );
+    WlanWsaAddKey& wha_cmd( aCtxImpl.WsaAddKey() );    
+    WHA::SWepPairwiseKey* key( CreateUnicastWepKeyCtx( 
+            aCtxImpl, 
+            wha_cmd,
+            aCtxImpl.GetBssId(),
+            keyData.length,
+            keyData.data ) );
+
+    if ( key )
+        {
+        ret = ETrue;
+        // change global state: entry procedure triggers action
+        ChangeState( aCtxImpl, 
+            *this,  // prev state
+            wha_cmd // next state
+            );
+
+        os_free( key ); // release the memory
+        }
+
+    return ret;
     }
 
 // -----------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 93.1.1 %
+* %version: 95 %
 */
 
 #ifndef CORE_TYPES_H
@@ -560,13 +560,6 @@ typedef enum _core_notification_e
      * for further information on this indication. 
      */
     core_notification_rcpi_roam_attempt_completed,
-    /**
-     * Indicates that the Broken Power Save test has failed.
-     * 
-     * If the Broken Power Save test fails, the engine will not allow the any power
-     * save functionality to be used with this BSSID, decreasing battery life.
-     */
-    core_notification_broken_power_save_test_failed,
     /**
      * Indicates the traffic mode of an access class has changed.
      *

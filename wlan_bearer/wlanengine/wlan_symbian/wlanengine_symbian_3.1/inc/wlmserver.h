@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 50 %
+* %version: 52 %
 */
 
 #ifndef WLMSERVER_H
@@ -39,7 +39,6 @@
 #include "wlaneapolinterface.h"
 #include "wlaneapolclient.h"
 #include "wlangenericplugin.h"
-#include "wlancbwaiter.h"
 
 class CWlmDriverIf;
 class CWlanSsidListDb;
@@ -178,15 +177,6 @@ NONSHARABLE_CLASS( CWlmServer ) :
             TBool aAvailability,
             TBool aNewNetworksDetected = EFalse,
             TBool aOldNetworksLost = EFalse );
-        
-        /**
-        * Callback function to receive notification about closed
-        * Broken Power Save Note dialog.
-        * @param aThisPtr Pointer to the server instance.
-        * @return error code
-        */
-        static TInt HandleBrokenPowerSaveNoteClosed(
-            TAny *aThisPtr );
         
         /**
          * Notify changed PSM server mode
@@ -1342,26 +1332,6 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * Storage for SSID lists.
          */
         CWlanSsidListDb* iSsidListDb;
-        
-        /**
-         * Whether to show Broken Power Save Note.
-         */
-        TBool iShowBrokenPowerSaveNote;
-        
-        /**
-         * Active object handling the Broken Power Save Notifier.
-         */
-        CWlanCbWaiter* iBrokenPowerSaveNotifierWaiter;
-        
-        /**
-         * Notifier for displaying Broken Power Save Note dialog.
-         */
-        RNotifier iBrokenPowerSaveNotifier;
-
-        /**
-         * Reply from Broken Power Save Notifier.
-         */
-        TPckgBuf<TBool> iBrokenPowerSaveNotifierReply;
         
         /**
          * Background scan provider.

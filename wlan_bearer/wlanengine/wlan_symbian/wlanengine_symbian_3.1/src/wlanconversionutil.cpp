@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 83 %
+* %version: 84 %
 */
 
 #include <in_sock.h>
@@ -284,8 +284,6 @@ TWlmNotify TWlanConversionUtil::ConvertNotificationType(
             return EWlmNotifyRcpiRoamAttemptStarted;
         case core_notification_rcpi_roam_attempt_completed:
             return EWlmNotifyRcpiRoamAttemptCompleted;
-        case core_notification_broken_power_save_test_failed:
-            return EWlmNotifyBrokenPowerSaveTestFailed;
         case core_notification_ac_traffic_mode_changed:
             return EWlmNotifyAcTrafficModeChanged;
         case core_notification_ac_traffic_status_changed:

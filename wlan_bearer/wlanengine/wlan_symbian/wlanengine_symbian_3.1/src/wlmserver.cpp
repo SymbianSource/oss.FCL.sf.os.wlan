@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 97 %
+* %version: 99 %
 */
 
 #include <e32def.h>
@@ -147,8 +147,6 @@ CWlmServer::CWlmServer() :
     iPowerSaveMode( EWlanPowerSaveAutomatic ),
     iPowerSaveEnabled( EFalse ),
     iSsidListDb( NULL ),
-    iShowBrokenPowerSaveNote( ETrue ),
-    iBrokenPowerSaveNotifierWaiter( NULL ),
     iBgScanProvider( NULL ),
     iTimerServices( NULL ),
     iAggressiveScanningAfterLinkLoss( EFalse )
@@ -234,10 +232,6 @@ void CWlmServer::ConstructL()
     // Create SSID list storage.
     iSsidListDb = CWlanSsidListDb::NewL();
     
-    // Initialise Broken Power Save Note handling
-    TCallBack cb( HandleBrokenPowerSaveNoteClosed, this );
-    iBrokenPowerSaveNotifierWaiter = CWlanCbWaiter::NewL( cb );
-    
     iTimerServices = CWlanTimerServices::NewL();
     
     iBgScanProvider = CWlanBgScan::NewL( static_cast<MWlanScanResultProvider&>( *this ), *iTimerServices );
@@ -295,9 +289,6 @@ CWlmServer::~CWlmServer()
     delete iCoreAsynchCb;
     delete iScanSchedulingTimer;
     delete iSsidListDb;
-    delete iBrokenPowerSaveNotifierWaiter;
-    iBrokenPowerSaveNotifier.Close();
-
     if ( iEapolClient )
         {
         delete iEapolClient;
@@ -1265,25 +1256,6 @@ void CWlmServer::GetAvailableIaps(
         return;
         }
 
-    /**
-     * If maxDelay is not infinite, background scanning isn't enabled
-     * and there are no WLAN IAPs defined, scanning isn't needed at all.
-     */
-    if ( maxDelayPckg() != KWlmInfiniteScanDelay &&
-         !iBgScanProvider->IsBgScanEnabled() &&
-         !iapList.Count() )
-        {
-        DEBUG( "CWlmServer::GetAvailableIaps() - no WLAN IAPs defined, skipping scanning" );
-
-        TWlmAvailableIaps tmp = { 0 };
-        TPckg<TWlmAvailableIaps> outPckg( tmp );
-        aMessage.Write( 0, outPckg );
-        aMessage.Complete( KErrNone );
-        iapList.Close();
-
-        return;
-        }
-
     // Create list for WLAN IAP data
     core_type_list_c<core_iap_data_s>* iapDataList = new core_type_list_c<core_iap_data_s>;
     if( iapDataList == NULL )
@@ -1544,10 +1516,6 @@ TInt CWlmServer::UpdateWlanSettings()
 
         return TWlanConversionUtil::ConvertErrorCode( ret );
         }
-    
-    // Store show broken power save note value
-    iShowBrokenPowerSaveNote = settings.showBrokenPowerSaveNote;
-    
     DEBUG( "CWlmServer::UpdateWlanSettings() - returning" );
 
     return KErrNone;
@@ -1833,13 +1801,6 @@ void CWlmServer::notify(
                     // if background scan is on, this call will cause a background scan
 					// when the background scan is completed, the icon is updated
                     iBgScanProvider->NotConnected();
-                    
-                    if ( iBrokenPowerSaveNotifierWaiter->IsActive() )
-                        {
-                        // cancelling the notifier will cause the iBrokenPowerSaveNotifierWaiter
-                        // to be cancelled as well
-                        iBrokenPowerSaveNotifier.CancelNotifier( KUidWlanPowerSaveTestNote );
-                        }
                     break;
                 case EWlanStateInfrastructure:
                     DEBUG( "CWlmServer::notify() - STATE: EWlanStateInfrastructure" );
@@ -1902,90 +1863,9 @@ void CWlmServer::notify(
         case EWlmNotifyAcTrafficStatusChanged:
             DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyAcTrafficStatusChanged<ind>" );
             break;
-        case EWlmNotifyBrokenPowerSaveTestFailed:
-            DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyBrokenPowerSaveTestFailed<ind>" );
-            
-            DEBUG1( "CWlmServer::notify() - iShowBrokenPowerSaveNote: %d",
-                    static_cast<TInt>( iShowBrokenPowerSaveNote ) );
-            
-            if ( iShowBrokenPowerSaveNote )
-                {
-                if ( !iBrokenPowerSaveNotifierWaiter->IsActive() )
-                    {
-                    TInt err = iBrokenPowerSaveNotifier.Connect();
-                    DEBUG1( "CWlmServer::notify() - iNotifier.Connect() returned %d", err );
-                    if ( err == KErrNone )
-                        {
-                        iBrokenPowerSaveNotifier.StartNotifierAndGetResponse( iBrokenPowerSaveNotifierWaiter->RequestStatus(),
-                                        KUidWlanPowerSaveTestNote, KNullDesC8(), iBrokenPowerSaveNotifierReply );
-
-                        iBrokenPowerSaveNotifierWaiter->IssueRequest();
-                        }
-                    }
-#ifdef _DEBUG
-                else
-                    {
-                    DEBUG( "CWlmServer::notify() - Notifier already active on the screen" );
-                    }
-#endif
-                }
-            break;    
         default:
             break;
         }
-    }
-
-// ---------------------------------------------------------
-// CWlmServer::BrokenPowerSaveNoteClosed
-// ---------------------------------------------------------
-//
-TInt CWlmServer::HandleBrokenPowerSaveNoteClosed(
-    TAny *aThisPtr )
-    {
-    DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed()" );
-    
-    CWlmServer* self = static_cast<CWlmServer*>( aThisPtr );
-
-    ASSERT( self );
-    ASSERT( self->iBrokenPowerSaveNotifierWaiter );
-
-    // close the notifier
-    self->iBrokenPowerSaveNotifier.Close();
-    
-    // check the request's completion status
-    TInt err = self->iBrokenPowerSaveNotifierWaiter->RequestStatus().Int();
-    switch ( err )
-        {
-        case KErrNotFound:
-            {
-            DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - Notifier not found, returning" );
-            return err;   
-            }
-        case KErrCancel:
-            {
-            DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - Notifier cancelled, returning" );
-            return err;        
-            }
-        default:
-            {
-            // flow through            
-            }
-        }
-    
-    self->iShowBrokenPowerSaveNote = self->iBrokenPowerSaveNotifierReply() ? EFalse : ETrue;
-
-    // re-use err variable
-    TRAP( err, self->StoreWlanCenRepKeyValueL( KWlanShowBrokenPowerSaveNote, self->iShowBrokenPowerSaveNote ) );
-    if ( err != KErrNone )
-        {
-        DEBUG1( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - failed to update CenRep, error code %d", err );
-        return err;
-        }
-    
-    DEBUG1( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - iShowBrokenPowerSaveNote value (%d) stored to CenRep",
-            static_cast<TInt>( self->iShowBrokenPowerSaveNote ) );
-        
-    return err;
     }
 
 // ---------------------------------------------------------
@@ -3625,12 +3505,11 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         return KErrNone;        
         }
     
-    // If roaming is ongoing, scanning is not started for GetAvailableIaps. 
+    // If the command is GetAvailableIaps
     if ( self->iRequestMap[index].iRequestId >= KWlanExtCmdBase && 
-         self->iRequestMap[index].iFunction == EGetAvailableIaps && 
-         self->IsRoaming() )
+         self->iRequestMap[index].iFunction == EGetAvailableIaps )
         {
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps, roam in progress, returning empty iap list" );
+        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps requested" );
 
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
         core_type_list_c<u32_t>* iapIdList =  reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
@@ -3638,36 +3517,42 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         core_type_list_c<core_ssid_entry_s>* iapSsidList =  reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
         TTime* scanTime =  reinterpret_cast<TTime*>( self->iRequestMap[index].iTime );        
         
-        // Only the triggering request is completed and then scan scheduling timer is set again 
-        if( self->IsSessionActive( self->iRequestMap[index] ) )
+        // If the device is roaming OR there are not WLAN IAPs defined in the device
+        // --> return empty list
+        if( self->IsRoaming() || iapDataList->count() == 0 )
             {
-            TWlmAvailableIaps tmp = { 0 };
-            TPckg<TWlmAvailableIaps> outPckg( tmp );
-            self->iRequestMap[index].iMessage.Write( 0, outPckg );
-            self->iRequestMap[index].iMessage.Complete( KErrNone );
-            }
+            DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - Device is roaming or no IAPs defined, returning empty list" );
+            // Only the triggering request is completed and then scan scheduling timer is set again 
+            if( self->IsSessionActive( self->iRequestMap[index] ) )
+                {
+                TWlmAvailableIaps tmp = { 0 };
+                TPckg<TWlmAvailableIaps> outPckg( tmp );
+                self->iRequestMap[index].iMessage.Write( 0, outPckg );
+                self->iRequestMap[index].iMessage.Complete( KErrNone );
+                }
 
-        delete iapDataList;
-        iapDataList = NULL;
-        delete iapIdList;
-        iapIdList = NULL;
-        delete scanList;
-        scanList = NULL;
-        delete iapSsidList;
-        iapSsidList = NULL;
-        delete scanTime;
-        scanTime = NULL;
+            delete iapDataList;
+            iapDataList = NULL;
+            delete iapIdList;
+            iapIdList = NULL;
+            delete scanList;
+            scanList = NULL;
+            delete iapSsidList;
+            iapSsidList = NULL;
+            delete scanTime;
+            scanTime = NULL;
         
-        self->iRequestMap.Remove( index );
+            self->iRequestMap.Remove( index );
 
-        if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
-            {
-            TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
-            self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
-            }
+            if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
+                {
+                TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
+                self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
+                }
         
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - message completed with empty iap list" );
-        return KErrNone;        
+            DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - message completed with empty iap list" );
+            return KErrNone;        
+            }
         }
 
     // If triggering request is background scan and WLAN connection exist, background scan is skipped

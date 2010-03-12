@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 41 %
+* %version: 42 %
 */
 
 #ifndef WLMCLIENTSERVER_H
@@ -243,9 +243,8 @@ enum TWlmNotify
     EWlmNotifyAccessPointInfoChanged        = 0x0400,
     EWlmNotifyRcpiRoamAttemptStarted        = 0x0800,
     EWlmNotifyRcpiRoamAttemptCompleted      = 0x1000,
-    EWlmNotifyBrokenPowerSaveTestFailed     = 0x2000,
-    EWlmNotifyAcTrafficModeChanged          = 0x4000,
-    EWlmNotifyAcTrafficStatusChanged        = 0x8000
+    EWlmNotifyAcTrafficModeChanged          = 0x2000,
+    EWlmNotifyAcTrafficStatusChanged        = 0x4000
     };
 
 /**

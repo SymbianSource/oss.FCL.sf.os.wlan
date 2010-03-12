@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 2 %
+* %version: 3 %
 */
 
 #include <e32base.h>
@@ -25,7 +25,6 @@
 #include "wlanscanproviderinterface.h"
 #include "awsinterface.h"
 #include "awsenginebase.h"
-#include "wlancbwaiter.h"
 #include "wlanbgscanawscommsinterface.h"
 #include "wlanbgscan.h"
 #include "wlanbgscanstates.h"

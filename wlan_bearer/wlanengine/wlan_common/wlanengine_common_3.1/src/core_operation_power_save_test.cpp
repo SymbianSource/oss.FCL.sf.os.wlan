@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -235,13 +235,7 @@ core_error_e core_operation_power_save_test_c::next_state()
                 server_m->get_connection_data()->add_ap_power_save_test_verdict(
                     bssid,
                     false_t );                
-                /**
-                 * Notify adaptation about the failed test.
-                 */
-                adaptation_m->notify(
-                    core_notification_broken_power_save_test_failed,
-                    0,
-                    NULL );
+
                 }
             else if( return_status_m == core_error_timeout )
                 {

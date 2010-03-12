@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 9 %
+* %version: 10 %
 */
 
 TARGETTYPE      dll
@@ -133,7 +133,6 @@ SOURCE          wlanmgmtcommandhandler.cpp
 SOURCE          wlannotificationhandler.cpp
 SOURCE          wlanmgmtframehandler.cpp
 SOURCE          wlanscanresultcache.cpp
-SOURCE          wlancbwaiter.cpp
 SOURCE          wlanconversionutil.cpp
 SOURCE          wlmtools.cpp
 SOURCE          wlangenericplugin.cpp

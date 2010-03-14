@@ -46,4 +46,4 @@ EXPORTS
 	?Connect@RWLMServer@@QAEHXZ @ 45 NONAME ; int RWLMServer::Connect(void)
 	?SetPowerSaveMode@RWLMServer@@QAEHW4TWlanPowerSaveMode@@@Z @ 46 NONAME ; int RWLMServer::SetPowerSaveMode(enum TWlanPowerSaveMode)
 	?GetPowerSaveSettings@RWLMServer@@QAEHAAUTWlanPowerSaveSettings@@@Z @ 47 NONAME ; int RWLMServer::GetPowerSaveSettings(struct TWlanPowerSaveSettings &)
-
+	?StartAggressiveBgScan@RWLMServer@@QAEHI@Z @ 48 NONAME ; int RWLMServer::StartAggressiveBgScan(unsigned int)

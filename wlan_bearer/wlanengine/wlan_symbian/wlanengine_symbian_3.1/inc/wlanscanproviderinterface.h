@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,12 +16,14 @@
 */
 
 /*
-* %version: 4 %
+* %version: 6 %
 */
 
 
 #ifndef WLANSCANPROVIDERINTERFACE_H
 #define WLANSCANPROVIDERINTERFACE_H
+
+#include <e32def.h>
 
 /**
  * @brief Interface definition for WLAN Scan Result Provider API.
@@ -52,6 +54,13 @@ public:
      */        
     virtual void CancelScan() = 0;
 
+    /**
+     * Publish WLAN background scan interval via P&S.
+     *
+     * @since S60 v5.2
+     * @param aInterval Background scan interval in seconds.
+     */
+    virtual void PublishBgScanInterval( TUint32& aInterval ) = 0;
     };
 
 
@@ -111,7 +120,7 @@ public:
     virtual void ScanComplete() = 0;
         
     /**
-     * Issued when WLAN is disconnected.
+     * Called to indicate that WLAN is no longer connected.
      *
      * @since S60 v5.2
      */
@@ -135,6 +144,16 @@ public:
      */
     virtual void NotifyChangedSettings( TWlanBgScanSettings& aSettings ) = 0;
 
+    /**
+     * Start aggressive background scanning.
+     *
+     * @since S60 v5.2
+     * @param aInterval interval for aggressive scan, in seconds
+     * @param aTimeout how long aggressive scanning is carried out
+     */
+    virtual void StartAggressiveBgScan(
+        TUint32& aInterval,
+        TUint32& aTimeout ) = 0;
     };
 
 

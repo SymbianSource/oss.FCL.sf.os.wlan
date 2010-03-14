@@ -16,13 +16,14 @@
 */
 
 /*
-* %version: 11 %
+* %version: 12 %
 */
 
 #include <in_sock.h> // Header is retained, but in_sock.h is modified for ipv6
 #include <in6_if.h>
 #include <in_pkt.h>
 #include <comms-infras/connectionsettings.h>
+#include <nifmbuf.h>
 #include "CLanIp6Bearer.h"
 #include "WlanProto.h"
 #include <comms-infras/es_protbinder.h>

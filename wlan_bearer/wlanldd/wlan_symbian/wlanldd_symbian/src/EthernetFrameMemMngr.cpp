@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 23 %
+* %version: 24 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -168,20 +168,11 @@ TInt DEthernetFrameMemMngr::OnInitialiseMemory(
 //
 DEthernetFrameMemMngr::~DEthernetFrameMemMngr()
     {
-    OnReleaseMemory();
+    MarkMemFree();
     
     iFrameXferBlock = NULL;
     iTxDataBuffer = NULL;
     iRxDataChunk = NULL;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void DEthernetFrameMemMngr::OnReleaseMemory()
-    {
-    MarkMemFree();      // mark as free
     }
 
 // ---------------------------------------------------------------------------
@@ -420,11 +411,18 @@ TBool DEthernetFrameMemMngr::AddTxFrame(
     TDataBuffer*& aPacketInKernSpace,
     TBool aUserDataTxEnabled )
     {
-    return (static_cast<RFrameXferBlockProtocolStack*>(
-        iFrameXferBlock))->AddTxFrame( 
-            aPacketInUserSpace, 
-            aPacketInKernSpace,
-            aUserDataTxEnabled );
+    if ( IsMemInUse() )
+        {
+        return (static_cast<RFrameXferBlockProtocolStack*>(
+            iFrameXferBlock))->AddTxFrame( 
+                aPacketInUserSpace, 
+                aPacketInKernSpace,
+                aUserDataTxEnabled );
+        }
+    else
+        {
+        return EFalse;
+        }
     }
 
 // ---------------------------------------------------------------------------
@@ -435,13 +433,15 @@ TDataBuffer* DEthernetFrameMemMngr::GetTxFrame(
     const TWhaTxQueueState& aTxQueueState,
     TBool& aMore )
     {
-    if ( IsMemInUse() )
+    if ( IsMemInUse() && iFrameXferBlock )
         {
         return (static_cast<RFrameXferBlockProtocolStack*>(
             iFrameXferBlock))->GetTxFrame( aTxQueueState, aMore );
         }
     else
+        {
         return NULL;
+        }
     }
 
 // ---------------------------------------------------------------------------

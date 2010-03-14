@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2006 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 12 %
+*/
 
 #ifndef WLMPLATFORMDATA_H
 #define WLMPLATFORMDATA_H
@@ -88,6 +91,15 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
             const TUid& aCategory,
             const TUint aKey );
 
+        /**
+         * Publishes WLAN background scanning interval via P&S.
+         * @since S60 v5.2
+         * @param aInterval WLAN BG scan interval in seconds.
+         * @return Symbian error code
+         */
+        TInt PublishBgScanInterval(
+            TUint32& aInterval );
+
     private:   // Methods
 
         /**
@@ -117,6 +129,9 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
         
         /** Handle to KPropertyWlanIndicator property via P&S. */
         RProperty iPsIndicator;
+        
+        /** Handle to KPropertyWlanBgScanInterval property via P&S. */
+        RProperty iPsBgScanInterval;
 
         /** Callback for notifications. */
         MWlmSystemNotify& iCallback;

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 18 %
+*/
 
 #ifndef CORE_SUB_OPERATION_CONNECT_H
 #define CORE_SUB_OPERATION_CONNECT_H
@@ -73,7 +76,8 @@ public:
         core_type_list_c<core_frame_dot11_ie_c>& assoc_ie_list,
         core_frame_assoc_resp_c** assoc_resp,
         bool_t is_pairwise_key_invalidated,
-        bool_t is_group_key_invalidated );
+        bool_t is_group_key_invalidated,
+        const core_cipher_key_s* pairwise_key );
 
     /**
      * Destructor.
@@ -185,6 +189,11 @@ private: // data
      * Whether the group key should be invalidated.
      */
     bool_t is_group_key_invalidated_m;
+
+    /**
+     * Pairwise key to be set before association. Not owned by this pointer.
+     */
+    const core_cipher_key_s* pairwise_key_m;
 
     };
 

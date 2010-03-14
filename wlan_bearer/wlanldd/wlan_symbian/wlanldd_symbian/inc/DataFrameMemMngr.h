@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 11 %
+* %version: 12 %
 */
 
 #ifndef DATAFRAMEMMNGR_H
@@ -145,8 +145,10 @@ private:
     /**
     * From DEthernetFrameMemMngr
     * Memory finalization method.
+    * 
+    * @param aThread The user mode client thread
     */
-    virtual void OnReleaseMemory();
+    virtual void OnReleaseMemory( DThread& aThread );
     
     // Prohibit copy constructor.
     DataFrameMemMngr( const DataFrameMemMngr& );

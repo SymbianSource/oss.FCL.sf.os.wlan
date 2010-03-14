@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 102 %
+* %version: 103 %
 */
 
 #ifndef WLANCONTEXTIMPL_H
@@ -630,6 +630,9 @@ public:
     inline void NetworkOperationMode( 
         WHA::TOperationMode aOperationMode );
 
+    inline const TPairwiseKeyData* RoamingPairwiseKey() const;
+    inline void  RoamingPairwiseKey( const TPairwiseKeyData* aKeyData );
+    
     // setters and getters for key type
     inline void GroupKeyType( WHA::TKeyType aKeyType );
     inline WHA::TKeyType GroupKeyType() const;

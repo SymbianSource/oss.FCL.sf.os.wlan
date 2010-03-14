@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 // INCLUDE FILES
@@ -158,8 +158,9 @@ void CWlanSystemTimeHandler::RunL()
              * Inform client that system time has now been changed. 
              */
             iClient.OnSystemTimeChange();
+            // falls through on purpose
             }
-        case KErrNone: // flow through from KErrAbort on purpose
+        case KErrNone:
             {
             Cancel();
 

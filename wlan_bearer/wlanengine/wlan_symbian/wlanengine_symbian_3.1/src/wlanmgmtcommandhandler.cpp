@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 37 %
+* %version: 38 %
 */
 
 // INCLUDES
@@ -997,12 +997,15 @@ void CWlanMgmtCommandHandler::Connect(
     const TUint8* aScanFrame,
     TBool aIsPairwiseKeyInvalidated,
     TBool aIsGroupKeyInvalidated,
-    TBool aIsRadioMeasurementSupported )
+    TBool aIsRadioMeasurementSupported,
+    const TPairwiseKeyData& aPairwiseKey )
     {
     DEBUG( "CWlanMgmtCommandHandler::Connect()" );
     
     DEBUG1( "CWlanMgmtCommandHandler::Connect() - aPairwiseKeyType = %u",
         aPairwiseKeyType );
+    DEBUG1( "CWlanMgmtCommandHandler::Connect() - aPairwiseKey.length = %u",
+        aPairwiseKey.length );
 
     TConnectMsg msg;
     msg.hdr.oid_id = E802_11_CONNECT;
@@ -1019,7 +1022,7 @@ void CWlanMgmtCommandHandler::Connect(
     msg.invalidatePairwiseKey = aIsPairwiseKeyInvalidated;
     msg.invalidateGroupKey = aIsGroupKeyInvalidated;
     msg.radioMeasurement = aIsRadioMeasurementSupported;
-
+    msg.pairwiseKey = aPairwiseKey;
     TPckg<TConnectMsg> buf( msg );
 
     TInt err = iChannel.ManagementCommand( buf, NULL, &iStatus );

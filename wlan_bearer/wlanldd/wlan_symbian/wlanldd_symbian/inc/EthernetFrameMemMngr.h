@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17 %
+* %version: 18 %
 */
 
 #ifndef DETHERNETFRAMEMEMMNGR_H
@@ -85,8 +85,9 @@ public:
     * Deallocates the shared memory chunk, if relevant
     *
     * @since S60 3.1
+    * @param aThread The user mode client thread
     */
-    virtual void OnReleaseMemory();
+    virtual void OnReleaseMemory( DThread& aThread ) = 0;
 
     /**
     * Gets a memory block that can be used for tx frame write
@@ -281,6 +282,7 @@ protected:
         iRxBufAlignmentPadding( 0 ),
         iVendorTxHdrLen( 0 ),
         iVendorTxTrailerLen( 0 ),
+        iClientChunkHandle( -1 ),
         iInUse( EFalse )
         {};
 
@@ -445,6 +447,9 @@ protected:  // Data
     * requires to exist in a Tx buffer after the 802.11 MPDU to be sent
     */
     TUint iVendorTxTrailerLen;
+    
+    /** user mode client's handle to the shared memory chunk */
+    TInt iClientChunkHandle;
     
 private:    // Data
     

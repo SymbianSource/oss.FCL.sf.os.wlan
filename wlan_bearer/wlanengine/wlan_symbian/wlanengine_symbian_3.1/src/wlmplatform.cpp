@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2006 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -13,6 +13,10 @@
 *
 * Description:  Offers API to platform for the rest of the engine
 *
+*/
+
+/*
+* %version: 12 %
 */
 
 
@@ -181,6 +185,15 @@ EXPORT_C void CWlmPlatform::InitializeSystemTimeHandler()
     
     iSystemTimeHandler->StartTimer();
     iPeriodicCacheClearingHandler->StartTimer();
+    }
+
+// ---------------------------------------------------------
+// CWlmPlatform::PublishBgScanInterval
+// ---------------------------------------------------------
+//
+EXPORT_C void CWlmPlatform::PublishBgScanInterval( TUint32& aInterval )
+    {
+    iPlatformData->PublishBgScanInterval( aInterval );
     }
 
 // ---------------------------------------------------------

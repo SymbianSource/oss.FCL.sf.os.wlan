@@ -46,4 +46,5 @@ EXPORTS
 	_ZN10RWLMServer7ConnectEv @ 45 NONAME
 	_ZN10RWLMServer7ReleaseEv @ 46 NONAME
 	_ZN10RWLMServer8GetBSSIDER11TMacAddress @ 47 NONAME
+	_ZN10RWLMServer21StartAggressiveBgScanEj @ 48 NONAME
 

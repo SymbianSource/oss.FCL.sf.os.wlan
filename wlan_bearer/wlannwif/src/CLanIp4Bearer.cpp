@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #include <in_sock.h> // Header is retained, but in_sock.h is modified for ipv6
@@ -24,6 +24,7 @@
 #include <in6_if.h>
 #include <nifvar.h>
 #include <comms-infras/connectionsettings.h>
+#include <nifmbuf.h>
 #include "CLanIp4Bearer.h"
 #include "arp_hdr.h"
 #include <commdb.h>

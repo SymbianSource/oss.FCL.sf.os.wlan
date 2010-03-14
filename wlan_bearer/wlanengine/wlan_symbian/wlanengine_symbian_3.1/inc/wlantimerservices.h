@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #ifndef WLANTIMERSERVICES_H
@@ -26,20 +26,7 @@
 #include <e32std.h>
 #include <e32cmn.h>
 
-
-/**
- * Callback interface
- */
-class MWlanTimerServiceCallback
-    {
-    public:
-    
-        /**
-         * Timeout has occurred.
-         */
-        virtual void OnTimeout() = 0;
-
-    };
+#include "wlantimerserviceinterface.h"
 
 class CTimeoutRequestEntry : public CBase
     {
@@ -87,7 +74,7 @@ private:
  *
  * @since S60 v5.2
  */
-NONSHARABLE_CLASS( CWlanTimerServices ) : public CActive
+NONSHARABLE_CLASS( CWlanTimerServices ) : public CActive, public MWlanTimerServices
     {
 public: // Constructors and destructor
 

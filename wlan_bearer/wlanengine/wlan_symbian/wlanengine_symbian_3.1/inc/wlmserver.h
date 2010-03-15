@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 52 %
+* %version: 54 %
 */
 
 #ifndef WLMSERVER_H
@@ -981,27 +981,27 @@ NONSHARABLE_CLASS( CWlmServer ) :
         
         /**
          * Handles completion routines of an internal request
-         * @param aIndex index to the request that should be completed.
+         * @param aRequest request that should be completed.
          * @param aStatus status of the completed operation.
          * @param aCompletedWasTriggering value ETrue means that
          *        completed request is the same as the request which
          *        triggered the core operation 
          */
         void CompleteInternalRequest(
-            TUint32 aIndex,
+            const SRequestMapEntry& aRequest,
             core_error_e aStatus,
             TBool aCompletedWasTriggering = ETrue );
 
         /**
          * Handles completion routines of an external request
-         * @param aIndex index to the request that should be completed.
+         * @param aRequest request that should be completed.
          * @param aStatus status of the completed operation.
          * @param aTriggerRequest pointer to the request that triggered core operation
          *        value NULL means that completed request is the same as the request which triggered 
          *        the core operation 
          */
         void CompleteExternalRequest(
-            TUint32 aIndex, 
+            const SRequestMapEntry& aRequest,
             core_error_e aStatus,
             SRequestMapEntry* aTriggerRequest = NULL );
 
@@ -1293,7 +1293,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
         CWlanEapolClient* iEapolClient;
         
         /**
-         * EAPOL callback handler in core.
+         * EAPOL callback handler in core. Not owned by this pointer.
          */        
         abs_wlan_eapol_callback_c* iEapolHandler;
        

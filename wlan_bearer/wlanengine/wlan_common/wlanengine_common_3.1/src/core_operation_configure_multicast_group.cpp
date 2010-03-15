@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 7 %
+*/
 
 #include "core_operation_configure_multicast_group.h"
 #include "core_server.h"
@@ -60,11 +63,19 @@ core_error_e core_operation_configure_multicast_group_c::next_state()
         case core_state_init:
             {                        
             operation_state_m = core_state_req_configure_multicast_group;
-            
+
+            if ( !server_m->get_core_settings().is_connected() )
+                {
+                DEBUG( "core_operation_configure_multicast_group_c::next_state() - not connected, nothing to do" );
+
+                return core_error_general;
+                }
+
             drivers_m->configure_multicast_group(
                 request_id_m,
                 is_join_m,
                 multicast_addr_m );
+
             break;
             }
         case core_state_req_configure_multicast_group:

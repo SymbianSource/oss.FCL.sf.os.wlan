@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 15 %
+* %version: 16 %
 */
 
 #include <e32base.h>
@@ -80,7 +80,6 @@ CWlanBgScan::CWlanBgScan( MWlanScanResultProvider& aProvider, MWlanTimerServices
     CWlanBgScanStates( *this, aProvider, aTimerServices ),
     iProvider ( aProvider ),
     iAwsComms( NULL ),
-    iAutoPeriod( EAutoPeriodNone ),
     iAwsOk( EFalse ),
     iCurrentPsmServerMode( 0 )
     {
@@ -157,18 +156,18 @@ void CWlanBgScan::ScanComplete()
 
 // ---------------------------------------------------------------------------
 // From class MWlanBgScanProvider.
-// CWlanBgScan::NotConnected
+// CWlanBgScan::WlanStateChanged
 // ---------------------------------------------------------------------------
 //
-void CWlanBgScan::NotConnected()
+void CWlanBgScan::WlanStateChanged( const MWlanBgScanProvider::TWlanBgScanWlanState &aState )
     {
-    DEBUG1( "CWlanBgScan::NotConnected() - current interval %us", GetBgInterval() );
-        
-    if ( GetBgInterval() != KWlanBgScanIntervalNever )
-        {
-        DEBUG( "CWlanBgScan::NotConnected() - issue a new request with immediate expiry" );
-        iProvider.Scan( KWlanBgScanMaxDelayExpireImmediately );
-        }
+    DEBUG2( "CWlanBgScan::WlanStateChanged() - old state: %u, new state: %u", iWlanState, aState );
+    
+    // store state
+    iWlanState = aState;
+
+    RefreshUsedInterval();
+
     }
 
 // ---------------------------------------------------------------------------

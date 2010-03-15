@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #include <e32base.h>
@@ -66,8 +66,7 @@ CWlanBgScanAwsComms::CWlanBgScanAwsComms( CWlanBgScan& aBgScan ) :
     iAwsImplUid( 0 ),
     iCommandHandler( NULL ),
     iAwsVersion( 0 ),
-    iPendingCommand( EAwsCommandMax ),
-    iAwsOk( EFalse )
+    iPendingCommand( EAwsCommandMax )
     {
     DEBUG( "CWlanBgScanAwsComms::CWlanBgScanAwsComms()" );
     }
@@ -89,7 +88,6 @@ CWlanBgScanAwsComms::~CWlanBgScanAwsComms()
     iAwsMsgQueue.Close();
     Cancel();
     iWlanEngineThread.Close();
-    //iStartupLock.Close();
     }
 
 // ---------------------------------------------------------------------------

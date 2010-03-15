@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 9 %
+* %version: 10 %
 */
 
 #ifndef WLANBGSCAN_H
@@ -46,17 +46,7 @@ NONSHARABLE_CLASS( CWlanBgScan ) :
     {
 
 public:
-            
-    /**
-     * States for Auto period.
-     */
-    enum TWlanBgScanAutoPeriod
-        {
-        EAutoPeriodNone = 0,
-        EAutoPeriodNight,
-        EAutoPeriodDay
-        };
-    
+
     /**
      * Describes relation of time to time range.
      */
@@ -97,11 +87,13 @@ public:
         
     /**
      * From MWlanBgScanProvider.
-     * Issued when WLAN is disconnected.
+     * Called to indicate that WLAN state has changed.
      *
      * @since S60 v5.2
+     * 
+     * @param aState New WLAN state
      */
-    void NotConnected();
+    void WlanStateChanged( const MWlanBgScanProvider::TWlanBgScanWlanState &aState );
     
     /**
      * From MWlanBgScanProvider.
@@ -118,8 +110,6 @@ public:
      * Notification about changed settings.
      *
      * @since S60 v5.2
-     * 
-     * @param aSettings new settings to be taken into use
      */
     void NotifyChangedSettings( MWlanBgScanProvider::TWlanBgScanSettings& aSettings );
     
@@ -288,11 +278,6 @@ private: // data
      * Interface to AWS comms object. 
      */
     MWlanBgScanAwsComms* iAwsComms;
-    
-    /**
-     * Current Auto period. 
-     */
-    TWlanBgScanAutoPeriod iAutoPeriod;
     
     /**
      * Whether AWS is ok or not. 

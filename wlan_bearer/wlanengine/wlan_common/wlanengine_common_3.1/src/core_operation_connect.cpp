@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 40 %
+* %version: 41 %
 */
 
 #include "genscaninfo.h"
@@ -97,8 +97,17 @@ core_error_e core_operation_connect_c::next_state()
             if( ret != core_error_ok )
                 {
                 DEBUG1( "core_operation_connect_c::next_state() - unable to initialize connection data (%d)", ret );
-                
+
                 return ret;
+                }
+
+            if( !server_m->get_connection_data()->iap_data().is_valid() )
+                {
+                DEBUG( "core_operation_connect_c::next_state() - invalid connection settings" );
+
+                server_m->clear_connection_data();
+
+                return core_error_illegal_argument;
                 }
 
             if( server_m->get_connection_data()->iap_data().is_eap_used() &&
@@ -106,24 +115,18 @@ core_error_e core_operation_connect_c::next_state()
                 {
                 DEBUG( "core_operation_connect_c::next_state() - unable to instantiate EAPOL (WFA)" );
 
-                return core_error_no_memory;               
+                server_m->clear_connection_data();
+
+                return core_error_no_memory;
                 }
             else if( server_m->get_connection_data()->iap_data().is_wapi_used() &&
                      !server_m->create_eapol_instance( core_eapol_operating_mode_wapi ) )
                 {
                 DEBUG( "core_operation_connect_c::next_state() - unable to instantiate EAPOL (WAPI)" );
 
-                return core_error_no_memory;               
-                }
-            
-            if( server_m->get_connection_data()->iap_data().operating_mode() == core_operating_mode_ibss &&
-                ( server_m->get_connection_data()->iap_data().security_mode() != core_security_mode_allow_unsecure && 
-                  server_m->get_connection_data()->iap_data().security_mode() != core_security_mode_wep ) )
-                {
-                DEBUG1( "core_operation_connect_c::next_state() - ad-hoc with security mode %d not supported",
-                        server_m->get_connection_data()->iap_data().security_mode() );
+                server_m->clear_connection_data();
 
-                return core_error_not_supported;
+                return core_error_no_memory;
                 }
 
             server_m->get_core_settings().clear_connection_statistics();

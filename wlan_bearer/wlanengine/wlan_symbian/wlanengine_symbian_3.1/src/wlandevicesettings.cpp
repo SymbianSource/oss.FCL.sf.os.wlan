@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 20 %
 */
 
 // INCLUDE FILES
@@ -203,8 +203,10 @@ EXPORT_C void CWlanDeviceSettings::GetDefaultSettings(
     aSettings.bgScanPeakPeriodEnd = KWlanDefaultBgScanPeakPeriodEnd;
     aSettings.bgScanIntervalPeak = KWlanDefaultBgScanIntervalPeakPeriod;
     aSettings.bgScanIntervalOffPeak = KWlanDefaultBgScanIntervalOffPeakPeriod;
-    aSettings.automaticTrafficStreamMgmt = ETrue;   
-    aSettings.region = KWlanDefaultRegion;                
+    aSettings.automaticTrafficStreamMgmt = ETrue;
+    aSettings.minActiveBroadcastChannelTime = KWlanDefaultMinActiveBroadcastChannelTime;
+    aSettings.maxActiveBroadcastChannelTime = KWlanDefaultMaxActiveBroadcastChannelTime;
+    aSettings.region = KWlanDefaultRegion;
     aSettings.regionTimestamp = KWlanDefaultRegionTimestamp;
     }
 
@@ -786,6 +788,20 @@ TInt CWlanDeviceSettings::ReadPrivateData( SWlanDeviceSettings& aSettings )
     if( err == KErrNone ) 
         {
         aSettings.automaticTrafficStreamMgmt = static_cast<TBool>( temp );
+        }  
+
+    // Read KWlanMinActiveBroadcastChannelTime
+    err = repository->Get( KWlanMinActiveBroadcastChannelTime, temp );
+    if( err == KErrNone ) 
+        {
+        aSettings.minActiveBroadcastChannelTime = temp;
+        }  
+
+    // Read KWlanMaxActiveBroadcastChannelTime
+    err = repository->Get( KWlanMaxActiveBroadcastChannelTime, temp );
+    if( err == KErrNone ) 
+        {
+        aSettings.maxActiveBroadcastChannelTime = temp;
         }  
 
     // Read KWlanRegion
@@ -1406,6 +1422,24 @@ TInt CWlanDeviceSettings::WritePrivateData( const SWlanDeviceSettings& aSettings
         DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanAutomaticTrafficStreamMgmt );
         }
 
+    // Write KWlanMinActiveBroadcastChannelTime
+    err = repository->Set( 
+        KWlanMinActiveBroadcastChannelTime, 
+        static_cast<TInt>( aSettings.minActiveBroadcastChannelTime ) );
+    if( err ) 
+        {
+        DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanMinActiveBroadcastChannelTime );
+        }
+
+    // Write KWlanMaxActiveBroadcastChannelTime
+    err = repository->Set( 
+        KWlanMaxActiveBroadcastChannelTime, 
+        static_cast<TInt>( aSettings.maxActiveBroadcastChannelTime ) );
+    if( err ) 
+        {
+        DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanMaxActiveBroadcastChannelTime );
+        }
+
     // Write KWlanRegion
     err = repository->Set( 
     	KWlanRegion, 
@@ -1679,6 +1713,10 @@ void CWlanDeviceSettings::LogSettings( const SWlanDeviceSettings& aSettings ) co
         aSettings.bgScanIntervalOffPeak );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - automaticTrafficStreamMgmt == %u",
         static_cast<TUint32>( aSettings.automaticTrafficStreamMgmt ) );
+    DEBUG1( "CWlanDeviceSettings::LogSettings() - minActiveBroadcastChannelTime == %d",
+        aSettings.minActiveBroadcastChannelTime );
+    DEBUG1( "CWlanDeviceSettings::LogSettings() - maxActiveBroadcastChannelTime == %d",
+        aSettings.maxActiveBroadcastChannelTime );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - region == %u",
         aSettings.region );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - regionTimestamp == %d",

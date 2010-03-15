@@ -16,6 +16,9 @@
 *
 */
 
+/*
+* %version: 28 %
+*/
 
 #include "core_operation_scan.h"
 #include "core_server.h"
@@ -82,7 +85,14 @@ core_error_e core_operation_scan_c::next_state()
 
             u32_t min_ch_time( server_m->get_device_settings().active_scan_min_ch_time );
             u32_t max_ch_time( server_m->get_device_settings().active_scan_max_ch_time );
-            if ( scan_mode_m == core_scan_mode_passive )
+            if ( scan_mode_m == core_scan_mode_active &&
+                 !scan_ssid_m.length &&
+                 !server_m->get_core_settings().is_connected() )
+                {
+                min_ch_time = server_m->get_device_settings().active_broadcast_scan_min_ch_time;
+                max_ch_time = server_m->get_device_settings().active_broadcast_scan_max_ch_time;            
+                }
+            else if ( scan_mode_m == core_scan_mode_passive )
                 {
                 min_ch_time = server_m->get_device_settings().passive_scan_min_ch_time;
                 max_ch_time = server_m->get_device_settings().passive_scan_max_ch_time;

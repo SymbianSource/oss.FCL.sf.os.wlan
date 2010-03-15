@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 11 %
+*/
 
 #ifndef CORE_IAP_DATA_H
 #define CORE_IAP_DATA_H
@@ -264,7 +267,13 @@ public:
      */    
     void remove_mac_from_iap_blacklist(
         const core_mac_address_s& mac );
-    
+
+    /**
+     * Check whether the IAP data contains a valid
+     * combination of parameters. 
+     */    
+    bool_t is_valid() const;
+
 private: // data
 
     /** Adaptation side data about the WLAN connection */

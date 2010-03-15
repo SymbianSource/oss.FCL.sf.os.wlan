@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 99 %
+* %version: 102 %
 */
 
 #include <e32def.h>
@@ -478,8 +478,9 @@ void CWlmServer::Connect(
         return;
         }
 
-    DEBUG4( "CWlmServer::Connect() - SecurityMode: %u, WPAKeyLength: %u, EnableWpaPsk: %u, PresharedKeyFormat: %u",
-        iapData.SecurityMode, iapData.WPAKeyLength, iapData.EnableWpaPsk, iapData.PresharedKeyFormat );
+    DEBUG5( "CWlmServer::Connect() - SecurityMode: %u, WPAKeyLength: %u, WPAPreSharedKey: %u, EnableWpaPsk: %u, PresharedKeyFormat: %u",
+        iapData.SecurityMode, iapData.WPAKeyLength, iapData.WPAPreSharedKey.Length(),
+        iapData.EnableWpaPsk, iapData.PresharedKeyFormat );
 
     // Check whether WAPI is supported
     if( iapData.SecurityMode == Wapi &&
@@ -1127,7 +1128,7 @@ void CWlmServer::GetScanResult(
     mapEntry.iParam1 = coreSsid;
     mapEntry.iTime = scanTime;
     iRequestMap.Append( mapEntry );
-	
+
     // Scan scheduling timer needs to be set again if this request needs the results earlier or
     // if this is the only timed pending request
     if( scanTime != NULL && ( IsOnlyTimedScanRequestInRequestMap( mapEntry ) || *scanTime < iScanSchedulingTimerExpiration ) )
@@ -1798,9 +1799,10 @@ void CWlmServer::notify(
                         iAggressiveScanningAfterLinkLoss = EFalse;
                         }
                     
-                    // if background scan is on, this call will cause a background scan
-					// when the background scan is completed, the icon is updated
-                    iBgScanProvider->NotConnected();
+                    // If background scan is on, this call will cause a background scan to occur.
+					// The icon is updated after the background scan is completed.
+                    iBgScanProvider->WlanStateChanged( MWlanBgScanProvider::EWlanStateDisconnected );
+                    
                     break;
                 case EWlanStateInfrastructure:
                     DEBUG( "CWlmServer::notify() - STATE: EWlanStateInfrastructure" );
@@ -2225,9 +2227,9 @@ void CWlmServer::request_complete(
         DEBUG( "CWlmServer::request_complete() - also additional requests can be completed" );
 
         /* 
-         * Request can be completed using other the results of another request if
+         * Request can be completed using the results of another request if
          * this method is related to scan scheduling and results of the triggering request can
-         * be used also to completed this request
+         * be used also to complete this request
          *
          * Following rules apply:
          *  - GetAvailableIaps results can be used to complete another GetAvailableIaps request, 
@@ -2251,12 +2253,12 @@ void CWlmServer::request_complete(
 
                 if( iRequestMap[i].iRequestId == KWlanIntCmdBackgroundScan )
                     {
-                    CompleteInternalRequest( i, status, EFalse );
+                    CompleteInternalRequest( iRequestMap[i], status, EFalse );
                     bgScanCompleted = ETrue;
                     }
                 else
                     {
-                    CompleteExternalRequest( i, status, &completedMapEntry );
+                    CompleteExternalRequest( iRequestMap[i], status, &completedMapEntry );
                     if( IsSessionActive( iRequestMap[i] ) )
                         {
                         iRequestMap[i].iMessage.Complete( 
@@ -2272,34 +2274,28 @@ void CWlmServer::request_complete(
             }
         }
 
-    // clear completedMapEntry as it is not needed anymore
-    completedMapEntry = SRequestMapEntry();
-    
-    // complete the request which Core has actually handled 
-    TInt triggerIndex = FindRequestIndex( request_id );
-
-    DEBUG1( "CWlmServer::request_complete() - completing triggering request (ID %u)", iRequestMap[triggerIndex].iRequestId );
+    DEBUG1( "CWlmServer::request_complete() - completing triggering request (ID %u)", completedMapEntry.iRequestId );
     if( request_id < KWlanExtCmdBase )
         {
-        CompleteInternalRequest( triggerIndex, status );
+        CompleteInternalRequest( completedMapEntry, status );
         }
-    else if( iRequestMap[triggerIndex].iFunction == EJoinByProfileId ) 
+    else if( completedMapEntry.iFunction == EJoinByProfileId ) 
         {
         core_iap_data_s* coreIapData =
-            reinterpret_cast<core_iap_data_s*>( iRequestMap[triggerIndex].iParam0 );
+            reinterpret_cast<core_iap_data_s*>( completedMapEntry.iParam0 );
         core_type_list_c<core_ssid_entry_s>* coreSsidList =
-            reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( iRequestMap[triggerIndex].iParam1 );
+            reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( completedMapEntry.iParam1 );
         core_connect_status_e* connectionStatus =
-            reinterpret_cast<core_connect_status_e*>( iRequestMap[triggerIndex].iParam2 );
+            reinterpret_cast<core_connect_status_e*>( completedMapEntry.iParam2 );
 
-        if( status == core_error_ok && IsSessionActive( iRequestMap[triggerIndex] ) )
+        if( status == core_error_ok && IsSessionActive( completedMapEntry ) )
             {
             DEBUG2("CONNECT COMPLETED WITH status == %u -> adapt == %d",
                 *connectionStatus,
                 TWlanConversionUtil::ConvertConnectStatus(
                     *connectionStatus,
                     coreIapData->security_mode ) );
-            iRequestMap[triggerIndex].iMessage.Complete(
+            completedMapEntry.iMessage.Complete(
                 TWlanConversionUtil::ConvertConnectStatus(
                     *connectionStatus,
                     coreIapData->security_mode ) );
@@ -2309,14 +2305,21 @@ void CWlmServer::request_complete(
                 // aggressive background scanning has to be carried out
                 // in case the connection drops
                 iAggressiveScanningAfterLinkLoss = ETrue;
+                
+                // Inform BgScan provider about successful connection.
+                // If background scan is currently on, background scan
+                // will be disabled and it's request will be removed
+                // from the request map.
+                iBgScanProvider->WlanStateChanged( MWlanBgScanProvider::EWlanStateConnected );
+                
                 }
             }
-        else if ( IsSessionActive( iRequestMap[triggerIndex] ) )
+        else if ( IsSessionActive( completedMapEntry ) )
             {
             DEBUG2("CONNECT COMPLETED WITH error == %u -> adapt == %d",
                 status,
                 TWlanConversionUtil::ConvertErrorCode( status ) );
-            iRequestMap[triggerIndex].iMessage.Complete(
+            completedMapEntry.iMessage.Complete(
                 TWlanConversionUtil::ConvertErrorCode( status ) );
             }
         else
@@ -2326,16 +2329,21 @@ void CWlmServer::request_complete(
         delete coreIapData;
         delete coreSsidList;
         delete connectionStatus;
-        iRequestMap.Remove( triggerIndex );
+        // re-use idx variable
+        idx = FindRequestIndex( completedMapEntry.iRequestId );
+        if( idx < iRequestMap.Count() )
+            {
+            iRequestMap.Remove( idx );
+            }
         }
-    else if ( iRequestMap[triggerIndex].iFunction == ERunProtectedSetup )
+    else if ( completedMapEntry.iFunction == ERunProtectedSetup )
         {
         core_iap_data_s* iapData =
-            reinterpret_cast<core_iap_data_s*>( iRequestMap[triggerIndex].iParam0 );
+            reinterpret_cast<core_iap_data_s*>( completedMapEntry.iParam0 );
         core_type_list_c<core_iap_data_s>* iapDataList =
-            reinterpret_cast<core_type_list_c<core_iap_data_s>*>( iRequestMap[triggerIndex].iParam1 );
+            reinterpret_cast<core_type_list_c<core_iap_data_s>*>( completedMapEntry.iParam1 );
         core_protected_setup_status_e* protectedSetupStatus = 
-            reinterpret_cast<core_protected_setup_status_e*>( iRequestMap[triggerIndex].iParam2 );
+            reinterpret_cast<core_protected_setup_status_e*>( completedMapEntry.iParam2 );
         
         // Convert the received credentials.
         TWlmProtectedSetupCredentials tmp;
@@ -2353,26 +2361,26 @@ void CWlmServer::request_complete(
         DEBUG1( "CWlmServer::request_complete() - converted %u Protected Setup credential attributes",
             tmp.count );
 
-        if( IsSessionActive( iRequestMap[triggerIndex] ) )
+        if( IsSessionActive( completedMapEntry ) )
             {
             TPckg<TWlmProtectedSetupCredentials> outPckg( tmp );
-            iRequestMap[triggerIndex].iMessage.Write( 1, outPckg );
+            completedMapEntry.iMessage.Write( 1, outPckg );
             }
 
-        if( status == core_error_ok && IsSessionActive( iRequestMap[triggerIndex] ) )
+        if( status == core_error_ok && IsSessionActive( completedMapEntry ) )
             {                    
-            DEBUG2("PROTECTED SETUP COMPLETED WITH status == %d -> adapt == %d",
+            DEBUG2("PROTECTED SETUP COMPLETED WITH status == %u -> adapt == %d",
                 *protectedSetupStatus,
                 TWlanConversionUtil::ConvertProtectedSetupStatus( *protectedSetupStatus ) );
-            iRequestMap[triggerIndex].iMessage.Complete( 
+            completedMapEntry.iMessage.Complete( 
                 TWlanConversionUtil::ConvertProtectedSetupStatus( *protectedSetupStatus ) );
             }
-        else if ( IsSessionActive( iRequestMap[triggerIndex] ) )
+        else if ( IsSessionActive( completedMapEntry ) )
             {
-            DEBUG2("PROTECTED SETUP COMPLETED WITH error == %d -> adapt == %d",
+            DEBUG2("PROTECTED SETUP COMPLETED WITH error == %u -> adapt == %d",
                 status,
                 TWlanConversionUtil::ConvertErrorCode( status ) );
-            iRequestMap[triggerIndex].iMessage.Complete( 
+            completedMapEntry.iMessage.Complete( 
                 TWlanConversionUtil::ConvertErrorCode( status ) );                    
             }
         else
@@ -2383,17 +2391,27 @@ void CWlmServer::request_complete(
         delete iapData;
         delete iapDataList;
         delete protectedSetupStatus;
-        iRequestMap.Remove( triggerIndex );
+        // re-use idx variable
+        idx = FindRequestIndex( completedMapEntry.iRequestId );
+        if( idx < iRequestMap.Count() )
+            {
+            iRequestMap.Remove( idx );
+            }
         }
     else
         {
-        CompleteExternalRequest( triggerIndex, status );
-        if( IsSessionActive( iRequestMap[triggerIndex] ) )
+        CompleteExternalRequest( completedMapEntry, status );
+        if( IsSessionActive( completedMapEntry ) )
             {
-            iRequestMap[triggerIndex].iMessage.Complete( 
+        	completedMapEntry.iMessage.Complete( 
                 TWlanConversionUtil::ConvertErrorCode( status ) );
             }
-        iRequestMap.Remove( triggerIndex );
+        // re-use idx variable
+        idx = FindRequestIndex( completedMapEntry.iRequestId );
+        if( idx < iRequestMap.Count() )
+            {
+            iRequestMap.Remove( idx );
+            }
         }
 
     // Background scan request needs to be updated only after all the other request have been completed
@@ -2420,7 +2438,8 @@ void CWlmServer::request_complete(
     if( requestMapCount )
         {
         DEBUG( "CWlmServer::request_complete() - remaining requests:" );
-        for ( TInt idx( 0 ); idx < requestMapCount; ++idx )
+        // re-use idx variable
+        for ( idx = 0; idx < requestMapCount; ++idx )
             {
             DEBUG1( "CWlmServer::request_complete() - ID %u", iRequestMap[idx].iRequestId );
             DEBUG1( "CWlmServer::request_complete() - function %d", iRequestMap[idx].iFunction );
@@ -2546,37 +2565,43 @@ TBool CWlmServer::CanRequestBeCompleted(
 // ---------------------------------------------------------
 //
 void CWlmServer::CompleteInternalRequest(
-    TUint32 aIndex, 
+    const SRequestMapEntry& aRequest, 
     core_error_e aStatus,
     TBool aCompletedWasTriggering )
     {
-    DEBUG1( "CWlmServer::CompleteInternalRequest() - index (%d)", aIndex );
+
+    TInt idx = FindRequestIndex( aRequest.iRequestId );
     
-    // Take the entry out from queue
-    SRequestMapEntry requestEntry = iRequestMap[ aIndex ];
+    if( idx >= iRequestMap.Count() )
+        {
+        DEBUG1("CWlmServer::CompleteInternalRequest() - request (ID %u) not in request map", idx );
+        return;
+        }
+    
+    DEBUG1( "CWlmServer::CompleteInternalRequest() - index (%d)", idx );
+    
+    iRequestMap.Remove( idx );
 
-    iRequestMap.Remove( aIndex );
-
-    switch( requestEntry.iRequestId )
+    switch( aRequest.iRequestId )
         {
         case KWlanIntCmdBackgroundScan:
             {
             core_type_list_c<core_ssid_entry_s>* iapSsidList =
-                reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( requestEntry.iParam3 );
+                reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( aRequest.iParam3 );
             delete iapSsidList;
             iapSsidList = NULL;
             
             ScanList* scanList = 
-                reinterpret_cast<ScanList*>( requestEntry.iParam2 );
+                reinterpret_cast<ScanList*>( aRequest.iParam2 );
             core_type_list_c<u32_t>* idList = 
-                reinterpret_cast<core_type_list_c<u32_t>*>( requestEntry.iParam1 );
+                reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
                 
             core_type_list_c<core_iap_data_s>* iapDataList =
-                reinterpret_cast<core_type_list_c<core_iap_data_s>*>( requestEntry.iParam0 );
+                reinterpret_cast<core_type_list_c<core_iap_data_s>*>( aRequest.iParam0 );
             delete iapDataList;
             iapDataList = NULL;
             
-            TTime* completedScanTime = reinterpret_cast<TTime*>( requestEntry.iTime );
+            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
             delete completedScanTime;
             completedScanTime = NULL;
 
@@ -2615,31 +2640,37 @@ void CWlmServer::CompleteInternalRequest(
 // ---------------------------------------------------------
 //
 void CWlmServer::CompleteExternalRequest(
-    TUint32 aIndex, 
+    const SRequestMapEntry& aRequest,
     core_error_e aStatus,
     SRequestMapEntry* aTriggerRequest )
     {
-    DEBUG1( "CWlmServer::CompleteExternalRequest() - index (%d)", aIndex );
-
-    // Take the entry out from queue
-    SRequestMapEntry requestEntry = iRequestMap[ aIndex ];
+    
+    TInt idx = FindRequestIndex( aRequest.iRequestId );
+    
+    if( idx >= iRequestMap.Count() )
+        {
+        DEBUG1("CWlmServer::CompleteExternalRequest() - request (ID %u) not in request map", idx );
+        return;
+        }
+    
+    DEBUG1( "CWlmServer::CompleteExternalRequest() - index (%d)", idx );
 
     // Find out the request type
     // in order to handle possible return parameters
-    switch( requestEntry.iFunction )
+    switch( aRequest.iFunction )
         {
         case EGetScanResults:
             {
             ScanList* tmp( NULL );
-            core_ssid_s* ssid = reinterpret_cast<core_ssid_s*>( requestEntry.iParam1 );
-            TTime* completedScanTime = reinterpret_cast<TTime*>( requestEntry.iTime );
-            ScanList* completedScanList = reinterpret_cast<ScanList*>( requestEntry.iParam0 );
+            core_ssid_s* ssid = reinterpret_cast<core_ssid_s*>( aRequest.iParam1 );
+            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
+            ScanList* completedScanList = reinterpret_cast<ScanList*>( aRequest.iParam0 );
 
             if( aTriggerRequest == NULL )
                 {
                 DEBUG( "CWlmServer::CompleteExternalRequest() - GetScanResults request handled by core" );    
 
-                tmp = reinterpret_cast<ScanList*>( requestEntry.iParam0);
+                tmp = reinterpret_cast<ScanList*>( aRequest.iParam0);
                 }
             else
                 {
@@ -2672,10 +2703,10 @@ void CWlmServer::CompleteExternalRequest(
                 DEBUG2( "CWlmServer::CompleteExternalRequest() - scan results count is %u, size is %u",
                     tmp->Count(), tmp->Size() );
 
-                if( requestEntry.iSessionId != 0 )
+                if( IsSessionActive( aRequest ) )
                     {
-                    requestEntry.iMessage.Write( 0, ptrScanList );
-                    requestEntry.iMessage.Write( 2, pckgDynamicScanList );
+                    aRequest.iMessage.Write( 0, ptrScanList );
+                    aRequest.iMessage.Write( 2, pckgDynamicScanList );
                     }
 
                 // Check whether to cache the results or not
@@ -2729,19 +2760,19 @@ void CWlmServer::CompleteExternalRequest(
             core_type_list_c<u32_t>* coreIdList;
             core_type_list_c<core_iap_data_s>* iapDataList;
 
-            iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( requestEntry.iParam3 );
-            iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( requestEntry.iParam0 );
+            iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( aRequest.iParam3 );
+            iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( aRequest.iParam0 );
             
-            TTime* completedScanTime = reinterpret_cast<TTime*>( requestEntry.iTime );
-            ScanList* completedScanList = reinterpret_cast<ScanList*>( requestEntry.iParam2);
-            core_type_list_c<u32_t>* completedIdList = reinterpret_cast<core_type_list_c<u32_t>*>( requestEntry.iParam1 );
+            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
+            ScanList* completedScanList = reinterpret_cast<ScanList*>( aRequest.iParam2);
+            core_type_list_c<u32_t>* completedIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
             
             if( aTriggerRequest == NULL )
                 {
                 DEBUG( "CWlmServer::CompleteExternalRequest() - GetAvailableIaps request handled by core" );    
 
-                scanList = reinterpret_cast<ScanList*>( requestEntry.iParam2);
-                coreIdList = reinterpret_cast<core_type_list_c<u32_t>*>( requestEntry.iParam1 );
+                scanList = reinterpret_cast<ScanList*>( aRequest.iParam2);
+                coreIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
                 }
             else
                 {
@@ -2789,15 +2820,14 @@ void CWlmServer::CompleteExternalRequest(
 
                 tmp.count = idx;
                 
-                if( requestEntry.iSessionId != 0 )
+                if( IsSessionActive( aRequest ) )
                     {
                     TPckg<TWlmAvailableIaps> outPckg( tmp );
-                    requestEntry.iMessage.Write( 0, outPckg );
+                    aRequest.iMessage.Write( 0, outPckg );
                     }
                 if( aTriggerRequest == NULL )
                     {
-                    DEBUG1("CWlmServer::CompleteExternalRequest() - delete iapIdList (%d)", coreIdList);
-
+                    DEBUG("CWlmServer::CompleteExternalRequest() - delete iapIdList" );
                     delete coreIdList;	
                     }
                 else
@@ -2841,16 +2871,14 @@ void CWlmServer::CompleteExternalRequest(
             }
         case EGetCurrentRSSI:
             {
-            TUint32 tmp 
-                = *( reinterpret_cast<TUint32*>
-                   ( requestEntry.iParam0 ) );
-            if( requestEntry.iSessionId != 0 )
+            TUint32 tmp = *( reinterpret_cast<TUint32*>( aRequest.iParam0 ) );
+            if( IsSessionActive( aRequest ) )
                 {
                 TPckg<TUint32> outPckg( tmp );
-                requestEntry.iMessage.Write( 0, outPckg );
+                aRequest.iMessage.Write( 0, outPckg );
                 }
             iPrevRcpiValue = tmp;
-            delete reinterpret_cast<TUint32*>( requestEntry.iParam0 );
+            delete reinterpret_cast<TUint32*>( aRequest.iParam0 );
             break;
             }
         case EGetSystemMode:
@@ -2861,39 +2889,38 @@ void CWlmServer::CompleteExternalRequest(
         case EConfigureMulticastGroup:
             {
             // no parameters to return
-            delete reinterpret_cast<TUint32*>( requestEntry.iParam0 );
+            delete reinterpret_cast<TUint32*>( aRequest.iParam0 );
             break;
             }
         case EGetPacketStatistics:
             {
             core_packet_statistics_s* coreStatistics =
-                reinterpret_cast<core_packet_statistics_s*>( requestEntry.iParam0 );
-            if( requestEntry.iSessionId != 0 )                
+                reinterpret_cast<core_packet_statistics_s*>( aRequest.iParam0 );
+            if( IsSessionActive( aRequest ) )                
                 {
                 TPckgBuf<TWlanPacketStatistics> statisticPckg;
                 TWlanConversionUtil::ConvertPacketStatistics(
                     statisticPckg(),
                     *coreStatistics );
-                requestEntry.iMessage.Write( 0, statisticPckg );
+                aRequest.iMessage.Write( 0, statisticPckg );
                 }
             delete coreStatistics;
             break;
             }
         case ECreateTrafficStream:
             {
-            u32_t* coreStreamId =
-                reinterpret_cast<u32_t*>( requestEntry.iParam0 );
+            u32_t* coreStreamId = reinterpret_cast<u32_t*>( aRequest.iParam0 );
             core_traffic_stream_status_e* coreStreamStatus =
-                reinterpret_cast<core_traffic_stream_status_e*>( requestEntry.iParam1 );
-            if( requestEntry.iSessionId != 0 &&
+                reinterpret_cast<core_traffic_stream_status_e*>( aRequest.iParam1 );
+            if( IsSessionActive( aRequest ) &&
                 aStatus == core_error_ok )
                 {                
                 TPckgBuf<TUint> streamIdPckg(
                     *coreStreamId ); 
                 TPckgBuf<TWlanTrafficStreamStatus> streamStatusPckg(
                     TWlanConversionUtil::ConvertTrafficStreamStatus( *coreStreamStatus ) );                
-                requestEntry.iMessage.Write( 2, streamIdPckg );
-                requestEntry.iMessage.Write( 3, streamStatusPckg );
+                aRequest.iMessage.Write( 2, streamIdPckg );
+                aRequest.iMessage.Write( 3, streamStatusPckg );
                 }
             delete coreStreamId;
             delete coreStreamStatus;
@@ -2912,7 +2939,7 @@ void CWlmServer::CompleteExternalRequest(
         default:
             {
             DEBUG1( "CWlmServer::CompleteExternalRequest() - ERROR: unknown request type (%d)!",
-                requestEntry.iFunction );
+                aRequest.iFunction );
             break;
             }
         }    
@@ -3120,7 +3147,7 @@ void CWlmServer::CancelExternalRequest(
                     DEBUG( "CWlmServer::CancelExternalRequest() - this request is not the scan scheduling triggering request" );
                     DEBUG( "CWlmServer::CancelExternalRequest() - remove the cancelled request" );
 
-                    CompleteExternalRequest( i, core_error_cancel );
+                    CompleteExternalRequest( iRequestMap[i], core_error_cancel );
                     if( IsSessionActive( iRequestMap[i] ) )
                         {
                         iRequestMap[i].iMessage.Complete( 
@@ -5099,6 +5126,7 @@ TInt CWlmServer::GetCurrentIapId(
             }
         }
     
+    wlanIapIds.Close();
     wlanSettings.Disconnect();
     
     DEBUG( "CWlmServer::GetCurrentIapId() - all done" );   

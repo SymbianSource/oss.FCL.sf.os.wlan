@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 21 %
+* %version: 22 %
 */
 
 #ifndef WLANDEVICESETTINGS_H
@@ -46,7 +46,7 @@ const TUint32 KWlanDefaultowerMode = 0;                         // 0 == enabled
 const TUint32 KWlanDefaultLongRetryLimit = 4;
 const TUint32 KWlanDefaultRTSThreshold = 2347;
 const TUint32 KWlanDefaultShortRetryLimit = 7;
-const TUint32 KWlanDefaultMinChanneltime = 7;
+const TUint32 KWlanDefaultMinChanneltime = 10;
 const TUint32 KWlanDefaultMaxChanneltime = 30;
 const TUint32 KWlanDefaultMaxTransmitMSDULifetime = 512;
 const TUint32 KWlanDefaultMinPassiveChannelTime = 110;
@@ -101,6 +101,8 @@ const TUint32 KWlanDefaultBgScanPeakPeriodStart = 600;          // Peak starts a
 const TUint32 KWlanDefaultBgScanPeakPeriodEnd = 100;            // Peak ends at 01:00 o'clock
 const TUint32 KWlanDefaultBgScanIntervalPeakPeriod = 600;       // Background scan interval for peak hours is 600 s
 const TUint32 KWlanDefaultBgScanIntervalOffPeakPeriod = 1200;   // Background scan interval for off-peak hours is 1200 s
+const TUint32 KWlanDefaultMinActiveBroadcastChannelTime = 10;
+const TUint32 KWlanDefaultMaxActiveBroadcastChannelTime = 110;
 
 // The value of backgroundScanInterval to deny periodic scanning
 const TUint KScanIntervalNever = 0;
@@ -128,8 +130,8 @@ public:
         TUint32 txPowerLevel;                       ///< Transmission power level in use. In mWs.
         TRate scanRate;                             ///< Data rate used in probe request.
         TUint32 rcpiTrigger;                        ///< Default value for RSSI trigger.
-        TUint32 minActiveChannelTime;               ///< Min time to listen channel in active scanning.
-        TUint32 maxActiveChannelTime;               ///< Max time to listen channel in active scanning.
+        TUint32 minActiveChannelTime;               ///< Min time (TUs) to listen a channel in active direct scanning / during an active connection.
+        TUint32 maxActiveChannelTime;               ///< Max time (TUs) to listen a channel in active direct scanning / during an active connection.
         TUint32 maxTxMSDULifeTime;                  ///< Max time to send one (fragmented) packet.
         TBool useDefaultSettings;                   ///< If ETrue default values are being used, EFalse use the user defined values.
         TUint32 scanExpirationTimer;                ///< Time after a new scan is done if required. Otherwise the last scan result is returned.
@@ -192,6 +194,8 @@ public:
         TUint32 bgScanIntervalPeak;                 ///< WLAN background scan interval for peak period.
         TUint32 bgScanIntervalOffPeak;              ///< WLAN background scan interval for off-peak period.
         TBool automaticTrafficStreamMgmt;           ///< Whether admission control traffic stream management is done automatically.        
+        TUint32 minActiveBroadcastChannelTime;      ///< Min time (TUs) to listen a channel in active broadcast scanning when not connected.
+        TUint32 maxActiveBroadcastChannelTime;      ///< Max time (TUs) to listen a channel in active broadcast scanning when not connected.
         TUint32 region;                             ///< Last known WLAN region that is valid for 5 hours. This value is selected based on the information received from the APs or from cellular network (MCC).
         TInt32  regionTimestamp;                    ///< Timestamp for storing the latest WLAN region (region) to CenRep (minutes from 0AD nominal Gregorian).  
         };

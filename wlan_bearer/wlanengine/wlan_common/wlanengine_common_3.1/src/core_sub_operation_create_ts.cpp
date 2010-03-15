@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #include "core_sub_operation_create_ts.h"
@@ -28,7 +28,11 @@
 #include "core_tools_parser.h"
 #include "am_debug.h"
 
+/** The amount of microseconds to wait for a response to our request. */
 const u32_t CORE_AP_RESP_WAITING_TIME = 1000000;
+
+/** The maximum amount of times AP can reject our request due to invalid parameters. */
+const u8_t CORE_MAX_INVALID_PARAMETERS_COUNT = 3;
 
 // ======== MEMBER FUNCTIONS ========
 
@@ -51,7 +55,8 @@ core_sub_operation_create_ts_c::core_sub_operation_create_ts_c(
     tid_m( tid ),
     user_priority_m( user_priority ),
     tspec_m( tspec ),
-    stream_status_m( stream_status )
+    stream_status_m( stream_status ),
+    invalid_parameters_count_m( 0 )
     {
     DEBUG( "core_sub_operation_create_ts_c::core_sub_operation_create_ts_c()" );
 
@@ -186,6 +191,17 @@ core_error_e core_sub_operation_create_ts_c::next_state()
             }
         case core_state_invalid_parameters:
             {
+            ++invalid_parameters_count_m;
+
+            if( invalid_parameters_count_m >= CORE_MAX_INVALID_PARAMETERS_COUNT )
+                {
+                server_m->unregister_frame_handler( this );
+
+                DEBUG( "core_sub_operation_create_ts_c::next_state() - invalid parameters counter exceeded, giving up" );
+
+                return core_error_general;
+                }
+
             DEBUG( "core_sub_operation_create_ts_c::next_state() - AP has downgraded our parameters, retrying" );
 
             return goto_state( core_state_init );
@@ -296,6 +312,8 @@ bool_t core_sub_operation_create_ts_c::receive_frame(
                     }
                 else if ( wmm_action->status() == core_frame_action_wmm_c::core_dot11_action_wmm_status_invalid_parameters )
                     {
+                    stream_status_m = core_traffic_stream_status_inactive_invalid_parameters;
+
                     asynch_goto( core_state_invalid_parameters, CORE_TIMER_IMMEDIATELY );
                     }
                 else

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #include <e32base.h>
@@ -57,7 +57,8 @@ CWlanBgScanStates::CWlanBgScanStates( CWlanBgScan& aBgScan, MWlanScanResultProvi
     iBgScanState( EBgScanStateMax ),
     iIntervalChangeRequestId( 0 ),
     iCompletedAwsCommand( MWlanBgScanAwsComms::EAwsCommandMax ),
-    iAwsCommandCompletionCode( KErrNone )
+    iAwsCommandCompletionCode( KErrNone ),
+    iWlanState( MWlanBgScanProvider::EWlanStateMax )
     {
     DEBUG( "CWlanBgScanStates::CWlanBgScanStates()" );
     }
@@ -836,11 +837,17 @@ void CWlanBgScanStates::RefreshUsedInterval()
     {
     TUint oldInterval = iUsedBgScanInterval;
     
-    DEBUG2( "CWlanBgScanStates::RefreshUsedInterval() - agg: %u, normal: %u",
-        iAggressiveBgScanInterval, iBgScanInterval );
+    DEBUG4( "CWlanBgScanStates::RefreshUsedInterval() - agg: %u, normal: %u, used: %u, wlan state: %u",
+        iAggressiveBgScanInterval, iBgScanInterval, iUsedBgScanInterval, iWlanState );
     
-    // Smaller of the two intervals will be taken into use
-    if( iAggressiveBgScanInterval < iBgScanInterval )
+    // If      ( WLAN state is connected )               -> use interval: KWlanNoScanning 
+    // Else If ( aggressive interval < normal interval ) -> use interval: aggressive interval
+    // Otherwise                                         -> use interval: background scan interval
+    if( iWlanState == MWlanBgScanProvider::EWlanStateConnected )
+        {
+        iUsedBgScanInterval = KWlanNoScanning;
+        }
+    else if( iAggressiveBgScanInterval < iBgScanInterval )
         {
         iUsedBgScanInterval = iAggressiveBgScanInterval;
         }
@@ -876,6 +883,8 @@ void CWlanBgScanStates::RefreshUsedInterval()
     // else
         // In case the new interval is bigger than the old one, it
         // is taken into use after the pending scan request completes.
+    DEBUG1( "CWlanBgScanStates::RefreshUsedInterval() - using interval: %u", iUsedBgScanInterval );
+    
     }
 
     

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 96 %
+* %version: 99 %
 */
 
 #include <e32def.h>
@@ -89,6 +89,26 @@ const TUint KWlanStaticFeatures =
     CWlmServer::EWlanFeaturePowerSaveTest |
     CWlmServer::EWlanFeature802dot11k;
 
+/** Multiplier for converting seconds into microseconds */
+const TUint KWlanSecsToMicrosecsMultiplier( 1000000 );
+
+/** Minimum value for aggressive background scan interval, in seconds */
+const TUint KWlanAggressiveBgScanMinInterval( 1 );
+
+/** Maximum value for aggressive background scan interval, in seconds */
+const TUint KWlanAggressiveBgScanMaxInterval( 120 );
+
+/** Multiplier for deciding aggressive scan mode duration from set interval */
+const TUint KWlanAggressiveBgScanDurationMultiplier( 6 );
+
+/** Interval (in seconds) used for aggressive background scanning after
+    unintentional link break. */
+const TUint32 KWlanLinkBreakRecoveryInterval( 10 );
+
+/** How long (in microseconds) aggressive background scanning is performed
+    after unintentional link break. */
+const TUint32 KWlanLinkBreakRecoveryDuration( 55000000 );  // 55 seconds
+
 // ============================ MEMBER FUNCTIONS ===============================
 
 // -----------------------------------------------------------------------------
@@ -127,10 +147,9 @@ CWlmServer::CWlmServer() :
     iPowerSaveMode( EWlanPowerSaveAutomatic ),
     iPowerSaveEnabled( EFalse ),
     iSsidListDb( NULL ),
-    iShowBrokenPowerSaveNote( ETrue ),
-    iBrokenPowerSaveNotifierWaiter( NULL ),
     iBgScanProvider( NULL ),
-    iTimerServices( NULL )
+    iTimerServices( NULL ),
+    iAggressiveScanningAfterLinkLoss( EFalse )
     {
     }
 
@@ -213,10 +232,6 @@ void CWlmServer::ConstructL()
     // Create SSID list storage.
     iSsidListDb = CWlanSsidListDb::NewL();
     
-    // Initialise Broken Power Save Note handling
-    TCallBack cb( HandleBrokenPowerSaveNoteClosed, this );
-    iBrokenPowerSaveNotifierWaiter = CWlanCbWaiter::NewL( cb );
-    
     iTimerServices = CWlanTimerServices::NewL();
     
     iBgScanProvider = CWlanBgScan::NewL( static_cast<MWlanScanResultProvider&>( *this ), *iTimerServices );
@@ -274,9 +289,6 @@ CWlmServer::~CWlmServer()
     delete iCoreAsynchCb;
     delete iScanSchedulingTimer;
     delete iSsidListDb;
-    delete iBrokenPowerSaveNotifierWaiter;
-    iBrokenPowerSaveNotifier.Close();
-
     if ( iEapolClient )
         {
         delete iEapolClient;
@@ -323,7 +335,7 @@ EXPORT_C TInt CWlmServer::StartServerThread()
 
         if ( err != KErrNone )
             {
-            DEBUG1( "CWlmServer::NewL leaved with code %d", err );
+            DEBUG1( "CWlmServer::StartServerThread() - NewL leaved with code %d", err );
             }
         }
     else
@@ -338,7 +350,7 @@ EXPORT_C TInt CWlmServer::StartServerThread()
     // Start the active Scheduler (if there are no errors)
     if ( err == KErrNone )
         {
-        DEBUG( "CWlmServer Starting scheduler..." );
+        DEBUG( "CWlmServer::StartServerThread() - Starting scheduler..." );
         CActiveScheduler::Start();
         }
     
@@ -657,6 +669,8 @@ void CWlmServer::CancelConnect(
     const RMessage2& aMessage )
     {
     DEBUG( "CWlmServer::CancelConnect()" );
+
+    iAggressiveScanningAfterLinkLoss = EFalse;
 
     aMessage.Complete( KErrNone );
     }
@@ -1242,25 +1256,6 @@ void CWlmServer::GetAvailableIaps(
         return;
         }
 
-    /**
-     * If maxDelay is not infinite, background scanning isn't enabled
-     * and there are no WLAN IAPs defined, scanning isn't needed at all.
-     */
-    if ( maxDelayPckg() != KWlmInfiniteScanDelay &&
-         !iBgScanProvider->IsBgScanEnabled() &&
-         !iapList.Count() )
-        {
-        DEBUG( "CWlmServer::GetAvailableIaps() - no WLAN IAPs defined, skipping scanning" );
-
-        TWlmAvailableIaps tmp = { 0 };
-        TPckg<TWlmAvailableIaps> outPckg( tmp );
-        aMessage.Write( 0, outPckg );
-        aMessage.Complete( KErrNone );
-        iapList.Close();
-
-        return;
-        }
-
     // Create list for WLAN IAP data
     core_type_list_c<core_iap_data_s>* iapDataList = new core_type_list_c<core_iap_data_s>;
     if( iapDataList == NULL )
@@ -1400,6 +1395,8 @@ void CWlmServer::ReleaseComplete(
     {
     DEBUG( "CWlmServer::ReleaseComplete()" );
 
+    iAggressiveScanningAfterLinkLoss = EFalse;
+
     // Data pipe should now be disconnected
     // -> safe to disconnect the management pipe.
 
@@ -1519,10 +1516,6 @@ TInt CWlmServer::UpdateWlanSettings()
 
         return TWlanConversionUtil::ConvertErrorCode( ret );
         }
-    
-    // Store show broken power save note value
-    iShowBrokenPowerSaveNote = settings.showBrokenPowerSaveNote;
-    
     DEBUG( "CWlmServer::UpdateWlanSettings() - returning" );
 
     return KErrNone;
@@ -1793,16 +1786,21 @@ void CWlmServer::notify(
                     // set icon to "not available"
                     SetIconState( EWlmIconStatusNotAvailable );
                     
+                    // if link was unintentionally lost, scan aggressively
+                    // for a while in order to try to find it again
+                    if( iAggressiveScanningAfterLinkLoss )
+                        {
+                        TUint32 interval( KWlanLinkBreakRecoveryInterval );
+                        TUint32 duration( KWlanLinkBreakRecoveryDuration );
+                        iBgScanProvider->StartAggressiveBgScan(
+                            interval,
+                            duration );
+                        iAggressiveScanningAfterLinkLoss = EFalse;
+                        }
+                    
                     // if background scan is on, this call will cause a background scan
 					// when the background scan is completed, the icon is updated
                     iBgScanProvider->NotConnected();
-                    
-                    if ( iBrokenPowerSaveNotifierWaiter->IsActive() )
-                        {
-                        // cancelling the notifier will cause the iBrokenPowerSaveNotifierWaiter
-                        // to be cancelled as well
-                        iBrokenPowerSaveNotifier.CancelNotifier( KUidWlanPowerSaveTestNote );
-                        }
                     break;
                 case EWlanStateInfrastructure:
                     DEBUG( "CWlmServer::notify() - STATE: EWlanStateInfrastructure" );
@@ -1865,90 +1863,9 @@ void CWlmServer::notify(
         case EWlmNotifyAcTrafficStatusChanged:
             DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyAcTrafficStatusChanged<ind>" );
             break;
-        case EWlmNotifyBrokenPowerSaveTestFailed:
-            DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyBrokenPowerSaveTestFailed<ind>" );
-            
-            DEBUG1( "CWlmServer::notify() - iShowBrokenPowerSaveNote: %d",
-                    static_cast<TInt>( iShowBrokenPowerSaveNote ) );
-            
-            if ( iShowBrokenPowerSaveNote )
-                {
-                if ( !iBrokenPowerSaveNotifierWaiter->IsActive() )
-                    {
-                    TInt err = iBrokenPowerSaveNotifier.Connect();
-                    DEBUG1( "CWlmServer::notify() - iNotifier.Connect() returned %d", err );
-                    if ( err == KErrNone )
-                        {
-                        iBrokenPowerSaveNotifier.StartNotifierAndGetResponse( iBrokenPowerSaveNotifierWaiter->RequestStatus(),
-                                        KUidWlanPowerSaveTestNote, KNullDesC8(), iBrokenPowerSaveNotifierReply );
-
-                        iBrokenPowerSaveNotifierWaiter->IssueRequest();
-                        }
-                    }
-#ifdef _DEBUG
-                else
-                    {
-                    DEBUG( "CWlmServer::notify() - Notifier already active on the screen" );
-                    }
-#endif
-                }
-            break;    
         default:
             break;
         }
-    }
-
-// ---------------------------------------------------------
-// CWlmServer::BrokenPowerSaveNoteClosed
-// ---------------------------------------------------------
-//
-TInt CWlmServer::HandleBrokenPowerSaveNoteClosed(
-    TAny *aThisPtr )
-    {
-    DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed()" );
-    
-    CWlmServer* self = static_cast<CWlmServer*>( aThisPtr );
-
-    ASSERT( self );
-    ASSERT( self->iBrokenPowerSaveNotifierWaiter );
-
-    // close the notifier
-    self->iBrokenPowerSaveNotifier.Close();
-    
-    // check the request's completion status
-    TInt err = self->iBrokenPowerSaveNotifierWaiter->RequestStatus().Int();
-    switch ( err )
-        {
-        case KErrNotFound:
-            {
-            DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - Notifier not found, returning" );
-            return err;   
-            }
-        case KErrCancel:
-            {
-            DEBUG( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - Notifier cancelled, returning" );
-            return err;        
-            }
-        default:
-            {
-            // flow through            
-            }
-        }
-    
-    self->iShowBrokenPowerSaveNote = self->iBrokenPowerSaveNotifierReply() ? EFalse : ETrue;
-
-    // re-use err variable
-    TRAP( err, self->StoreWlanCenRepKeyValueL( KWlanShowBrokenPowerSaveNote, self->iShowBrokenPowerSaveNote ) );
-    if ( err != KErrNone )
-        {
-        DEBUG1( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - failed to update CenRep, error code %d", err );
-        return err;
-        }
-    
-    DEBUG1( "CWlmServer::HandleBrokenPowerSaveNoteClosed() - iShowBrokenPowerSaveNote value (%d) stored to CenRep",
-            static_cast<TInt>( self->iShowBrokenPowerSaveNote ) );
-        
-    return err;
     }
 
 // ---------------------------------------------------------
@@ -2045,7 +1962,6 @@ void CWlmServer::SetCachedRegion(
     	}
     }
 
-
 // ---------------------------------------------------------
 // CWlmServer::store_ap_country_info
 // ---------------------------------------------------------
@@ -2070,23 +1986,8 @@ void CWlmServer::store_ap_country_info(
             region = KWlmRegionETSI;
             }
         
-        TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, region ));
-        if ( ret == KErrNone )
-            {
-            TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) ));
-            if ( ret == KErrNone )
-                {
-                DEBUG1( "CWlmServer::regulatory_domain() - stored regulatory domain is 0x%02X ", iRegion );
-                }
-            else
-                {
-                DEBUG1( "CWlmServer::regulatory_domain() - attempt to store region timestamp leaved with code %d,", ret );                    
-                }
-            }
-        else
-            {
-            DEBUG1( "CWlmServer::regulatory_domain() - attempt to store region leaved with code %d,", ret );
-            }
+        StoreRegionAndTimestamp( region, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) );
+
    		}
   	// If the APs country information was inconsistent then region is selected to be ETSI
   	else
@@ -2097,14 +1998,38 @@ void CWlmServer::store_ap_country_info(
         DEBUG1( "CWlmServer::store_ap_country_info() - regulatory domain is 0x%02X", iRegion );
    		}
 
-
     // Set timers to notice if system time is changed
     iPlatform->InitializeSystemTimeHandler();
     
     iCoreAsynchCbId = request_id;
     iCoreAsynchCbStatus = core_error_ok;
     iCoreAsynchCb->CallBack();
-      
+    
+    }
+
+// ---------------------------------------------------------
+// CWlmServer::StoreRegionAndTimestamp
+// ---------------------------------------------------------
+//
+void CWlmServer::StoreRegionAndTimestamp( const TInt aRegion, const TInt aTimestamp )
+    {
+    TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, aRegion ) );
+    if ( ret == KErrNone )
+        {
+        TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, aTimestamp ) );
+        if ( ret == KErrNone )
+            {
+            DEBUG1( "CWlmServer::StoreRegionAndTimestamp() - stored regulatory domain is 0x%02X ", aRegion );
+            }
+        else
+            {
+            DEBUG1( "CWlmServer::StoreRegionAndTimestamp() - attempt to store region timestamp leaved with code %d,", ret );                    
+            }
+        }
+    else
+        {
+        DEBUG1( "CWlmServer::StoreRegionAndTimestamp() - attempt to store region leaved with code %d,", ret );
+        }
     }
 
 // ---------------------------------------------------------
@@ -2157,30 +2082,15 @@ void CWlmServer::get_regulatory_domain(
                     break;
                     }
                 }
-            // Write the WLAN region and timestamp to CenRep
+
             TInt wlanRegion( KWlmRegionFCC );
             if ( iRegion == EETSI )
             	{
             	wlanRegion = KWlmRegionETSI;
             	}
             
-            TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, wlanRegion ));
-            if ( ret == KErrNone )
-                {
-                TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) ));
-                if ( ret == KErrNone )
-                    {
-                    DEBUG1( "CWlmServer::regulatory_domain() - stored regulatory domain is 0x%02X ", iRegion );
-                    }
-                else
-                    {
-                    DEBUG1( "CWlmServer::regulatory_domain() - attempt to store timestamp leaved with code %d,", ret );                    
-                    }
-                }
-            else
-                {
-                DEBUG1( "CWlmServer::regulatory_domain() - attempt to store region leaved with code %d,", ret );
-                }
+            // Store the WLAN region and timestamp to CenRep
+            StoreRegionAndTimestamp( wlanRegion, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) );
             
             // Set timers to notice if system time is changed
             iPlatform->InitializeSystemTimeHandler();
@@ -2232,23 +2142,7 @@ void CWlmServer::get_regulatory_domain(
                     wlanRegion = KWlmRegionETSI;
                     }
                 
-                TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, wlanRegion ));
-                if ( ret == KErrNone )
-                    {
-                    TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) ));
-                    if ( ret == KErrNone )
-                        {
-                        DEBUG1( "CWlmServer::regulatory_domain() - stored regulatory domain is 0x%02X ", iRegion );
-                        }
-                    else
-                        {
-                        DEBUG1( "CWlmServer::regulatory_domain() - attempt to store region timestamp leaved with code %d,", ret );                    
-                        }
-                    }
-                else
-                    {
-                    DEBUG1( "CWlmServer::regulatory_domain() - attempt to store region leaved with code %d,", ret );
-                    }
+                StoreRegionAndTimestamp( wlanRegion, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) );
                 
                 // Set timers to notice if system time is changed
                 iPlatform->InitializeSystemTimeHandler();
@@ -2409,6 +2303,13 @@ void CWlmServer::request_complete(
                 TWlanConversionUtil::ConvertConnectStatus(
                     *connectionStatus,
                     coreIapData->security_mode ) );
+            if( *connectionStatus == core_connect_ok )
+                {
+                // If connection succeeded, raise flag indicating that
+                // aggressive background scanning has to be carried out
+                // in case the connection drops
+                iAggressiveScanningAfterLinkLoss = ETrue;
+                }
             }
         else if ( IsSessionActive( iRequestMap[triggerIndex] ) )
             {
@@ -3604,12 +3505,11 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         return KErrNone;        
         }
     
-    // If roaming is ongoing, scanning is not started for GetAvailableIaps. 
+    // If the command is GetAvailableIaps
     if ( self->iRequestMap[index].iRequestId >= KWlanExtCmdBase && 
-         self->iRequestMap[index].iFunction == EGetAvailableIaps && 
-         self->IsRoaming() )
+         self->iRequestMap[index].iFunction == EGetAvailableIaps )
         {
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps, roam in progress, returning empty iap list" );
+        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps requested" );
 
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
         core_type_list_c<u32_t>* iapIdList =  reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
@@ -3617,36 +3517,42 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         core_type_list_c<core_ssid_entry_s>* iapSsidList =  reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
         TTime* scanTime =  reinterpret_cast<TTime*>( self->iRequestMap[index].iTime );        
         
-        // Only the triggering request is completed and then scan scheduling timer is set again 
-        if( self->IsSessionActive( self->iRequestMap[index] ) )
+        // If the device is roaming OR there are not WLAN IAPs defined in the device
+        // --> return empty list
+        if( self->IsRoaming() || iapDataList->count() == 0 )
             {
-            TWlmAvailableIaps tmp = { 0 };
-            TPckg<TWlmAvailableIaps> outPckg( tmp );
-            self->iRequestMap[index].iMessage.Write( 0, outPckg );
-            self->iRequestMap[index].iMessage.Complete( KErrNone );
-            }
+            DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - Device is roaming or no IAPs defined, returning empty list" );
+            // Only the triggering request is completed and then scan scheduling timer is set again 
+            if( self->IsSessionActive( self->iRequestMap[index] ) )
+                {
+                TWlmAvailableIaps tmp = { 0 };
+                TPckg<TWlmAvailableIaps> outPckg( tmp );
+                self->iRequestMap[index].iMessage.Write( 0, outPckg );
+                self->iRequestMap[index].iMessage.Complete( KErrNone );
+                }
 
-        delete iapDataList;
-        iapDataList = NULL;
-        delete iapIdList;
-        iapIdList = NULL;
-        delete scanList;
-        scanList = NULL;
-        delete iapSsidList;
-        iapSsidList = NULL;
-        delete scanTime;
-        scanTime = NULL;
+            delete iapDataList;
+            iapDataList = NULL;
+            delete iapIdList;
+            iapIdList = NULL;
+            delete scanList;
+            scanList = NULL;
+            delete iapSsidList;
+            iapSsidList = NULL;
+            delete scanTime;
+            scanTime = NULL;
         
-        self->iRequestMap.Remove( index );
+            self->iRequestMap.Remove( index );
 
-        if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
-            {
-            TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
-            self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
-            }
+            if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
+                {
+                TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
+                self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
+                }
         
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - message completed with empty iap list" );
-        return KErrNone;        
+            DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - message completed with empty iap list" );
+            return KErrNone;        
+            }
         }
 
     // If triggering request is background scan and WLAN connection exist, background scan is skipped
@@ -3940,19 +3846,7 @@ void CWlmServer::SystemTimeChanged()
             TTime timestampClear(1);
             iTimeofDomainQuery = timestampClear;
             
-            TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, KWlmRegionUnknown ));
-            if ( ret == KErrNone )
-                {
-                TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, iTimeofDomainQuery.Int64() ));
-                if ( ret != KErrNone )
-                    {
-                    DEBUG1( "CWlmServer::SystemTimeChanged() - attempt to store region timestamp leaved with code %d,", ret );                    
-                    }
-                }
-            else
-                {
-                DEBUG1( "CWlmServer::SystemTimeChanged() - attempt to store region leaved with code %d,", ret );
-                }
+            StoreRegionAndTimestamp( KWlmRegionUnknown, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep ) );
     	    }
     	
         DEBUG("CWlmServer::SystemTimeChanged() - inform timer services about system time change");
@@ -4006,16 +3900,8 @@ void CWlmServer::ClearRegionCache()
     TTime timestampClear(1);
     iTimeofDomainQuery = timestampClear;
     
-    TRAPD( ret, StoreWlanCenRepKeyValueL( KWlanRegion, KWlmRegionUnknown ));
-    if ( ret != KErrNone )
-        {
-   	    DEBUG1( "CWlmServer::ClearRegionCache() - StoreWlanCenRepKeyValueL() leaved with code %d,", ret );
-   	    }
-    TRAP( ret, StoreWlanCenRepKeyValueL( KWlanRegionTimestamp, iTimeofDomainQuery.Int64() ));
-    if ( ret != KErrNone )
-        {
-        DEBUG1( "CWlmServer::ClearRegionCache() - StoreWlanCenRepKeyValueL() leaved with code %d,", ret );
-        }
+    StoreRegionAndTimestamp( KWlmRegionUnknown, ( iTimeofDomainQuery.Int64() / KWlmTimestampInCenrep )  );
+
     }
 
 // ---------------------------------------------------------
@@ -4060,7 +3946,7 @@ void CWlmServer::Scan(
         }
     else
         {
-        DEBUG1( "CWlmServer::Scan() - there is a pending background scan request, index (%d)", index);
+        DEBUG1( "CWlmServer::Scan() - there is a pending background scan request, index (%d)", index );
         
         ASSERT( iRequestMap[index].iTime );
         
@@ -4118,7 +4004,9 @@ void CWlmServer::CancelScan()
     {
     DEBUG( "CWlmServer::CancelScan()" );
     
-    if( iConnectionState == EWlanStateNotConnected )
+    // if background scan is not enabled anymore, set icon
+    if( iConnectionState == EWlanStateNotConnected &&
+        !iBgScanProvider->IsBgScanEnabled() )
         {
         SetIconState( EWlmIconStatusNotAvailable );
         }
@@ -4173,6 +4061,48 @@ void CWlmServer::CancelScan()
             }
         }
     DEBUG( "CWlmServer::CancelScan() - returning" );
+    }
+
+// ---------------------------------------------------------
+// CWlmServer::StartAggressiveBgScan
+// ---------------------------------------------------------
+//
+void CWlmServer::StartAggressiveBgScan(
+    TUint /* aSessionId */,
+    const RMessage2& aMessage )
+    {
+    DEBUG( "CWlmServer::StartAggressiveBgScan" );
+    
+    // Scan interval in seconds
+    TUint32 ScanInterval( aMessage.Int0() );
+    
+    aMessage.Complete( KErrNone );
+    
+    // Check that requested interval is in valid range
+    // and if it is not, adjust the value.
+    if( ScanInterval < KWlanAggressiveBgScanMinInterval )
+        {
+        DEBUG1( "CWlmServer::StartAggressiveBgScan - Requested value (%u) is below minimum limit",
+            ScanInterval );
+        ScanInterval = KWlanAggressiveBgScanMinInterval;
+        }
+    else if( ScanInterval > KWlanAggressiveBgScanMaxInterval )
+        {
+        DEBUG1( "CWlmServer::StartAggressiveBgScan - Requested value (%u) is above maximum limit",
+            ScanInterval );
+        ScanInterval = KWlanAggressiveBgScanMaxInterval;
+        }
+    
+    // Calculate from scan interval how long the aggressive
+    // mode will be kept active
+    TUint32 duration( KWlanAggressiveBgScanDurationMultiplier *
+                     ScanInterval *
+                     KWlanSecsToMicrosecsMultiplier );
+    
+    // Forward request to BG scan module
+    iBgScanProvider->StartAggressiveBgScan(
+        ScanInterval,
+        duration );
     }
 
 // ---------------------------------------------------------
@@ -5175,3 +5105,15 @@ TInt CWlmServer::GetCurrentIapId(
     
     return KErrNone;
     }
+    
+// ---------------------------------------------------------
+// CWlmServer::PublishBgScanInterval
+// ---------------------------------------------------------
+//
+void CWlmServer::PublishBgScanInterval( TUint32& aInterval )
+    {
+    DEBUG1( "CWlmServer::PublishWlanBgScanInterval( %u )", aInterval );
+    
+    iPlatform->PublishBgScanInterval( aInterval );
+    }
+    

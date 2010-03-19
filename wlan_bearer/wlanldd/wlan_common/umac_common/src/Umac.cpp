@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 54 %
+* %version: 55 %
 */
 
 #include "config.h"
@@ -519,6 +519,9 @@ TBool Umac::HandleConnect(const TAny *aInputBuffer)
     OsTracePrint( KWlmCmdDetails, (TUint8*)
         ("Umac::HandleConnect: radiomeasurement (bool): %d"), 
         msg->radioMeasurement );		
+    OsTracePrint( KWlmCmdDetails, (TUint8*)
+        ("Umac::HandleConnect: pairwise key length: %d"), 
+        msg->pairwiseKey.length );
 #endif // !NDEBUG 
 
     // make sure that these are clear when starting the connect operation
@@ -541,6 +544,15 @@ TBool Umac::HandleConnect(const TAny *aInputBuffer)
 
     //Set Radio Measurement setting for later use
     iPimpl->RadioMeasurement( msg->radioMeasurement );
+    
+    if ( msg->pairwiseKey.length != 0 )
+        {
+        iPimpl->RoamingPairwiseKey( &(msg->pairwiseKey) );
+        }
+    else
+        {
+        iPimpl->RoamingPairwiseKey( NULL );
+        }
     
     return iPimpl->CurrentState().Connect( 
         *iPimpl, 

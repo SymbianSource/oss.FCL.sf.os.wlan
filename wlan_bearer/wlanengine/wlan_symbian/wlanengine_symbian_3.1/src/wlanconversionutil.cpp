@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 82 %
+* %version: 84 %
 */
 
 #include <in_sock.h>
@@ -284,8 +284,6 @@ TWlmNotify TWlanConversionUtil::ConvertNotificationType(
             return EWlmNotifyRcpiRoamAttemptStarted;
         case core_notification_rcpi_roam_attempt_completed:
             return EWlmNotifyRcpiRoamAttemptCompleted;
-        case core_notification_broken_power_save_test_failed:
-            return EWlmNotifyBrokenPowerSaveTestFailed;
         case core_notification_ac_traffic_mode_changed:
             return EWlmNotifyAcTrafficModeChanged;
         case core_notification_ac_traffic_status_changed:
@@ -2024,4 +2022,20 @@ u32_t TWlanConversionUtil::ConvertTxRate(
         default:
             return 0;
         }
+    }
+
+// ---------------------------------------------------------
+// TWlanConversionUtil::ConvertCipherKey()
+// ---------------------------------------------------------
+//
+void TWlanConversionUtil::ConvertCipherKey(
+    TPairwiseKeyData& aAmKey,
+    const core_cipher_key_s& aCoreKey )
+    {
+    aAmKey.keyIndex = aCoreKey.key_index;
+    aAmKey.length = aCoreKey.key_length;
+    Mem::Copy(
+        &aAmKey.data[0],
+        &aCoreKey.key_data[0],
+        MAX_CIPHER_KEY_LENGTH );
     }

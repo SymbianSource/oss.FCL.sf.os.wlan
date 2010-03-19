@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 21 %
 */
 
 #ifndef WLANDEVICESETTINGS_H
@@ -154,7 +154,6 @@ public:
         TUint32 qosNullFrameEntryTimeout;           ///< If the time between two voice packets is less than this value, QoS NULL data frame sending is started (in microseconds).
         TUint32 maxApDeauthenticationCount;         ///< After a successful roam an AP can deauthenticate the terminal this many times before it's blacklisted.
         TUint32 apDeauthenticationTimeout;          ///< Deauthentications that happen within time defined by this value after a successful roam are calculated towards AP's deauthentication count (in microseconds).
-        TBool showBrokenPowerSaveNote;              ///< Is WLAN Broken Power Save Note shown on UI.
         TUint32 maxDtimSkipInterval;                ///< Maximum amount of microseconds to sleep when waking up on DTIMs.       
         TUint32 psActiveToLightTimeout;             ///< Timeout for Active->Light transition.
         TUint32 psActiveToLightThreshold;           ///< Frame count threshold for Active->Light transition.

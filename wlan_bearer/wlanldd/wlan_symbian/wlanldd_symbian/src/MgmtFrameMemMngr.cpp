@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 20 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -91,7 +91,11 @@ TInt MgmtFrameMemMngr::DoAllocate( DChunk*& aSharedMemoryChunk )
     TUint32 physicalAddressNotNeeded ( 0 );
 
     // Map our device's memory into the chunk (at offset 0)
-    r = Kern::ChunkCommitContiguous( chunk, 0, iChunkSize, physicalAddressNotNeeded );
+    r = Kern::ChunkCommitContiguous( 
+            chunk, 
+            0, 
+            iChunkSize, 
+            physicalAddressNotNeeded );
 
     if ( r != KErrNone)
         {
@@ -163,6 +167,7 @@ TInt MgmtFrameMemMngr::DoOpenHandle(
             // store the handle & the chunk size
             aSharedChunkInfo.iChunkHandle = r;
             aSharedChunkInfo.iSize = iChunkSize;
+            iClientChunkHandle = r;
 
             // store the kernel addresses
 
@@ -595,28 +600,39 @@ TInt MgmtFrameMemMngr::RxBufAlignmentPadding() const
 // 
 // ---------------------------------------------------------------------------
 //
-void MgmtFrameMemMngr::OnReleaseMemory()
+void MgmtFrameMemMngr::OnReleaseMemory( DThread& aThread )
     {
     TraceDump(INIT_LEVEL, ("WLANLDD: MgmtFrameMemMngr::OnReleaseMemory"));
 
-    TraceDump(MEMORY, (("WLANLDD: delete WlanChunk: 0x%08x"), 
-        reinterpret_cast<TUint32>(iRxFrameMemoryPool)));        
-
-    delete iRxFrameMemoryPool;
-    iRxFrameMemoryPool = NULL;
+    if ( iRxFrameMemoryPool )
+        {
+        TraceDump(MEMORY, (("WLANLDD: delete WlanChunk: 0x%08x"), 
+            reinterpret_cast<TUint32>(iRxFrameMemoryPool)));        
+    
+        delete iRxFrameMemoryPool;
+        iRxFrameMemoryPool = NULL;
+        }
 
     if ( iParent.SharedMemoryChunk() )
         {
         TraceDump(MEMORY, (("WLANLDD: delete DChunk: 0x%08x"), 
             reinterpret_cast<TUint32>(iParent.SharedMemoryChunk())));        
 
+        if ( iClientChunkHandle >= 0 )
+            {
+            TraceDump(INIT_LEVEL, 
+                (("WLANLDD: MgmtFrameMemMngr::OnReleaseMemory: close shared "
+                 "chunk handle: %d"), 
+                iClientChunkHandle));
+            
+            // We have a valid client handle to the shared chunk, so close it 
+            Kern::CloseHandle( &aThread, iClientChunkHandle );
+            iClientChunkHandle = -1;
+            }
+        
         // schedule the shared memory chunk for destruction
         Kern::ChunkClose( iParent.SharedMemoryChunk() );
         iParent.SharedMemoryChunk() = NULL;
-        MarkMemFree();      // mark as free            
+        MarkMemFree();
         }    
-    else
-        {
-        // nothing here
-        }
     }

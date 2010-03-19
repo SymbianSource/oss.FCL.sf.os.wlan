@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17 %
+* %version: 18 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -60,6 +60,7 @@ TInt DataFrameMemMngr::DoOpenHandle(
             // store the handle & chunk size
             aSharedChunkInfo.iChunkHandle = r;
             aSharedChunkInfo.iSize = aSharedMemoryChunk->Size();
+            iClientChunkHandle = r;
 
             // store the kernel addresses
 
@@ -375,15 +376,16 @@ TDataBuffer* DataFrameMemMngr::AllocTxBuffer( TUint aLength )
     
     TDataBuffer* metaHdr ( NULL );
 
-    if ( aLength > KMaxEthernetFrameLength )
+    if ( ( !IsMemInUse() ) || ( aLength > KMaxEthernetFrameLength ) )
         {
 #ifndef NDEBUG
         TraceDump( NWSA_TX_DETAILS, 
-            ("WLANLDD: DataFrameMemMngr::AllocTxBuffer: WARNING: max size exceeded; req. denied") );
+            ("WLANLDD: DataFrameMemMngr::AllocTxBuffer: WARNING: either "
+             "memory not in use OR max size exceeded. Req. denied") );
         os_assert( 
             (TUint8*)("WLANLDD: panic"), 
             (TUint8*)(WLAN_FILE), 
-            __LINE__ );                    
+            __LINE__ );
 #endif        
         
         return metaHdr;
@@ -439,7 +441,7 @@ void DataFrameMemMngr::FreeTxPacket( TDataBuffer*& aPacket )
 // 
 // ---------------------------------------------------------------------------
 //
-void DataFrameMemMngr::OnReleaseMemory()
+void DataFrameMemMngr::OnReleaseMemory( DThread& aThread )
     {
     TraceDump(INIT_LEVEL, ("WLANLDD: DataFrameMemMngr::OnReleaseMemory"));
 
@@ -452,6 +454,18 @@ void DataFrameMemMngr::OnReleaseMemory()
         iTxFrameMemoryPool = NULL;
         iTxDataChunk = NULL;
         
-        MarkMemFree();            
+        MarkMemFree();
+        }
+    
+    if ( iClientChunkHandle >= 0 )
+        {
+        TraceDump(INIT_LEVEL, 
+            (("WLANLDD: DataFrameMemMngr::OnReleaseMemory: close shared chunk "
+             "handle: %d"), 
+            iClientChunkHandle));
+        
+        // We have a valid client handle to the shared chunk, so close it 
+        Kern::CloseHandle( &aThread, iClientChunkHandle );
+        iClientChunkHandle = -1;
         }
     }

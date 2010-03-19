@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 49 %
+* %version: 52 %
 */
 
 #ifndef WLMSERVER_H
@@ -39,11 +39,10 @@
 #include "wlaneapolinterface.h"
 #include "wlaneapolclient.h"
 #include "wlangenericplugin.h"
-#include "wlantimerservices.h"
-#include "wlancbwaiter.h"
 
 class CWlmDriverIf;
 class CWlanSsidListDb;
+class CWlanTimerServices;
 
 /**
  * Command Ids to be used un the asynchronous core service requests
@@ -178,15 +177,6 @@ NONSHARABLE_CLASS( CWlmServer ) :
             TBool aAvailability,
             TBool aNewNetworksDetected = EFalse,
             TBool aOldNetworksLost = EFalse );
-        
-        /**
-        * Callback function to receive notification about closed
-        * Broken Power Save Note dialog.
-        * @param aThisPtr Pointer to the server instance.
-        * @return error code
-        */
-        static TInt HandleBrokenPowerSaveNoteClosed(
-            TAny *aThisPtr );
         
         /**
          * Notify changed PSM server mode
@@ -766,6 +756,18 @@ NONSHARABLE_CLASS( CWlmServer ) :
             const RMessage2& aMessage );
 
         /**
+         * StartAggressiveBgScan
+         * Sets WLAN background scanning into more aggressive mode for a while.
+         * 
+         * @since S60 v5.2
+         * @param aSessionId ID identifying the session.
+         * @param aMessage Message containing the respective command.
+         */
+        void StartAggressiveBgScan(
+            TUint aSessionId,
+            const RMessage2& aMessage );
+
+        /**
          * From MWlmPlatformCallback
          * Send an indication to request data pipe disconnection.
          *
@@ -1150,6 +1152,22 @@ NONSHARABLE_CLASS( CWlmServer ) :
         TInt GetCurrentIapId( 
             const TUint aLanServiceId, 
             core_iap_data_s& aCoreIapData );
+        
+        /**
+         * Store region and timestamp to CenRep.
+         *
+         * @param aRegion Specifies a region to be stored.
+         * @param aTimestamp Specifies a timestamp to be stored.
+         */
+        void StoreRegionAndTimestamp( const TInt aRegion, const TInt aTimestamp );
+
+        /**
+         * Publish WLAN background scan interval.
+         * 
+         * @see MWlanScanResultProvider
+         * @param aInterval WLAN BG scan interval in seconds.
+         */
+        void PublishBgScanInterval( TUint32& aInterval );
 
     private:    // Data
     
@@ -1316,26 +1334,6 @@ NONSHARABLE_CLASS( CWlmServer ) :
         CWlanSsidListDb* iSsidListDb;
         
         /**
-         * Whether to show Broken Power Save Note.
-         */
-        TBool iShowBrokenPowerSaveNote;
-        
-        /**
-         * Active object handling the Broken Power Save Notifier.
-         */
-        CWlanCbWaiter* iBrokenPowerSaveNotifierWaiter;
-        
-        /**
-         * Notifier for displaying Broken Power Save Note dialog.
-         */
-        RNotifier iBrokenPowerSaveNotifier;
-
-        /**
-         * Reply from Broken Power Save Notifier.
-         */
-        TPckgBuf<TBool> iBrokenPowerSaveNotifierReply;
-        
-        /**
          * Background scan provider.
          */
         MWlanBgScanProvider* iBgScanProvider;
@@ -1349,7 +1347,12 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * Timer services.
          */
         CWlanTimerServices* iTimerServices;
-                
+        
+        /**
+         * Flag indicating whether aggressive scanning has to be performed
+         * after link loss.
+         */   
+        TBool iAggressiveScanningAfterLinkLoss;        
     };
     
 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 1 %
+* %version: 2 %
 */
 
 #ifndef WLANBGSCANAWSCOMMS_H
@@ -40,30 +40,11 @@ class CWlanBgScan;
 NONSHARABLE_CLASS( CWlanBgScanAwsComms ) :
     public CActive,
     public MAwsBgScanProvider,
-    public MWlanBgScanCommandListener
+    public MWlanBgScanCommandListener,
+    public MWlanBgScanAwsComms
     {
 
 public:
-    
-    /**
-     * AWS commands.
-     */
-    enum TAwsCommand
-        {
-        EStart = 0,
-        EStop,
-        ESetPowerSaveMode,
-        EAwsCommandMax //not a real command
-        };
-    
-    /**
-     * AWS message.
-     */
-    struct TAwsMessage
-        {
-        TAwsCommand iCmd;
-        TInt iParameter;
-        };
 
     /**
      * Two-phased constructor.
@@ -103,14 +84,13 @@ public:
      * @since S60 v5.2
      */
     void SendOrQueueAwsCommand( TAwsMessage& aMessage );
-
+    
     /**
-     * Whether AWS is present in system.
+     * Blocks calling thread until AWS is constructed.
      *
      * @since S60 v5.2
-     * @return ETrue if present, EFalse if not
      */
-    TBool IsAwsPresent();
+    //void WaitForAwsStartupToComplete();
     
 private: // From CActive
     
@@ -169,9 +149,9 @@ private:
     static TInt AwsThreadEntryPoint( TAny* aThisPtr );
     
     /**
-     * Instantiate AWS ECOM Plugin.
+     * Instantiate and run AWS ECOM Plugin.
      */
-    void InstantiateAwsPluginL();
+    void InstantiateAndRunAwsPluginL();
 
     /**
      * Send message to AWS.
@@ -194,9 +174,9 @@ private: // data
     CAwsEngineBase* iAws;
     
     /**
-     * Reference to AWS ECOM plugin implementation info. 
+     * AWS ECOM plugin UID. 
      */
-    CImplementationInformation* iAwsImplInfo;
+    TInt iAwsImplUid;
 
     /**
      * Command Handler.
@@ -222,6 +202,16 @@ private: // data
      * If AWS instantiation was successful.
      */
     TBool iAwsOk;
+    
+    /**
+     * Synchronization object between WLAN Engine and AWS threads.
+     */
+    //RSemaphore iStartupLock;
+    
+    /**
+     * Handle to WLAN Engine thread.
+     */
+    RThread iWlanEngineThread;
         
     };
 

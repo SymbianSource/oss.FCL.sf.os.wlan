@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 93 %
+* %version: 95 %
 */
 
 #ifndef CORE_TYPES_H
@@ -416,6 +416,21 @@ typedef struct _core_wep_key_s
     } core_wep_key_s;
 
 /**
+ * Data structure for storing a cipher key.
+ */
+typedef struct _core_cipher_key_s
+    {
+    /** The length of KeyMaterial in bytes. Range: 0-29. */
+    u32_t key_length;
+    /** Specifies which key to add or remove. Range: 0-3. */
+    u8_t key_index;
+    /** Array that stores the WEP key. */
+    u8_t key_data[MAX_CIPHER_KEY_LENGTH];
+    } core_cipher_key_s;    
+
+const core_cipher_key_s CIPHER_KEY_NOT_DEFINED = { 0,0 };
+
+/**
  * Data structure for storing an ARP filters.
  */
 typedef struct _core_arp_filter_s
@@ -545,13 +560,6 @@ typedef enum _core_notification_e
      * for further information on this indication. 
      */
     core_notification_rcpi_roam_attempt_completed,
-    /**
-     * Indicates that the Broken Power Save test has failed.
-     * 
-     * If the Broken Power Save test fails, the engine will not allow the any power
-     * save functionality to be used with this BSSID, decreasing battery life.
-     */
-    core_notification_broken_power_save_test_failed,
     /**
      * Indicates the traffic mode of an access class has changed.
      *

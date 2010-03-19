@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 30 %
+* %version: 31 %
 */
 
 #ifndef WLANMGMTCOMMANDHANDLER_H
@@ -392,6 +392,7 @@ public: // Constructors and destructor
      * @param aIsPairwiseKeyInvalidated    Whether the pairwise key should be invalidated.
      * @param aIsGroupKeyInvalidated       Whether the group key should be invalidated
      * @param aIsRadioMeasurementSupported Whether the radio measurement is supported
+     * @param aPairwiseKey                 Pairwise key to set before association.
      */
     void Connect(
         const TSSID& aSSID,                 
@@ -406,7 +407,8 @@ public: // Constructors and destructor
         const TUint8* aScanFrame,
         TBool aIsPairwiseKeyInvalidated,
         TBool aIsGroupKeyInvalidated,
-        TBool aIsRadioMeasurementSupported );
+        TBool aIsRadioMeasurementSupported,
+        const TPairwiseKeyData& aPairwiseKey );
 
 protected: // From CActive
 

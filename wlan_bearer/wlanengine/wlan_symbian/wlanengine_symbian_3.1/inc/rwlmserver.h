@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 24 %
+* %version: 25 %
 */
 
 #ifndef RWLMSERVER_H
@@ -546,6 +546,27 @@ NONSHARABLE_CLASS( RWLMServer ) : public RSessionBase, public MWLMNotify
          * Cancel an outstanding directed roam request.
          */
         IMPORT_C void CancelDirectedRoam();
+        
+        /**
+         * Start aggressive background scanning.
+         * 
+         * Sends a blind request (i.e. request is sent without waiting for
+         * reply) to WLAN Engine to enter aggressive BG scan mode. WLAN
+         * Engine decides how long it stays in the aggressive mode. The
+         * client can monitor BG scan interval changes via WLAN Info P&S.
+         * The request is valid only when WLAN is disconnected, if the request
+         * is sent when WLAN is connected, it is ignored. If the interval
+         * given as a parameter is out of valid range, it is automatically
+         * corrected to closest valid value. In case of multiple simultaneous
+         * requests, the one with highest scan frequency is served.
+         * 
+         * @since S60 v5.2
+         * @param aInterval Desired background scan interval in seconds.
+         *                  Valid range is from 1 to 120 seconds.
+         * @return KErrNone if sending succeeded, an error otherwise
+         */
+        IMPORT_C TInt StartAggressiveBgScan(
+            TUint aInterval );
 
     protected: // Methods
 

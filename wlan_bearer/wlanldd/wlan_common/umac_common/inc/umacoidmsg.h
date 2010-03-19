@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 42 %
+* %version: 43 %
 */
 
 #ifndef WLAN_OID_MSG_H
@@ -347,6 +347,21 @@ typedef struct _TAccessCategoryStatistics
 
 // -------------------------------------------------------------------------
 
+typedef struct _TPairwiseKeyData
+    {
+    /** 
+    * length of the data block. 
+    * If zero, the other fields in this struct are not relevant. 
+    */
+    TUint32 length;
+    /** data block that holds the cipher key */
+    TUint8 data[KMaxCipherKeyLength];
+    /** index of the key */
+    TUint8 keyIndex;
+    } TPairwiseKeyData;
+        
+// -------------------------------------------------------------------------
+
     
 /**
 * Common header for all messages.
@@ -410,7 +425,9 @@ typedef struct _TConnectMsg
     /**
      * ETrue if Radio Measurements are on
      */
-    TBool radioMeasurement;    
+    TBool radioMeasurement;
+    /** pairwise key data; if relevant */
+    TPairwiseKeyData pairwiseKey;
     } TConnectMsg;
 
 // -------------------------------------------------------------------------

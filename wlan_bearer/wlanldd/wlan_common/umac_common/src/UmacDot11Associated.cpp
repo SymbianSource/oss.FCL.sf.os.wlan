@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 95 %
+* %version: 96 %
 */
 
 #include "config.h"
@@ -918,7 +918,7 @@ void WlanDot11Associated::OnDataFrameRx(
         // inform Null Send Controller about data frame Rx
         aCtxImpl.OnDataRxCompleted( 
             ( KEtherType == KEapolType || KEtherType == KWaiType ) ?
-            // as EAPOL and WAI frames or not really Voice data (they
+            // as EAPOL and WAI frames are not really Voice data (they
             // are just sometimes sent with Voice priority), handle them 
             // here as Best Effort (Legacy)
             WHA::ELegacy : 
@@ -2077,7 +2077,7 @@ void WlanDot11Associated::OnPacketSendComplete(
             // data frame Tx completion
             aCtxImpl.OnDataTxCompleted( 
                 aPacketId == E802Dot11FrameTypeDataEapol ?
-                // as EAPOL and WAI frames or not really Voice data (we just
+                // as EAPOL and WAI frames are not really Voice data (we just
                 // send them with Voice priority in WMM nw), handle them
                 // here as Best Effort (Legacy)
                 WHA::ELegacy : 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 51 %
+*/
 
 #include <wlanhwinit.h>
 #include "wlanlddcommon.h"
@@ -824,7 +827,8 @@ void CWlmDriverIf::connect(
     const u8_t* scan_frame,
     bool_t is_pairwise_key_invalidated,
     bool_t is_group_key_invalidated,
-    bool_t is_radio_measurement_supported )
+    bool_t is_radio_measurement_supported,
+    const core_cipher_key_s* pairwise_key )
     {
 #ifdef _DEBUG
     if( is_infra == true_t )
@@ -850,6 +854,11 @@ void CWlmDriverIf::connect(
     TWlanConversionUtil::ConvertSSID( tmpSsid, ssid );
     TMacAddress tmpBssid;
     TWlanConversionUtil::ConvertMacAddress( tmpBssid, bssid );
+    TPairwiseKeyData tmpKey = { 0, 0 };
+    if( pairwise_key )
+        {
+        TWlanConversionUtil::ConvertCipherKey( tmpKey, *pairwise_key );
+        }
 
     iManagementCommandHandler->Connect(
         tmpSsid,
@@ -864,8 +873,8 @@ void CWlmDriverIf::connect(
         scan_frame,
         is_pairwise_key_invalidated,
         is_group_key_invalidated,
-        is_radio_measurement_supported );
-        
+        is_radio_measurement_supported,
+        tmpKey );
     }
 
 // -----------------------------------------------------------------------------

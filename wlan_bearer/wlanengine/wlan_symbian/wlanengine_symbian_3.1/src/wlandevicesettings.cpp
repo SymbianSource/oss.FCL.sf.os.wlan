@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17 %
+* %version: 19 %
 */
 
 // INCLUDE FILES
@@ -166,7 +166,6 @@ EXPORT_C void CWlanDeviceSettings::GetDefaultSettings(
     aSettings.qosNullFrameEntryTimeout = KWlanDefaultQoSNullFrameEntryTimeout;   
     aSettings.maxApDeauthenticationCount = KWlanDefaultMaxApDeauthenticationCount; 
     aSettings.apDeauthenticationTimeout = KWlanDefaultApDeauthenticationTimeout;  
-    aSettings.showBrokenPowerSaveNote = ETrue;
     aSettings.maxDtimSkipInterval = KWlanDefaultMaxDtimSkipInterval;
     aSettings.psActiveToLightTimeout = KWlanDefaultPsActiveToLightTimeout;
     aSettings.psActiveToLightThreshold = KWlanDefaultPsActiveToLightThreshold;
@@ -522,13 +521,6 @@ TInt CWlanDeviceSettings::ReadPrivateData( SWlanDeviceSettings& aSettings )
         {
         aSettings.apDeauthenticationTimeout = temp;
         }                                
-
-    // Read KWlanShowBrokenPowerSaveNote
-    err = repository->Get( KWlanShowBrokenPowerSaveNote, temp );
-    if( err == KErrNone ) 
-        {
-        aSettings.showBrokenPowerSaveNote = static_cast<TBool>( temp );
-        }  
 
     // Read KWlanMaxDtimSkipInterval
     err = repository->Get( KWlanMaxDtimSkipInterval, temp );
@@ -1081,15 +1073,6 @@ TInt CWlanDeviceSettings::WritePrivateData( const SWlanDeviceSettings& aSettings
         DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanApDeauthenticationTimeout );
         }
 
-    // Write KWlanShowBrokenPowerSaveNote
-    err = repository->Set( 
-        KWlanShowBrokenPowerSaveNote, 
-        static_cast<TInt>( aSettings.showBrokenPowerSaveNote ) );
-    if( err ) 
-        {
-        DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanShowBrokenPowerSaveNote );
-        }
-
     // Write KWlanMaxDtimSkipInterval
     err = repository->Set( 
         KWlanMaxDtimSkipInterval, 
@@ -1622,8 +1605,6 @@ void CWlanDeviceSettings::LogSettings( const SWlanDeviceSettings& aSettings ) co
         aSettings.maxApDeauthenticationCount );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - apDeauthenticationTimeout == %u",
         aSettings.apDeauthenticationTimeout );
-    DEBUG1( "CWlanDeviceSettings::LogSettings() - showBrokenPowerSaveNote == %u",
-        static_cast<TUint32>( aSettings.showBrokenPowerSaveNote ) );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - maxDtimSkipInterval == %u",
         aSettings.maxDtimSkipInterval );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - psActiveToLightTimeout == %u",

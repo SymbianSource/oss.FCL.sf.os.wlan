@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 11 %
+* %version: 14 %
 */
 
 #ifndef WLANDEVICESETTINGSINTERNALCRKEYS_H
@@ -177,11 +177,6 @@ const TUint32 KWlanApDeauthenticationTimeout =           0x0000001C;
  * Default value in seconds for BackGround Scan Interval
  */
 const TUint32 KWlanDefaultBGScanInterval =               0x0000001D;
-
-/**
- * Whether Broken Power Save note is shown to user.
- */
-const TUint32 KWlanShowBrokenPowerSaveNote =             0x0000001E;
 
 /**
  * Maximum amount of microseconds to sleep when waking up on DTIMs.
@@ -412,7 +407,16 @@ const TUint32 KWlanRegion =                              0x00000050;
 /**
  * Timestamp for cached WLAN region (minutes from 0AD nominal Gregorian).
  */
-const TInt32 KWlanRegionTimestamp =                      0x00000051;
+const TUint32 KWlanRegionTimestamp =                     0x00000051;
 
+/**
+ * Master switch for WLAN.
+ */
+const TUint32 KWlanOnOff =                               0x00000052;
+
+/**
+ * Setting for overriding WLAN on/off, forcing it to off.
+ */
+const TUint32 KWlanForceDisable =                        0x00000053;
 
 #endif      // WLANDEVICESETTINGSINTERNALCRKEYS_H

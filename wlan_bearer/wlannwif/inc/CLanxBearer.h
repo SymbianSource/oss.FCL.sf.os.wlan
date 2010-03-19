@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 7 %
+* %version: 8 %
 */
 
 #ifndef CLANXBEARER_H
@@ -31,6 +31,8 @@
 #include <es_mbuf.h>
 #include <comms-infras/ss_protflow.h>
 #include <comms-infras/ss_flowbinders.h>
+#include <es_prot.h>
+
 
 class CLANLinkCommon;
 class TLanProvision;

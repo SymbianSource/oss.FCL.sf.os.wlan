@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 59 %
+*/
 
 #include "core_sub_operation_wpa_connect.h"
 #include "core_sub_operation_connect.h"
@@ -59,7 +62,8 @@ core_sub_operation_wpa_connect_c::core_sub_operation_wpa_connect_c(
     eapol_auth_type_m( wlan_eapol_if_eapol_key_authentication_type_none ),
     assoc_ie_list_m( assoc_ie_list ),
     assoc_resp_m( assoc_resp ),
-    is_key_caching_used_m( false_t )
+    is_key_caching_used_m( false_t ),
+    pairwise_key_m( CIPHER_KEY_NOT_DEFINED )
     {
     DEBUG( "core_sub_operation_wpa_connect_c::core_sub_operation_wpa_connect_c()" );
     }
@@ -380,7 +384,8 @@ core_error_e core_sub_operation_wpa_connect_c::next_state()
                 assoc_ie_list_m,
                 assoc_resp_m,
                 is_pairwise_key_invalidated,
-                true_t );
+                true_t,
+                pairwise_key_m.key_length ? &pairwise_key_m : NULL );
 
             return run_sub_operation( operation );
             }
@@ -797,14 +802,32 @@ core_error_e core_sub_operation_wpa_connect_c::packet_data_session_key(
             ap_data_m.best_pairwise_cipher(),
             ap_data_m.best_group_cipher() );
 
-    ASSERT( drivers_m );
-    drivers_m->add_cipher_key(
-        type,
-        static_cast<u8_t>( key->key_index ),
-        static_cast<u16_t>( key->key_length ),
-        key->key,
-        mac,
-        true_t );
+    /**
+     * If a pairwise key is supplied before association, we cache it for
+     * later use instead of immediately setting it.
+     */
+    if ( is_cached_sa_used_m &&
+         eapol_auth_type_m == wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam &&
+         key->eapol_key_type == wlan_eapol_if_eapol_key_type_unicast )
+        {
+        pairwise_key_m.key_length = static_cast<u16_t>( key->key_length );
+        pairwise_key_m.key_index = static_cast<u8_t>( key->key_index );
+        core_tools_c::copy(
+            &pairwise_key_m.key_data[0],
+            key->key,
+            pairwise_key_m.key_length );
+        }
+    else
+        {
+        ASSERT( drivers_m );
+        drivers_m->add_cipher_key(
+            type,
+            static_cast<u8_t>( key->key_index ),
+            static_cast<u16_t>( key->key_length ),
+            key->key,
+            mac,
+            true_t );
+        }
 
     return core_error_ok;
     }

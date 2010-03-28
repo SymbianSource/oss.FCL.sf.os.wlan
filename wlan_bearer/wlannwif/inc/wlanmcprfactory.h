@@ -33,7 +33,7 @@ public:
 protected:
 	CWlanMetaConnectionProviderFactory(TUid aFactoryId, ESock::CMetaConnectionFactoryContainer& aParentContainer);
 	
-	ESock::ACommsFactoryNodeId* CWlanMetaConnectionProviderFactory::DoCreateObjectL(ESock::TFactoryQueryBase& aQuery);
+	ESock::ACommsFactoryNodeId* DoCreateObjectL(ESock::TFactoryQueryBase& aQuery);
 	};
 
 #endif //__WLANMCPRFACTORY_H__

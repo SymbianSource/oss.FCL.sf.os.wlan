@@ -31,7 +31,7 @@
 class CTimeoutRequestEntry : public CBase
     {
 public:
-    CTimeoutRequestEntry::CTimeoutRequestEntry(
+    CTimeoutRequestEntry(
     	TTime& aAt,
     	MWlanTimerServiceCallback& aCb,
     	TUint aRequestId,

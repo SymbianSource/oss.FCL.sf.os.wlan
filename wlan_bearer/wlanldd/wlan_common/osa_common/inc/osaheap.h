@@ -113,7 +113,7 @@ private:
 
     RWlanHeap(TInt aInitialSize, TInt aAllocationUnit );
     
-    TAny* RWlanHeap::operator new(TUint aSize, TAny* aBase);
+    TAny* operator new(TUint aSize, TAny* aBase);
     
     void Initialise();
     

@@ -232,7 +232,7 @@ class TWlanConversionUtil
         * @param aCorePowerMode (IN)
         * @return TPowerMode
         */        
-        static TPowerMode TWlanConversionUtil::ConvertPowerMode(
+        static TPowerMode ConvertPowerMode(
             const core_power_mode_e& aCorePowerMode );
 
         /**
@@ -243,7 +243,7 @@ class TWlanConversionUtil
         * @param aCoreWakeUpMode (OUT)
         * @param aCoreWakeUpInterval (IN)
         */        
-        static void TWlanConversionUtil::ConvertWakeUpInterval(
+        static void ConvertWakeUpInterval(
             TWlanWakeUpInterval& aAmWakeUpMode,
             TUint8& aAmWakeUpInterval,
             const core_power_save_wakeup_mode_e& aCoreWakeUpMode,

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 102 %
+* %version: 105 %
 */
 
 #include <e32def.h>
@@ -86,8 +86,8 @@ const TUint KWlanSsidListGranularity = 100;
 
 /** Bitmask of WLAN features enabled at compile-time. */
 const TUint KWlanStaticFeatures =
-    CWlmServer::EWlanFeaturePowerSaveTest |
-    CWlmServer::EWlanFeature802dot11k;
+    CWlmServer::EWlanStaticFeature802dot11k |
+    CWlmServer::EWlanStaticFeature802dot11n;
 
 /** Multiplier for converting seconds into microseconds */
 const TUint KWlanSecsToMicrosecsMultiplier( 1000000 );
@@ -175,7 +175,7 @@ void CWlmServer::ConstructL()
 
     if( FeatureManager::FeatureSupported( KFeatureIdFfWlanWapi ) )
         {
-        iSupportedFeatures |= EWlanFeatureWapi;
+        iSupportedFeatures |= EWlanStaticFeatureWapi;
         }
 
     DEBUG1( "CWlmServer::ConstructL() - supported WLAN features: 0x%08X",
@@ -206,14 +206,16 @@ void CWlmServer::ConstructL()
     SetCachedRegion(deviceSettings.region, deviceSettings.regionTimestamp);    
     core_device_settings_s coreSettings; // core needs the settings here
     TWlanConversionUtil::ConvertDeviceSettings( coreSettings, deviceSettings );
-        
+
     // Create core server    
     User::LeaveIfNull( iCoreServer = core_server_factory_c::instance(
         *this,
         *iDriverIf,
         coreSettings,
         core_mac,
-        TWlanConversionUtil::ConvertFeatureFlags( iSupportedFeatures ) ) );
+        TWlanConversionUtil::ConvertFeatureFlags(
+            iSupportedFeatures,
+            deviceSettings.enabledFeatures ) ) );
     iCoreServer->disable_wlan( KWlanIntCmdDisableWlan );
 
     // Create scan timer
@@ -278,8 +280,9 @@ CWlmServer::~CWlmServer()
         delete session;
         }
 
+    // Stop all plugins
     iGenericWlanPlugin.StopPlugins();
-    
+
     delete iCoreServer;
     delete iDriverIf;
     iNotificationArray.Close();
@@ -289,12 +292,11 @@ CWlmServer::~CWlmServer()
     delete iCoreAsynchCb;
     delete iScanSchedulingTimer;
     delete iSsidListDb;
-    if ( iEapolClient )
-        {
-        delete iEapolClient;
-        iEapolClient = NULL;
-        }
+    delete iBgScanProvider;
+    delete iTimerServices;
+    delete iEapolClient;
     iEapolHandler = NULL;
+    REComSession::FinalClose();    
     }
 
 // -----------------------------------------------------------------------------
@@ -484,7 +486,7 @@ void CWlmServer::Connect(
 
     // Check whether WAPI is supported
     if( iapData.SecurityMode == Wapi &&
-        !( iSupportedFeatures & EWlanFeatureWapi ) )
+        !( iSupportedFeatures & EWlanStaticFeatureWapi ) )
         {
         DEBUG( "CWlmServer::Connect() - WAPI is not supported" );
 
@@ -1517,6 +1519,19 @@ TInt CWlmServer::UpdateWlanSettings()
 
         return TWlanConversionUtil::ConvertErrorCode( ret );
         }
+    
+    u32_t coreFeatures = TWlanConversionUtil::ConvertFeatureFlags(
+        iSupportedFeatures,
+        settings.enabledFeatures );
+    ret = iCoreServer->set_enabled_features( coreFeatures );
+    if( ret != core_error_ok )
+        {
+        DEBUG1( "CWlmServer::UpdateWlanSettings() - set_enabled_features() failed with %u",
+            ret );
+
+        return TWlanConversionUtil::ConvertErrorCode( ret );
+        }
+
     DEBUG( "CWlmServer::UpdateWlanSettings() - returning" );
 
     return KErrNone;
@@ -2569,7 +2584,6 @@ void CWlmServer::CompleteInternalRequest(
     core_error_e aStatus,
     TBool aCompletedWasTriggering )
     {
-
     TInt idx = FindRequestIndex( aRequest.iRequestId );
     
     if( idx >= iRequestMap.Count() )
@@ -2579,8 +2593,6 @@ void CWlmServer::CompleteInternalRequest(
         }
     
     DEBUG1( "CWlmServer::CompleteInternalRequest() - index (%d)", idx );
-    
-    iRequestMap.Remove( idx );
 
     switch( aRequest.iRequestId )
         {
@@ -2630,9 +2642,12 @@ void CWlmServer::CompleteInternalRequest(
             }
         case KWlanIntCmdNull: // Fall through on purpose
         default:
+            DEBUG1( "CWlmServer::CompleteInternalRequest() - request ID %u not handled", aRequest.iRequestId );
             break;
             // not interested in rest of the internal request completions
         }
+
+    iRequestMap.Remove( idx );
     }
 
 // ---------------------------------------------------------
@@ -3436,7 +3451,9 @@ TInt CWlmServer::BackgroundScanRequest(
     
     // create mapping
     SRequestMapEntry mapEntry;
+    mapEntry.iFunction = EGetAvailableIaps;
     mapEntry.iRequestId = KWlanIntCmdBackgroundScan;
+    mapEntry.iSessionId = 0;
     mapEntry.iParam0 = iapDataList;
     mapEntry.iParam1 = iapIdList;
     mapEntry.iParam2 = scanList;
@@ -4050,8 +4067,14 @@ void CWlmServer::CancelScan()
             
             DEBUG( "CWlmServer::CancelScan() - cancel timer" );
             iScanSchedulingTimer->Cancel();
-            
+
             DEBUG( "CWlmServer::CancelScan() - remove entry from request map" );
+            SRequestMapEntry entry = iRequestMap[index];
+            delete reinterpret_cast<core_type_list_c<core_iap_data_s>*>( entry.iParam0 );
+            delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
+            delete reinterpret_cast<ScanList*>( entry.iParam2);
+            delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
+            delete reinterpret_cast<TTime*>( entry.iTime );
             iRequestMap.Remove( index );
 
             DEBUG( "CWlmServer::CancelScan() - find next possible timed scan scheduling request" );
@@ -4083,6 +4106,12 @@ void CWlmServer::CancelScan()
                 DEBUG( "CWlmServer::CancelScan() - just remove the entry from the request map" );
                 
                 DEBUG( "CWlmServer::CancelScan() - remove entry from request map" );
+                SRequestMapEntry entry = iRequestMap[index];
+                delete reinterpret_cast<core_type_list_c<core_iap_data_s>*>( entry.iParam0 );
+                delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
+                delete reinterpret_cast<ScanList*>( entry.iParam2);
+                delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
+                delete reinterpret_cast<TTime*>( entry.iTime );                
                 iRequestMap.Remove( index );
                 }
             }

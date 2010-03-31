@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 103 %
+* %version: 104 %
 */
 
 #ifndef WLANCONTEXTIMPL_H
@@ -608,6 +608,26 @@ public:
     */
     inline TMacAddress& GetBssId();
 
+    /**
+    * Regarding the features which we allow to be be configured on or off,
+    * sets the allowed features per WLAN Mgmt client request
+    *
+    * @param aFeaturesAllowed Feature bit mask where 1 means that the use of 
+    *        the corresponding feature is allowed and 0 means that its not
+    *        allowed 
+    */ 
+    inline void FeaturesAllowed( TWlanFeatures aFeaturesAllowed );
+        
+    /**
+    * Regarding the features which we allow to be be configured on or off,
+    * returns the allowed features
+    *
+    * @return Feature bit mask where 1 means that the use of 
+    *        the corresponding feature is allowed and 0 means that its not
+    *        allowed 
+    */ 
+    inline TWlanFeatures FeaturesAllowed() const;
+    
     inline void Aid( const TUint32 aAid );
     inline TUint32 Aid() const;
 
@@ -2000,6 +2020,14 @@ private:  // definitions
     typedef TUint8 TWlanFeatureArray[KMaxNumOfWlanFeatures];
 
 private:  // data
+
+    /**
+    * If a bit in this mask is set, use of the corresponding WLAN 
+    * feature is allowed; otherwise it is not allowed.
+    * Note that this mask doesn't contain all supported WLAN features
+    * but only the ones which we allow to be be configured on or off.
+    */ 
+    TWlanFeatures               iAllowedWlanFeatures;
     
     /** 
     * ETrue if the Tx data buffer for frames created internally in this 

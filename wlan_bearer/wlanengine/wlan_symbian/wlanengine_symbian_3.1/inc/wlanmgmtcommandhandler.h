@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 31 %
+* %version: 32 %
 */
 
 #ifndef WLANMGMTCOMMANDHANDLER_H
@@ -170,6 +170,7 @@ public: // Constructors and destructor
      *                      (in microseconds).
      * @param aSpMinIndicationInterval Defines the minimum time interval for consecutive roam
      *                                 indications from the signal predictor algorithm (in microseconds).
+     * @param aEnabledFeatures Bitmask of enabled features.
      */
     void Configure(
         TUint16 aRTSThreshold, 
@@ -181,7 +182,8 @@ public: // Constructors and destructor
         TUint32 aKeepAliveInterval,
         TUint32 aSpRcpiTarget,
         TUint32 aSpTimeTarget,
-        TUint32 aSpMinIndicationInterval );
+        TUint32 aSpMinIndicationInterval,
+        TUint32 aEnabledFeatures );
 
     /**
      * GetLastRCPI

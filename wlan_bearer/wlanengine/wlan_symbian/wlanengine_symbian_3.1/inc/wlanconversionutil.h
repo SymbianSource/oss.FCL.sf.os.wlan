@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 33 %
+* %version: 34 %
 */
 
 #ifndef WLANCONVERSIONUTIL_H
@@ -562,16 +562,28 @@ class TWlanConversionUtil
         static void ConvertPowerSaveMode(
             core_power_save_mode_s& aCoreMode,
             TWlanPowerSaveMode aAmMode );        
-      
+
         /**
          * Convert feature flags.
          *
          * @since S60 v5.1
-         * @param aFeatures
+         * @param aStaticFeatures Bitmask of statically enabled features.
+         * @param aDynamicFeatures Bitmask of dynamically enabled features.
          * @return Corresponding core features.
          */
         static u32_t ConvertFeatureFlags(
-            TUint aFeatures );
+            TUint aStaticFeatures,
+            TUint aDynamicFeatures );
+
+        /**
+         * Convert feature flags.
+         *
+         * @since S60 v5.1
+         * @param aCoreFlags Bitmask enabled features.
+         * @return Corresponding UMAC features.
+         */        
+        static TUint ConvertFeatureFlags(
+            u32_t aCoreFlags );
 
         /**
          * Convert access class.

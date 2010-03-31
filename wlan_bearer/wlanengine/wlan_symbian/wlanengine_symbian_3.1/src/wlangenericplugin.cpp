@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2008-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2008-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 4 %
+*/
 
 #include <wlanpluginclient.h>
 #include "wlangenericplugin.h"
@@ -165,6 +168,7 @@ TInt CGenericWlanPlugin::GenericWlanPluginThreadMain( TAny* aPluginArrayEntryPtr
     __UHEAP_MARKEND;
     
     delete cleanup;
+    REComSession::FinalClose();
     return KErrNone;
     }
 
@@ -207,5 +211,4 @@ void CGenericWlanPlugin::LoadGenericWlanPluginL( TPluginArrayEntry * aPluginArra
     CleanupStack::PopAndDestroy(scheduler);
     
     DEBUG("CGenericWlanPlugin::LoadGenericWlanPluginL() - exit");
-    User::Exit( KErrNone );
     }

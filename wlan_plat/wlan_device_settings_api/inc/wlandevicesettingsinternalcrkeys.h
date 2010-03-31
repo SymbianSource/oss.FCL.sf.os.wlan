@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 11.1.2 %
+* %version: 11.1.3 %
 */
 
 #ifndef WLANDEVICESETTINGSINTERNALCRKEYS_H
@@ -405,6 +405,11 @@ const TUint32 KWlanMinActiveBroadcastChannelTime =       0x00000045;
  * The maximum channel time for active broadcast scan in milliseconds.
  */
 const TUint32 KWlanMaxActiveBroadcastChannelTime =       0x00000046;
+
+/**
+ * Bitmask of enabled WLAN features.
+ */
+const TUint32 KWlanEnabledFeatures =                     0x00000047;
 
 /**
  * Cached WLAN region where possible values are: 

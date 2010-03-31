@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 54 %
+* %version: 55 %
 */
 
 #ifndef CORE_SERVER_H
@@ -860,6 +860,16 @@ public: // abs_core_server_c
      */
     core_error_e get_current_ac_traffic_info(
         core_ac_traffic_information_s& info );
+
+    /**
+     * Set the currently enabled feature set.
+     *
+     * @since S60 v5.2
+     * @param features Bitmask of enabled features.
+     * @return core_error_ok if success, an error code otherwise.
+     */
+    core_error_e set_enabled_features(
+        u32_t features );
 
     /**
      * An asynchronous request from the core server has been completed.

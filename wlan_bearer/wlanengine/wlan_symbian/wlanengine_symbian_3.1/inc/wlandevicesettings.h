@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 22 %
+* %version: 23 %
 */
 
 #ifndef WLANDEVICESETTINGS_H
@@ -103,6 +103,18 @@ const TUint32 KWlanDefaultBgScanIntervalPeakPeriod = 600;       // Background sc
 const TUint32 KWlanDefaultBgScanIntervalOffPeakPeriod = 1200;   // Background scan interval for off-peak hours is 1200 s
 const TUint32 KWlanDefaultMinActiveBroadcastChannelTime = 10;
 const TUint32 KWlanDefaultMaxActiveBroadcastChannelTime = 110;
+const TUint32 KWlanDefaultEnabledFeatures = 0xFFFFFFFF;
+
+/**
+ * Bit definitions for run-time WLAN features.
+ */
+enum TWlanRunTimeFeature
+    {
+    /** Initialisation value. */
+    EWlanRunTimeFeatureNone                = 0x00000000,
+    /** Whether 802.11n is enabled. */
+    EWlanRunTimeFeature802dot11n           = 0x00000001,
+    };
 
 // The value of backgroundScanInterval to deny periodic scanning
 const TUint KScanIntervalNever = 0;
@@ -196,6 +208,7 @@ public:
         TBool automaticTrafficStreamMgmt;           ///< Whether admission control traffic stream management is done automatically.        
         TUint32 minActiveBroadcastChannelTime;      ///< Min time (TUs) to listen a channel in active broadcast scanning when not connected.
         TUint32 maxActiveBroadcastChannelTime;      ///< Max time (TUs) to listen a channel in active broadcast scanning when not connected.
+        TUint32 enabledFeatures;                    ///< Bitmask of enabled WLAN features.
         TUint32 region;                             ///< Last known WLAN region that is valid for 5 hours. This value is selected based on the information received from the APs or from cellular network (MCC).
         TInt32  regionTimestamp;                    ///< Timestamp for storing the latest WLAN region (region) to CenRep (minutes from 0AD nominal Gregorian).  
         };

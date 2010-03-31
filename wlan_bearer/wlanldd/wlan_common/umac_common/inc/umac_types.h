@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 29 %
 */
 
 #ifndef UMACTYPES_H
@@ -26,7 +26,15 @@
 #include "pack.h"
 #include <wlanosaplatform.h>
 
-/// Indication data type
+
+/** WLAN feature bit mask */
+typedef TUint32 TWlanFeatures;
+
+/** HT operation (per 802.11n) */
+const TWlanFeatures KWlanHtOperation = ( 1 << 0 );
+
+
+/** Indication data type */
 typedef enum _TIndication
     {
 	EMediaDisconnect,

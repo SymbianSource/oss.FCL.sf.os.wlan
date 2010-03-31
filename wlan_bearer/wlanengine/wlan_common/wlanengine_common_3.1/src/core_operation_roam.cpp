@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76 %
+* %version: 76.1.1 %
 */
 
 #include "core_operation_roam.h"
@@ -511,6 +511,21 @@ core_error_e core_operation_roam_c::next_state()
                     server_m->get_connection_data()->set_last_connection_state(
                         state );
                     }
+                }
+
+            if ( server_m->get_connection_data()->last_rcp_class() != core_rcp_normal )
+                {
+                DEBUG( "core_operation_roam_c::next_state() - sending a notification about the normal signal level" );
+
+                u8_t buf[5];
+                buf[0] = static_cast<u8_t>( core_rcp_normal );
+                buf[1] = current_ap_m->rcpi();
+
+                adaptation_m->notify(
+                    core_notification_rcp_changed,
+                    sizeof( buf ),
+                    buf );
+                server_m->get_connection_data()->set_last_rcp_class( core_rcp_normal );
                 }
 
             if ( current_ap_m->is_wpx() )
@@ -1209,7 +1224,7 @@ bool_t core_operation_roam_c::process_frame(
             is_security_association_available( *server_m->get_connection_data()->current_ap_data() ) )
             {
             DEBUG( "core_operation_roam_c::process_frame() - WPX fast-roam supported" );
-                
+
             entry->is_cached_sa_available = true_t;
             entry_score += CORE_ROAMING_LIST_BONUS_WPX_FAST_ROAM;
             }

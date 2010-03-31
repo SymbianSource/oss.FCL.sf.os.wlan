@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 38 %
+* %version: 39 %
 */
 
 // INCLUDES
@@ -335,7 +335,8 @@ void CWlanMgmtCommandHandler::Configure(
     TUint32 aKeepAliveInterval,
     TUint32 aSpRcpiTarget,
     TUint32 aSpTimeTarget,
-    TUint32 aSpMinIndicationInterval )
+    TUint32 aSpMinIndicationInterval,
+    TUint32 aEnabledFeatures )
     {
     DEBUG( "CWlanMgmtCommandHandler::Configure()" );
 
@@ -359,9 +360,12 @@ void CWlanMgmtCommandHandler::Configure(
         aSpTimeTarget );
     DEBUG1( "CWlanMgmtCommandHandler::Configure() - aSpMinIndicationInterval = %u",
         aSpMinIndicationInterval );
+    DEBUG1( "CWlanMgmtCommandHandler::Configure() - aEnabledFeatures = 0x%08X",
+        aEnabledFeatures );
 
     TConfigureMsg msg;
     msg.hdr.oid_id = E802_11_CONFIGURE;
+    msg.allowedWlanFeatures = aEnabledFeatures;
     msg.RTSThreshold = aRTSThreshold;
     msg.maxTxMSDULifetime = aMaxTxMSDULifetime;
     msg.voiceCallEntryTimeout = aQoSNullFrameEntryTimeout;

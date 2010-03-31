@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 70 %
+* %version: 71 %
 */
 
 #include "config.h"
@@ -74,6 +74,7 @@ WlanContextImpl::WlanContextImpl( Umac& aUmac ) :
             iUmac( aUmac ), 
             iEnableUserData( EFalse ),
             iCurrentRxBuffer( NULL ),
+            iAllowedWlanFeatures( 0 ),
             iInternalTxBufFree ( ETrue ),
             iInternalTxBufBeingWaited ( EFalse ),            
             iAlignNullData( 0 ), 

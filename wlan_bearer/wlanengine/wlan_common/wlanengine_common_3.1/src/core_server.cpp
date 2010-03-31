@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 89 %
+* %version: 90 %
 */
 
 #include "core_server.h"
@@ -1612,6 +1612,19 @@ core_error_e core_server_c::get_current_ap_info(
         }
 
     return core_error_not_connected;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+core_error_e core_server_c::set_enabled_features(
+    u32_t features )
+    {
+    DEBUG( "core_server_c::set_enabled_features()" );
+
+    core_settings_m.set_enabled_features( features );
+    
+    return core_error_ok;
     }
 
 // ---------------------------------------------------------------------------

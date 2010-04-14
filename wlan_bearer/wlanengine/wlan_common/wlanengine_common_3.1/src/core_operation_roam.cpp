@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76.1.1 %
+* %version: 76.1.2 %
 */
 
 #include "core_operation_roam.h"
@@ -464,7 +464,6 @@ core_error_e core_operation_roam_c::next_state()
             {                        
             DEBUG( "core_operation_roam_c::next_state() - connection done" );
 
-            server_m->get_connection_data()->set_last_rcp_class( core_rcp_normal );
             server_m->get_connection_data()->set_ssid( ssid_m );
             server_m->get_core_settings().roam_metrics().set_roam_ts_userdata_enabled();
             server_m->get_core_settings().roam_metrics().inc_roam_success_count();

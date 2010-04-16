@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 40.1.2 %
+* %version: 41 %
 */
 
 #include "core_operation_get_available_iaps.h"
@@ -284,6 +284,14 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                     channels.channels2dot4ghz[1],
                     channels.channels2dot4ghz[0] );
 
+                u32_t min_ch_time( server_m->get_device_settings().active_broadcast_scan_min_ch_time );
+                u32_t max_ch_time( server_m->get_device_settings().active_broadcast_scan_max_ch_time );
+                if ( server_m->get_core_settings().is_connected() )
+                    {
+                    min_ch_time = server_m->get_device_settings().active_scan_min_ch_time;
+                    max_ch_time = server_m->get_device_settings().active_scan_max_ch_time;
+                    }
+
                 server_m->register_event_handler( this );
                 server_m->register_frame_handler( this );
 
@@ -293,8 +301,8 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                     BROADCAST_SSID,
                     server_m->get_device_settings().scan_rate,
                     channels,
-                    server_m->get_device_settings().active_scan_min_ch_time,
-                    server_m->get_device_settings().active_scan_max_ch_time,
+                    min_ch_time,
+                    max_ch_time,
                     is_split_scan_m );
                 }
 

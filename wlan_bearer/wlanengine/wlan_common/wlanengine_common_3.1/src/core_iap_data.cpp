@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 14.1.1 %
+*/
 
 #include "core_iap_data.h"
 #include "core_tools.h"
@@ -336,4 +339,58 @@ void core_iap_data_c::remove_mac_from_iap_blacklist(
         
         addr = iap_blacklist_m.next();
         }       
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+bool_t core_iap_data_c::is_valid() const
+    {
+    if( iap_data_m.security_mode == core_security_mode_wep )
+        {
+        if( !iap_data_m.wep_key1.key_length &&
+            !iap_data_m.wep_key2.key_length &&
+            !iap_data_m.wep_key3.key_length &&
+            !iap_data_m.wep_key4.key_length )
+            {
+            DEBUG( "core_iap_data_c::is_valid() - security mode is WEP but no keys defined" );
+
+            return false_t;
+            }
+
+        if( ( iap_data_m.default_wep_key > WEP_KEY4 ) ||             
+            ( iap_data_m.default_wep_key == WEP_KEY1 &&
+              !iap_data_m.wep_key1.key_length ) ||
+            ( iap_data_m.default_wep_key == WEP_KEY2 &&
+              !iap_data_m.wep_key2.key_length ) ||
+            ( iap_data_m.default_wep_key == WEP_KEY3 &&
+              !iap_data_m.wep_key3.key_length ) ||
+            ( iap_data_m.default_wep_key == WEP_KEY4 &&
+              !iap_data_m.wep_key4.key_length ) )
+            {
+            DEBUG( "core_iap_data_c::is_valid() - security mode is WEP but default key not defined" );
+
+            return false_t;
+            }
+        }
+
+    if( iap_data_m.wpa_preshared_key_in_use &&
+        !iap_data_m.wpa_preshared_key.key_length )
+        {
+        DEBUG( "core_iap_data_c::is_valid() - security mode is WPA-PSK but key is not defined" );
+
+        return false_t;   
+        }
+    
+    if( iap_data_m.op_mode == core_operating_mode_ibss &&
+        ( iap_data_m.security_mode != core_security_mode_allow_unsecure &&
+          iap_data_m.security_mode != core_security_mode_wep ) )
+        {
+        DEBUG1( "core_iap_data_c::is_valid() - IBSS mode with security mode %u not supported",
+            iap_data_m.security_mode );
+
+        return false_t;        
+        }
+
+    return true_t;
     }

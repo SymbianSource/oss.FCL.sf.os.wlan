@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 4 %
+* %version: 5 %
 */
 
 #ifndef CORE_SUB_OPERATION_CREATE_TS_H
@@ -108,6 +108,9 @@ private: // data
     /** The current status of the traffic stream. */
     core_traffic_stream_status_e& stream_status_m; 
 
+    /** How many times AP has rejected our request due to invalid parameters. */
+    u8_t invalid_parameters_count_m;
+    
     };
 
 #endif // CORE_SUB_OPERATION_CREATE_TS_H

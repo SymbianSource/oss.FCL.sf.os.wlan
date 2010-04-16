@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 84 %
+* %version: 84.1.2 %
 */
 
 #include <in_sock.h>
@@ -649,6 +649,8 @@ void TWlanConversionUtil::ConvertDeviceSettings(
 	aCoreSettings.rcpi_trigger = static_cast<u32_t>( aAmSettings.rcpiTrigger );
 	aCoreSettings.active_scan_min_ch_time = static_cast<u32_t>( aAmSettings.minActiveChannelTime );
 	aCoreSettings.active_scan_max_ch_time = static_cast<u32_t>( aAmSettings.maxActiveChannelTime );
+	aCoreSettings.active_broadcast_scan_min_ch_time = static_cast<u32_t>( aAmSettings.minActiveBroadcastChannelTime );
+	aCoreSettings.active_broadcast_scan_max_ch_time = static_cast<u32_t>( aAmSettings.maxActiveBroadcastChannelTime );	
 	aCoreSettings.passive_scan_min_ch_time = static_cast<u32_t>( aAmSettings.minPassiveChannelTime );
 	aCoreSettings.passive_scan_max_ch_time = static_cast<u32_t>( aAmSettings.maxPassiveChannelTime );
     aCoreSettings.max_tx_msdu_life_time = static_cast<u32_t>( aAmSettings.maxTxMSDULifeTime );
@@ -853,8 +855,8 @@ void TWlanConversionUtil::ConvertIapSettings(
         Mem::Copy(
             aCoreSettings.wpa_preshared_key.key_data,
             aAmSettings.WPAPreSharedKey.Ptr(),
-            aAmSettings.WPAKeyLength );
-        aCoreSettings.wpa_preshared_key.key_length = aAmSettings.WPAKeyLength;
+            aAmSettings.WPAPreSharedKey.Length() );
+        aCoreSettings.wpa_preshared_key.key_length = aAmSettings.WPAPreSharedKey.Length();
         }
 
     // Handle

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 2 %
+* %version: 3 %
 */
 
 #ifndef WLANBGSCANAWSCOMMS_H
@@ -84,14 +84,7 @@ public:
      * @since S60 v5.2
      */
     void SendOrQueueAwsCommand( TAwsMessage& aMessage );
-    
-    /**
-     * Blocks calling thread until AWS is constructed.
-     *
-     * @since S60 v5.2
-     */
-    //void WaitForAwsStartupToComplete();
-    
+        
 private: // From CActive
     
     /**
@@ -131,7 +124,7 @@ private:
      * Clean-up ECOM array
      *
      * @since S60 v5.2
-     * @param aArray ECOM objec array
+     * @param aArray ECOM object array
      */
     static void CleanupEComArray(TAny* aArray);
         
@@ -202,11 +195,6 @@ private: // data
      * If AWS instantiation was successful.
      */
     TBool iAwsOk;
-    
-    /**
-     * Synchronization object between WLAN Engine and AWS threads.
-     */
-    //RSemaphore iStartupLock;
     
     /**
      * Handle to WLAN Engine thread.

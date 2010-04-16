@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 15 %
 */
 
 #ifndef WLANDEVICESETTINGSINTERNALCRKEYS_H
@@ -395,6 +395,16 @@ const TUint32 KWlanBgScanIntervalOffPeakPeriod =         0x00000043;
  * Whether admission control traffic stream management is done automatically.
  */
 const TUint32 KWlanAutomaticTrafficStreamMgmt =          0x00000044;
+
+/**
+ * The minimum channel time for active broadcast scan in milliseconds.
+ */
+const TUint32 KWlanMinActiveBroadcastChannelTime =       0x00000045;
+
+/**
+ * The maximum channel time for active broadcast scan in milliseconds.
+ */
+const TUint32 KWlanMaxActiveBroadcastChannelTime =       0x00000046;
 
 /**
  * Cached WLAN region where possible values are: 

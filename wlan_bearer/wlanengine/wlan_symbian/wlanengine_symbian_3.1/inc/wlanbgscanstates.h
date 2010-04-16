@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 2 %
+* %version: 3 %
 */
 
 #ifndef WLANBGSCANSTATES_H
@@ -366,14 +366,7 @@ private:
      * @param aInterval new background scan interval to be taken into use
      */
     void SetInterval( TUint32 aInterval );
-    
-    /**
-     * Refreshes the used background scan interval.
-     *
-     * @since S60 v5.2
-     */
-    void RefreshUsedInterval();
-      
+          
 protected:
     
     /**
@@ -413,10 +406,7 @@ protected:
      * @param aStatus new status
      * @since S60 v5.2
      */
-    inline void SetAwsStartupStatus( TInt aStatus )
-        {
-        iAwsStartupStatus = aStatus;
-        }
+    inline void SetAwsStartupStatus( TInt aStatus );
     
     /**
      * Set AWS command status.
@@ -425,11 +415,7 @@ protected:
      * @param aStatus new status
      * @since S60 v5.2
      */
-    inline void SetAwsCmdStatus( MWlanBgScanAwsComms::TAwsCommand aCmd, TInt aStatus )
-        {
-        iAwsCmd = aCmd;
-        iAwsCmdStatus = aStatus;
-        }
+    inline void SetAwsCmdStatus( MWlanBgScanAwsComms::TAwsCommand aCmd, TInt aStatus );
     
     /**
      * Set Auto interval.
@@ -437,10 +423,14 @@ protected:
      * @param aAutoInterval new auto interval
      * @since S60 v5.2
      */
-    inline void SetAutoInterval( TUint aAutoInterval )
-        {
-        iAutoInterval = aAutoInterval;
-        }
+    inline void SetAutoInterval( TUint aAutoInterval );
+    
+    /**
+     * Refreshes the used background scan interval.
+     *
+     * @since S60 v5.2
+     */
+    void RefreshUsedInterval();
     
 private: // data
     
@@ -538,7 +528,15 @@ protected: // data
     /**
      * Status code of the completed AWS command.
      */
-    TInt iAwsCommandCompletionCode;           
+    TInt iAwsCommandCompletionCode;         
+    
+    /**
+     * Current WLAN state. 
+     */
+    MWlanBgScanProvider::TWlanBgScanWlanState iWlanState;
+    
     };
+
+#include "wlanbgscanstates.inl"
 
 #endif // WLANBGSCANSTATES_H

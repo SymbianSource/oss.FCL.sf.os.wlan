@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 6 %
+* %version: 7 %
 */
 
 
@@ -78,6 +78,13 @@ class MWlanBgScanProvider
 
 public:
     
+    enum TWlanBgScanWlanState
+        {
+        EWlanStateConnected = 1,
+        EWlanStateDisconnected,
+        EWlanStateMax // not used
+        };
+    
     struct TWlanBgScanSettings
         {
         TUint32 backgroundScanInterval;
@@ -120,11 +127,13 @@ public:
     virtual void ScanComplete() = 0;
         
     /**
-     * Called to indicate that WLAN is no longer connected.
+     * Called to indicate that WLAN state has changed.
      *
      * @since S60 v5.2
+     * 
+     * @param aState New WLAN state
      */
-    virtual void NotConnected() = 0;
+    virtual void WlanStateChanged( const TWlanBgScanWlanState &aState ) = 0;
     
     /**
      * Whether background scan is enabled.

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 30 %
+* %version: 31 %
 */
 
 // INCLUDE FILES
@@ -563,8 +563,7 @@ void CWlanMgmtImpl::CancelProtectedSetup()
         iProtectedSetupRequest->IsActive() )
         {
         iProtectedSetupRequest->Cancel();
-
-        User::RequestComplete( iPendingProtectedSetupStatus, KErrCancel );
+        ProtectedSetupComplete( KErrCancel );
         }
     }
 
@@ -580,8 +579,7 @@ void CWlanMgmtImpl::CancelGetScanResults()
         iScanRequest->IsActive() )
         {
         iScanRequest->Cancel();
-
-        User::RequestComplete( iPendingScanStatus, KErrCancel );
+        ScanComplete( KErrCancel );
         }
     }
 
@@ -597,8 +595,7 @@ void CWlanMgmtImpl::CancelGetAvailableIaps()
         iAvailableIapsRequest->IsActive() )
         {
         iAvailableIapsRequest->Cancel();
-
-        User::RequestComplete( iPendingAvailableIapsStatus, KErrCancel );
+        AvailableIapsComplete( KErrCancel );
         }
     }
 
@@ -808,6 +805,7 @@ void CWlanMgmtImpl::ScanComplete(
     TInt aStatus )
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::ScanComplete()" ) ) );    	
+
     User::RequestComplete( iPendingScanStatus, aStatus );
 	delete iScanRequest;
 	iScanRequest = NULL;
@@ -822,6 +820,7 @@ void CWlanMgmtImpl::AvailableIapsComplete(
     TInt aStatus )
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::AvailableIapsComplete()" ) ) );    	
+
     User::RequestComplete( iPendingAvailableIapsStatus, aStatus );
 	delete iAvailableIapsRequest;    
 	iAvailableIapsRequest = NULL;   

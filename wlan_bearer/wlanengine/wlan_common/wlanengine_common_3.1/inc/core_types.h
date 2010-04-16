@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 95 %
+* %version: 95.1.2 %
 */
 
 #ifndef CORE_TYPES_H
@@ -79,10 +79,10 @@ const u16_t ADMISSION_CAPACITY_NOT_DEFINED = 0xFFFF;
 
 const u32_t REQUEST_ID_CORE_INTERNAL = 0;
 
-const u32_t WEP_KEY1 = 1;
-const u32_t WEP_KEY2 = 2;
-const u32_t WEP_KEY3 = 3;
-const u32_t WEP_KEY4 = 4;
+const u32_t WEP_KEY1 = 0;
+const u32_t WEP_KEY2 = 1;
+const u32_t WEP_KEY3 = 2;
+const u32_t WEP_KEY4 = 3;
 
 const u32_t EAP_TYPE_NONE = 0;
 const u32_t EAP_ERROR_NONE = 0;
@@ -1421,8 +1421,10 @@ struct core_device_settings_s
 	u32_t scan_rate;	                        ///< Data rate used to send probe requests.
 	                                            ///< The rate is defined in units of 500kbit/s.
 	u32_t rcpi_trigger;                         ///< Roaming is attemped when RCPI value is lower than this.
-	u32_t active_scan_min_ch_time;              ///< Min time (TUs) to listen a channel in active scanning.
-	u32_t active_scan_max_ch_time;              ///< Max time (TUs) to listen a channel in active scanning.
+	u32_t active_scan_min_ch_time;              ///< Min time (TUs) to listen a channel in active direct scanning / during an active connection.
+	u32_t active_scan_max_ch_time;              ///< Max time (TUs) to listen a channel in active direct scanning / during an active connection.
+    u32_t active_broadcast_scan_min_ch_time;    ///< Min time (TUs) to listen a channel in active broadcast scanning when not connected.
+    u32_t active_broadcast_scan_max_ch_time;    ///< Max time (TUs) to listen a channel in active broadcast scanning when not connected.
 	u32_t passive_scan_min_ch_time;             ///< Min time (TUs) to listen a channel in passive scanning.
 	u32_t passive_scan_max_ch_time;             ///< Max time (TUs) to listen a channel in passive scanning.
     u32_t max_tx_msdu_life_time;                ///< Max time (TUs) to (re-)send one (fragmented) packet.

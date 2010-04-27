@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 12.1.1 %
 */
 
 //  INCLUDE FILES
@@ -110,49 +110,72 @@ void CWLanSettings::GetDataL( SWLANSettings& aSettings)
     ClearWepKeys( aSettings);
     
     aSettings.Id = iWLANRecord->RecordId();
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.Id: %d"),
+        aSettings.Id));
 
     aSettings.Name = *((CMDBField<TDesC>*)iWLANRecord->GetFieldByIdL(KCDTIdRecordName));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.Name: %S [%d]"),
+        &aSettings.Name, aSettings.Name.Length()));
 
     aSettings.ServiceID = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanServiceId));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.ServiceID: %d"),
+        aSettings.ServiceID));
     
     aSettings.ConnectionMode = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanConnMode));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.ConnectionMode: %d"),
+        aSettings.ConnectionMode));
     
     aSettings.SSID = *((CMDBField<TDesC>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanSSID));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.SSID: %S [%d]"),
+        &aSettings.SSID, aSettings.SSID.Length()));
     
     // new
     aSettings.UsedSSID = *((CMDBField<TDesC>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanUsedSSID));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.UsedSSID: %S [%d]"),
+        &aSettings.UsedSSID, aSettings.UsedSSID.Length()));
     
     aSettings.ScanSSID = *((CMDBField<TBool>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanScanSSID));
-    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL ScanSSID = %d"),aSettings.ScanSSID));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.ScanSSID: %d"),
+        aSettings.ScanSSID));
     
     aSettings.ChannelID = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanChannelID));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.ChannelID: %d"),
+        aSettings.ChannelID));
+
     // end new
 
     aSettings.AuthenticationMode = EWepAuthModeOpen; // defaults to open (in case of wep, the value will be read from db later)
     aSettings.EnableWpaPsk = EFalse;
     aSettings.WPAKeyLength = 0;
+    aSettings.WPAPreSharedKey.Zero();
+    aSettings.PresharedKeyFormat = EWlanPresharedKeyFormatAscii;
 
     aSettings.SecurityMode = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanSecMode));
+    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.SecurityMode: %d"),
+        aSettings.SecurityMode));
     
-    TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL, SecurityMode = %d"),aSettings.SecurityMode));
-
     if( aSettings.SecurityMode == Wep)
         {    
         // authentication mode can be != open only when WEP in use
         aSettings.AuthenticationMode = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanAuthMode));
+        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.AuthenticationMode: %d"),
+            aSettings.AuthenticationMode));
 
         aSettings.WepIndex = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanWepIndex));
-        ReadWepKeysL(aSettings);
+        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.WepIndex: %d"),
+            aSettings.WepIndex));
+        ReadWepKeysL(aSettings);           
         TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL, Wep keys succesfully read")));
         }
     else if( aSettings.SecurityMode > Wep)
         {
         aSettings.WPAKeyLength = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanWpaKeyLength));
+        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.WPAKeyLength: %d"),
+            aSettings.WPAKeyLength));       
         aSettings.EnableWpaPsk = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanEnableWpaPsk));
-        aSettings.PresharedKeyFormat = EWlanPresharedKeyFormatAscii;
-        aSettings.WPAPreSharedKey.Zero();
-        CMDBField<TDesC8>* wpaKey = static_cast<CMDBField<TDesC8>*>(iWLANRecord->GetFieldByIdL(KCDTIdWlanWpaPreSharedKey));
-         
+        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.EnableWpaPsk: %d"),
+            aSettings.EnableWpaPsk));       
+        CMDBField<TDesC8>* wpaKey = static_cast<CMDBField<TDesC8>*>(iWLANRecord->GetFieldByIdL(KCDTIdWlanWpaPreSharedKey));        
         aSettings.WPAPreSharedKey.Append( *wpaKey);
         
         // In WPA-PSK case the preshared key can be either 8 - 63 characters in ASCII
@@ -171,6 +194,9 @@ void CWLanSettings::GetDataL( SWLANSettings& aSettings)
                 aSettings.PresharedKeyFormat = EWlanPresharedKeyFormatHex;
                 }
             }            
+        
+        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.PresharedKeyFormat: %d"),
+            aSettings.PresharedKeyFormat));       
         }
     
     TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL end")));
@@ -1085,6 +1111,7 @@ EXPORT_C TInt CWLanSettings::IsEasyWlan( TUint aServiceId, TBool &aEasyWlan)
 EXPORT_C void CWLanSettings::GetIAPWlanServicesL( RArray<SWlanIAPId>& aServices)
     {
     TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetIAPWlanServicesL start")));
+    CleanupClosePushL( aServices );
     
     CMDBRecordSet<CCDIAPRecord>* iapRecSet = new (ELeave) CMDBRecordSet<CCDIAPRecord>(KCDTIdIAPRecord);
     CleanupStack::PushL( iapRecSet);
@@ -1098,7 +1125,7 @@ EXPORT_C void CWLanSettings::GetIAPWlanServicesL( RArray<SWlanIAPId>& aServices)
     iapPrimer->iServiceType.SetL( servType);
     iapRecSet->iRecords.AppendL( iapPrimer);
     
-    CleanupStack::Pop( ); // iapPrimer
+    CleanupStack::Pop( iapPrimer );
     iapPrimer = 0;
     
     TBool found( EFalse);
@@ -1123,7 +1150,8 @@ EXPORT_C void CWLanSettings::GetIAPWlanServicesL( RArray<SWlanIAPId>& aServices)
                 }
             }
         }
-    CleanupStack::PopAndDestroy( ); // iapRecSet
+    CleanupStack::PopAndDestroy( iapRecSet );
+    CleanupStack::Pop( &aServices );
     TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetIAPWlanServicesL end")));
     }
 

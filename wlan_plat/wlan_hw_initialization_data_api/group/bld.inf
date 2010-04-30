@@ -20,8 +20,6 @@
 * %version: tr1cfwln#5 %
 */
 
-#include <platform_paths.hrh>
-
 PRJ_PLATFORMS
 DEFAULT
 
@@ -30,3 +28,17 @@ PRJ_EXPORTS
 ../inc/wlanhwinitinterface.h    OS_LAYER_PLATFORM_EXPORT_PATH(wlanhwinitinterface.h)
 ../inc/wlanhwinit.h             OS_LAYER_PLATFORM_EXPORT_PATH(wlanhwinit.h)
 ../inc/wlanhwconfiguredata.h    OS_LAYER_PLATFORM_EXPORT_PATH(wlanhwconfiguredata.h)
+
+// DEF file for wlanhwinit.dll
+
+bwins.def   OS_LAYER_PLATFORM_EXPORT_PATH(shai/bwins/wlanhwinitu.def)
+eabi.def    OS_LAYER_PLATFORM_EXPORT_PATH(shai/eabi/wlanhwinitu.def)
+
+// MMH file for people implementing wlanhwinit.dll
+
+wlanhwinit.mmh	OS_LAYER_PLATFORM_EXPORT_PATH(shai/wlanhwinit.mmh)
+
+
+PRJ_MMPFILES
+
+wlanhwinit_lib

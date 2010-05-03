@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 7 %
+* %version: 8 %
 */
 
 
@@ -119,6 +119,11 @@ public:
         
         };
 
+    /**
+     * Destructor.
+     */
+    virtual ~MWlanBgScanProvider() {};
+    
     /**
      * Called when Scan is complete.
      *

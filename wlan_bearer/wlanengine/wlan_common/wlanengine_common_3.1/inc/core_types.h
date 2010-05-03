@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 95.1.2 %
+* %version: 97 %
 */
 
 #ifndef CORE_TYPES_H
@@ -1133,7 +1133,9 @@ typedef enum _core_feature_e
     /** Power save test enabled. */    
     core_feature_power_save_test        = 1,
     /** 802.11k support enabled. */
-    core_feature_802dot11k              = 2
+    core_feature_802dot11k              = 2,
+    /** 802.11n support enabled. */
+    core_feature_802dot11n              = 4    
     } core_feature_e;
 
 /**

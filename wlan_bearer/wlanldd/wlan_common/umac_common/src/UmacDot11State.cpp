@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 85 %
+* %version: 86 %
 */
 
 #include "config.h"
@@ -139,6 +139,9 @@ TBool WlanDot11State::SetPowerMode(
         aCtxImpl.StopPowerModeManagement();
         }
     
+    // it is now also our desired dot11 power management mode
+    aCtxImpl.DesiredDot11PwrMgmtMode( aCtxImpl.ClientDot11PwrMgmtMode() );
+
     aCtxImpl.SetClientLightPsModeConfig( 
         aWakeupModeInLightPs, 
         aListenIntervalInLightPs );
@@ -158,10 +161,6 @@ TBool WlanDot11State::SetPowerMode(
         // there is a difference in current dot11 power management mode and 
         // WLAN Mgmt Client's desired dot11 power management mode
         
-        // So, WLAN Mgmt Client's desired dot11 power management mode becomes
-        // our new desired mode
-        aCtxImpl.DesiredDot11PwrMgmtMode( aCtxImpl.ClientDot11PwrMgmtMode() );
-
         // callee will complete the mgmt command
         ret = OnDot11PwrMgmtTransitRequired( aCtxImpl );
         }
@@ -2305,10 +2304,6 @@ TBool WlanDot11State::ConfigureHtCapabilities(
     if ( aCtxImpl.GetNwHtCapabilitiesIe().iData.DsssCckIn40Mhz() )
         {
         mib->iPeerFeatures |= WHA::KDsssCckIn40Mhz;
-        }
-    if ( aCtxImpl.GetNwHtCapabilitiesIe().iData.Psmp() )
-        {
-        mib->iPeerFeatures |= WHA::KPsmp;
         }
     if ( aCtxImpl.GetNwHtCapabilitiesIe().iData.LsigTxopProtection() )
         {
@@ -4726,13 +4721,15 @@ TBool WlanDot11State::HandleDot11n(
     TBool status ( ETrue ); 
     
     if ( ( aCtxImpl.PairwiseCipher() == EWlanCipherSuiteTkip ) || 
-         !( aCtxImpl.QosEnabled() ) )
+         !( aCtxImpl.QosEnabled() ) ||
+         !( aCtxImpl.FeaturesAllowed() & KWlanHtOperation ) )
         {
         // as the control is here it means that 
         // - the WLAN vendor implementation
         // supports HT AND EITHER
         // - TKIP will be used as the pairwise cipher OR
-        // - the target nw doesn't support WMM
+        // - the target nw doesn't support WMM OR
+        // - HT use has been denied by WLAN Mgmt client
         // In these cases we must not use HT functionality, even if the target 
         // nw supported it. We achieve that by handling the target nw as
         // a non-HT nw
@@ -4740,7 +4737,7 @@ TBool WlanDot11State::HandleDot11n(
         
         OsTracePrint( KInfoLevel, (TUint8*)
             ("UMAC: WlanDot11State::HandleDot11n: TKIP as pairwise cipher "
-             "or WMM not supported => HT disabled") );
+             "OR WMM not supported OR HT use denied => HT disabled") );
         }
     else
         {

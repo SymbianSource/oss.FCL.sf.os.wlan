@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 54 %
+* %version: 55 %
 */
 
 #ifndef WLMSERVER_H
@@ -105,18 +105,20 @@ NONSHARABLE_CLASS( CWlmServer ) :
             };
 
         /**
-         * Bit definitions for WLAN features.
+         * Bit definitions for static WLAN features.
          */
-        enum TWlanFeature
+        enum TWlanStaticFeature
             {
             /** Initialisation value. */
-            EWlanFeatureNone                = 0x00000000,
+            EWlanStaticFeatureNone                = 0x00000000,
             /** Whether WAPI is enabled. */
-            EWlanFeatureWapi                = 0x00000001,
+            EWlanStaticFeatureWapi                = 0x00000001,
             /** Whether power save test is enabled. */
-            EWlanFeaturePowerSaveTest       = 0x00000002,
+            EWlanStaticFeaturePowerSaveTest       = 0x00000002,
             /** Whether 802.11k is enabled. */
-            EWlanFeature802dot11k           = 0x00000004
+            EWlanStaticFeature802dot11k           = 0x00000004,
+            /** Whether 802.11n is enabled. */
+            EWlanStaticFeature802dot11n           = 0x00000008,
             };
 
         /**

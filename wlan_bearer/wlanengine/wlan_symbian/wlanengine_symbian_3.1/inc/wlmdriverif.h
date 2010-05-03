@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 38 %
+* %version: 39 %
 */
 
 #ifndef WLMDRIVERIF_H
@@ -392,6 +392,7 @@ public: // Functions from base classes
      *                       (in microseconds).
      * @param sp_min_indication_interval Defines the minimum time interval for consecutive roam
      *                                   indications from the signal predictor algorithm (in microseconds).
+     * @param enabled_features Bitmask of enabled features. @see core_feature_e.
      */
     void load_drivers(
         u32_t request_id,
@@ -404,7 +405,8 @@ public: // Functions from base classes
         u32_t keep_alive_interval,
         u32_t sp_rcpi_target,
         u32_t sp_time_target,
-        u32_t sp_min_indication_interval );
+        u32_t sp_min_indication_interval,
+        u32_t enabled_features );
 
     /**
      * Send a frame.

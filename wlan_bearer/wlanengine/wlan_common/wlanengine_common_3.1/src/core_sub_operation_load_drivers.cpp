@@ -92,7 +92,7 @@ core_error_e core_sub_operation_load_drivers_c::next_state()
             DEBUG( "core_sub_operation_load_drivers_c::next_state() - loading drivers" );
 
             operation_state_m = core_state_req_load_drivers;
-            
+
             drivers_m->load_drivers(
                 request_id_m,
                 server_m->get_device_settings().rts,
@@ -104,7 +104,8 @@ core_error_e core_sub_operation_load_drivers_c::next_state()
                 server_m->get_device_settings().keep_alive_interval,
                 server_m->get_device_settings().sp_rcpi_target,
                 server_m->get_device_settings().sp_time_target,
-                server_m->get_device_settings().sp_min_indication_interval );
+                server_m->get_device_settings().sp_min_indication_interval,
+                server_m->get_core_settings().enabled_features() );
 
             break;
             }

@@ -469,7 +469,25 @@ public:
      * @param iap_id IAP ID to be removed.
      */   
     void remove_iap_id_from_weak_list( u32_t iap_id );
-	
+
+    /**
+     * Set the currently enabled feature set.
+     *
+     * @since S60 v5.2
+     * @param features Bitmask of enabled features.
+     * @return core_error_ok if success, an error code otherwise.
+     */
+    void set_enabled_features(
+        u32_t features );
+
+    /**
+     * Get the currently enabled feature set.
+     *
+     * @since S60 v5.2
+     * @return Bitmask of enabled features.
+     */
+    u32_t enabled_features() const;
+
 	/**
      * Check whether the given feature is enabled.
      *
@@ -484,10 +502,10 @@ private: // data
 
     /** Defines whether wlan functionality is enabled or disabled */
     bool_t is_wlan_enabled_m;    
-    
+
     /** Defines whether the drivers have been loaded. */
     bool_t is_driver_loaded_m;
-    
+
     /** Specifies the current connection state */
     core_connection_state_e connection_state_m;
 
@@ -511,7 +529,7 @@ private: // data
 
     /** Defines the currently used regional domain. */
     core_wlan_region_e region_m;
-    
+
     /** Defines whether the mobile country code is known or not. */
     bool_t mcc_known_m;
 
@@ -532,14 +550,12 @@ private: // data
 
     /** Power save settings for access classes. */
     core_power_save_settings_s power_save_settings_m;
-    
+
     /** Block ACK usage per traffic stream. */
     core_block_ack_usage_s block_ack_usage_m;
-	
-	    
+
     /** List of IAP Ids whose rcpi values are weak  */
     core_type_list_c<u32_t> weak_iap_list_m;
-    
 
     /** Bitmask of enabled features. */
     u32_t features_m;

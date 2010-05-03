@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 57 %
+* %version: 59 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -24,7 +24,6 @@
 #include "WlanLogicalChannel.h"
 #include "EthernetFrameMemMngr.h"
 #include "EtherCardIoc.h"
-#include "RWlanLogicalChannel.h"
 #include "Umac.h"
 #include "wllddoidmsgstorage.h"
 #include "WlanLogicalDevice.h"
@@ -186,11 +185,6 @@ DWlanLogicalChannel::~DWlanLogicalChannel()
     else if ( iUnit == KUnitEthernet )
         {
         iTxTriggerDfc.Cancel();
-        
-        // detach protocol stack side callback
-        TraceDump(INIT_LEVEL, 
-            ("WLANLDD: detach protocol stack side callback from UMAC"));
-        iUmac.DetachProtocolStackSideUmacCb();
         }
 
     if ( iEthernetFrameMemMngr )
@@ -443,8 +437,7 @@ TInt DWlanLogicalChannel::DoCreate(
         }
     else if ( iUnit == KUnitEthernet )
         {
-        // attach protocol stack side callbac
-        iUmac.AttachProtocolStackSideUmacCb( *this );
+        // nothing for now
         }
     else
         {
@@ -632,11 +625,15 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
     // in supervisor mode
     
     // acquire mutex
+    // Enter critical section before requesting the mutex as
+    // we are executing in the context of a user mode thread
+    NKern::ThreadEnterCS();    
 #ifndef RD_WLAN_DDK
     Kern::MutexWait( iMutex );
 #else
     iOsa->MutexAcquire();
 #endif
+    NKern::ThreadLeaveCS();
     
     TraceDump(MUTEX, 
         (("WLANLDD: DWlanLogicalChannel::DoControlFast: mutex acquired")));
@@ -708,11 +705,15 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
         }
     
     // release mutex
+    // Enter critical section before releasing the mutex as
+    // we are executing in the context of a user mode thread
+    NKern::ThreadEnterCS();    
 #ifndef RD_WLAN_DDK
     Kern::MutexSignal( iMutex );
 #else
     iOsa->MutexRelease();
 #endif 
+    NKern::ThreadLeaveCS();
     
     TraceDump(MUTEX, 
         ("WLANLDD: DWlanLogicalChannel::DoControlFast: mutex released"));
@@ -1010,7 +1011,7 @@ void DWlanLogicalChannel::TxProtocolStackData()
         TBool morePackets ( EFalse );
         iTxActive = ETrue;
         
-        while ( iUmac.TxPermitted( txQueueState ) && iEthernetFrameMemMngr )
+        while ( iEthernetFrameMemMngr && iUmac.TxPermitted( txQueueState ) )
             {
             TDataBuffer* metaHeader = 
                 iEthernetFrameMemMngr->GetTxFrame( txQueueState, morePackets );
@@ -1599,6 +1600,18 @@ TInt DWlanLogicalChannel::OnInitialiseEthernetFrameBuffers(
             aSharedChunkInfo,
             vendorTxHdrLen,
             vendorTxTrailerLen );
+        
+        if ( ( iUnit == KUnitEthernet ) && 
+             ( ret == KErrNone ) )
+            {
+            // attach protocol stack side callback
+            TraceDump(INIT_LEVEL, 
+                ("WLANLDD: attach protocol stack side callback to UMAC"));
+            iUmac.AttachProtocolStackSideUmacCb( *this );
+    
+            // set frame Tx offset for protocol stack side 
+            iUmac.SetTxOffset();
+            }
         }
 
     return ret;
@@ -1613,6 +1626,14 @@ void DWlanLogicalChannel::OnReleaseEthernetFrameBuffers()
     if ( iEthernetFrameMemMngr )
         {
         iEthernetFrameMemMngr->OnReleaseMemory( *iClient );    
+        }
+
+    if ( iUnit == KUnitEthernet )
+        {
+        // detach protocol stack side callback
+        TraceDump(INIT_LEVEL, 
+            ("WLANLDD: detach protocol stack side callback from UMAC"));
+        iUmac.DetachProtocolStackSideUmacCb();
         }
     }
 
@@ -1671,9 +1692,6 @@ TInt DWlanLogicalChannel::OnEthernetSideControl(
                     a1));
                 ret = OnInitialiseEthernetFrameBuffers( 
                     static_cast<TSharedChunkInfo*>(a1) );
-
-                // set frame Tx offset for protocol stack side 
-                iUmac.SetTxOffset();
                 }
             else
                 {

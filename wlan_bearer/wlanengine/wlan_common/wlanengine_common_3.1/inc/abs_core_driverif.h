@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 35 %
+* %version: 36 %
 */
 
 #ifndef ABS_CORE_DRIVERIF_H
@@ -373,6 +373,7 @@ public:
      *                       (in microseconds).
      * @param sp_min_indication_interval Defines the minimum time interval for consecutive roam
      *                                   indications from the signal predictor algorithm (in microseconds).
+     * @param enabled_features Bitmask of enabled features. @see core_feature_e.
      */
     virtual void load_drivers(
         u32_t request_id,
@@ -385,7 +386,8 @@ public:
         u32_t keep_alive_interval,
         u32_t sp_rcpi_target,
         u32_t sp_time_target,
-        u32_t sp_min_indication_interval ) = 0;
+        u32_t sp_min_indication_interval,
+        u32_t enabled_features ) = 0;
 
     /**
      * Send a frame.

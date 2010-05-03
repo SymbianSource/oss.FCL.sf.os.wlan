@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 44 %
+* %version: 45 %
 */
 
 #ifndef WLAN802DOT11_H
@@ -1659,7 +1659,6 @@ struct SHtCapabilitiesIeData
         EStbcRxMask             = 0x0300,
         EDelayedBlockAckMask    = 0x0400,
         EDsssCckIn40MhzMask     = 0x1000,
-        EPsmpMask               = 0x2000,
         ELsigTxopProtectionMask = 0x8000
         };    
 
@@ -1860,18 +1859,6 @@ struct SHtCapabilitiesIeData
     * @param aValue ETrue if supported, EFalse otherwise
     */
     inline void SetDsssCckIn40Mhz( TBool aValue );
-
-    /**
-    * Evaluates if PSMP operation is supported
-    * @return ETrue if supported, EFalse otherwise
-    */
-    inline TBool Psmp() const;
-
-    /**
-    * Sets support for PSMP operation
-    * @param aValue ETrue if supported, EFalse otherwise
-    */
-    inline void SetPsmp( TBool aValue );
 
     /**
     * Evaluates if L-SIG TXOP protection is supported
@@ -2308,37 +2295,6 @@ inline void SHtCapabilitiesIeData::SetDsssCckIn40Mhz( TBool aValue )
         WriteHtoUint16( 
             &iCapabilitiesInfo, 
             temp & ( ~EDsssCckIn40MhzMask ) );        
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-inline TBool SHtCapabilitiesIeData::Psmp() const
-    {
-    return ( ( ReadUint16Toh( &iCapabilitiesInfo ) & EPsmpMask )
-             ? ETrue : EFalse );
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-inline void SHtCapabilitiesIeData::SetPsmp( TBool aValue )
-    {
-    if ( aValue )
-        {
-        WriteHtoUint16( &iCapabilitiesInfo, 
-            ReadUint16Toh( &iCapabilitiesInfo ) | 
-            EPsmpMask );
-        }
-    else
-        {
-        const TUint16 temp ( ReadUint16Toh( &iCapabilitiesInfo ) );
-        WriteHtoUint16( 
-            &iCapabilitiesInfo, 
-            temp & ( ~EPsmpMask ) );        
         }
     }
 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 34 %
+* %version: 35 %
 */
 
 #include "config.h"
@@ -542,9 +542,6 @@ void WlanDot11InitPhase1::ConfigureOurHtCapabilitiesElement(
     aCtxImpl.GetOurHtCapabilitiesIe().iData.SetDsssCckIn40Mhz( 
         aCtxImpl.WHASettings().iHtCapabilities.iHTCapabilitiesBitMask & 
         WHA::KDsssCckIn40Mhz );
-    aCtxImpl.GetOurHtCapabilitiesIe().iData.SetPsmp( 
-        aCtxImpl.WHASettings().iHtCapabilities.iHTCapabilitiesBitMask & 
-        WHA::KPsmp );
     aCtxImpl.GetOurHtCapabilitiesIe().iData.SetLsigTxopProtection( 
         aCtxImpl.WHASettings().iHtCapabilities.iHTCapabilitiesBitMask & 
         WHA::KLsigTxopProtection );

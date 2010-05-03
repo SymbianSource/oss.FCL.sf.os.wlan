@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 51 %
+* %version: 52 %
 */
 
 #include <wlanhwinit.h>
@@ -131,7 +131,8 @@ void CWlmDriverIf::load_drivers(
     u32_t keep_alive_interval,
     u32_t sp_rcpi_target,
     u32_t sp_time_target,
-    u32_t sp_min_indication_interval )
+    u32_t sp_min_indication_interval,
+    u32_t enabled_features )
     {
     DEBUG( "CWlmDriverIf::load_drivers()" );
 
@@ -227,7 +228,8 @@ void CWlmDriverIf::load_drivers(
         keep_alive_interval,
         sp_rcpi_target,
         sp_time_target,
-        sp_min_indication_interval );
+        sp_min_indication_interval,
+        TWlanConversionUtil::ConvertFeatureFlags( enabled_features ) );
     }
 
 // -----------------------------------------------------------------------------

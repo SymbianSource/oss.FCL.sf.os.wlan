@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 55 %
+* %version: 56 %
 */
 
 #include "config.h"
@@ -690,6 +690,10 @@ TBool Umac::HandleConfigure(const TAny *aInputBuffer)
     
     const TConfigureMsg* msg = static_cast<const TConfigureMsg*>(aInputBuffer);
 
+#ifndef NDEBUG
+    OsTracePrint( KWlmCmdDetails, (TUint8*)
+        ("UMAC: Umac::HandleConfigure: allowedWlanFeatures: 0x%08x"), 
+        msg->allowedWlanFeatures );
     OsTracePrint( KWlmCmdDetails, (TUint8*)
         ("UMAC: Umac::HandleConfigure: RTSThreshold: %d"), 
         msg->RTSThreshold );
@@ -720,7 +724,10 @@ TBool Umac::HandleConfigure(const TAny *aInputBuffer)
     OsTracePrint( KWlmCmdDetails, (TUint8*)
         ("UMAC: Umac::HandleConfigure: spMinIndicationInterval: %d"), 
         msg->spMinIndicationInterval );
-
+#endif
+    
+    iPimpl->FeaturesAllowed( msg->allowedWlanFeatures );
+    
     return iPimpl->CurrentState().Configure( 
         *iPimpl, 
         msg->RTSThreshold, 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 84.1.2 %
+* %version: 86 %
 */
 
 #include <in_sock.h>
@@ -1794,19 +1794,42 @@ void TWlanConversionUtil::ConvertPowerSaveMode(
 // ---------------------------------------------------------
 //
 u32_t TWlanConversionUtil::ConvertFeatureFlags(
-    TUint aFeatures )
+    TUint aStaticFeatures,
+    TUint aDynamicFeatures )
     {
     u32_t coreFeatures( core_feature_none );
-    if( aFeatures & CWlmServer::EWlanFeaturePowerSaveTest )
+    if( aStaticFeatures & CWlmServer::EWlanStaticFeaturePowerSaveTest )
         {
         coreFeatures |= core_feature_power_save_test;
         }
-    if( aFeatures & CWlmServer::EWlanFeature802dot11k )
+    if( aStaticFeatures & CWlmServer::EWlanStaticFeature802dot11k )
         {
         coreFeatures |= core_feature_802dot11k;
         }
+    if( ( aStaticFeatures & CWlmServer::EWlanStaticFeature802dot11n ) &&
+        ( aDynamicFeatures & EWlanRunTimeFeature802dot11n ) ) 
+        {
+        coreFeatures |= core_feature_802dot11n;
+        }
 
     return coreFeatures;
+    }
+
+// ---------------------------------------------------------
+// TWlanConversionUtil::ConvertFeatureFlags()
+// ---------------------------------------------------------
+//
+TUint TWlanConversionUtil::ConvertFeatureFlags(
+    u32_t aCoreFlags )
+    {
+    TUint ret( 0 );
+
+    if( aCoreFlags & core_feature_802dot11n )
+        {
+        ret |= KWlanHtOperation;
+        }
+
+    return ret;
     }
 
 // ---------------------------------------------------------

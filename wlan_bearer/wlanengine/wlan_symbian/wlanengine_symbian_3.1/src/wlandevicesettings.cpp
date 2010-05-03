@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 20 %
+* %version: 21 %
 */
 
 // INCLUDE FILES
@@ -206,6 +206,7 @@ EXPORT_C void CWlanDeviceSettings::GetDefaultSettings(
     aSettings.automaticTrafficStreamMgmt = ETrue;
     aSettings.minActiveBroadcastChannelTime = KWlanDefaultMinActiveBroadcastChannelTime;
     aSettings.maxActiveBroadcastChannelTime = KWlanDefaultMaxActiveBroadcastChannelTime;
+    aSettings.enabledFeatures = KWlanDefaultEnabledFeatures;
     aSettings.region = KWlanDefaultRegion;
     aSettings.regionTimestamp = KWlanDefaultRegionTimestamp;
     }
@@ -802,6 +803,13 @@ TInt CWlanDeviceSettings::ReadPrivateData( SWlanDeviceSettings& aSettings )
     if( err == KErrNone ) 
         {
         aSettings.maxActiveBroadcastChannelTime = temp;
+        }  
+
+    // Read KWlanEnabledFeatures
+    err = repository->Get( KWlanEnabledFeatures, temp );
+    if( err == KErrNone ) 
+        {
+        aSettings.enabledFeatures = temp;
         }  
 
     // Read KWlanRegion
@@ -1440,6 +1448,15 @@ TInt CWlanDeviceSettings::WritePrivateData( const SWlanDeviceSettings& aSettings
         DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanMaxActiveBroadcastChannelTime );
         }
 
+    // Write KWlanEnabledFeatures
+    err = repository->Set( 
+        KWlanEnabledFeatures, 
+        static_cast<TInt>( aSettings.enabledFeatures ) );
+    if( err ) 
+        {
+        DEBUG1( "CWlanDeviceSettings::WritePrivateData() - could not set key 0x%X", KWlanEnabledFeatures );
+        }
+
     // Write KWlanRegion
     err = repository->Set( 
     	KWlanRegion, 
@@ -1717,6 +1734,8 @@ void CWlanDeviceSettings::LogSettings( const SWlanDeviceSettings& aSettings ) co
         aSettings.minActiveBroadcastChannelTime );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - maxActiveBroadcastChannelTime == %d",
         aSettings.maxActiveBroadcastChannelTime );
+    DEBUG1( "CWlanDeviceSettings::LogSettings() - enabledFeatures == %d",
+        aSettings.enabledFeatures );    
     DEBUG1( "CWlanDeviceSettings::LogSettings() - region == %u",
         aSettings.region );
     DEBUG1( "CWlanDeviceSettings::LogSettings() - regionTimestamp == %d",

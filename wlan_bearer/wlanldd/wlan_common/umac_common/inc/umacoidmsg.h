@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 43 %
+* %version: 44 %
 */
 
 #ifndef WLAN_OID_MSG_H
@@ -555,6 +555,13 @@ typedef struct _TConfigureMsg
     {
     /** Common message header */
     TOIDHeader hdr;
+    /** 
+    * If a bit in this mask is set, use of the corresponding WLAN 
+    * feature is allowed; otherwise it is not allowed.
+    * Note that this mask doesn't contain all supported WLAN features
+    * but only the ones which we allow to be be configured on or off. 
+    */
+    TWlanFeatures allowedWlanFeatures;    
     /** Limit for packet size when to use RTS/CTS protocol. */
     TUint16 RTSThreshold;
     /** Max. time to (re-)send whole MSDU packet (in TUs) */
@@ -607,7 +614,6 @@ typedef struct _TConfigureMsg
     * loss prediction indications.
     */
     TUint32 spMinIndicationInterval;
-
     } TConfigureMsg;
 
 // -------------------------------------------------------------------------

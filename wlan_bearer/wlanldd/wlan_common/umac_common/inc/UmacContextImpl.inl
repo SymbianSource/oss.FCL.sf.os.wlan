@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76 %
+* %version: 77 %
 */
 
 #include "umacconnectcontext.h"
@@ -250,6 +250,24 @@ inline void WlanContextImpl::TxRatePolicy(
 inline TMacAddress& WlanContextImpl::GetBssId() 
     {
     return iConnectContext.iBSSID;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline void WlanContextImpl::FeaturesAllowed( TWlanFeatures aFeaturesAllowed )
+    {
+    iAllowedWlanFeatures = aFeaturesAllowed;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline TWlanFeatures WlanContextImpl::FeaturesAllowed() const
+    {
+    return iAllowedWlanFeatures;
     }
 
 // ---------------------------------------------------------------------------

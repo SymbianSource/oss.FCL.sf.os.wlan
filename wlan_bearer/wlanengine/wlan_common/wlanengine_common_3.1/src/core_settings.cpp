@@ -48,7 +48,8 @@ core_settings_c::core_settings_c(
     weak_iap_list_m( ),
 	features_m( features )
     {
-    DEBUG( "core_settings_c::core_settings_c()" ); 
+    DEBUG1( "core_settings_c::core_settings_c() - features: 0x%08X",
+        features ); 
 
     clear_connection_statistics();
 
@@ -740,6 +741,38 @@ void core_settings_c::remove_iap_id_from_weak_list( u32_t iap_id )
         
         iap_id_p = weak_iap_list_m.next();
         }       
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+void core_settings_c::set_enabled_features(
+    u32_t features )
+    {
+    DEBUG1( "core_settings_c::set_enabled_features() - features: 0x%08X",
+        features );
+    if( features & core_feature_power_save_test )
+        {
+        DEBUG( "core_settings_c::set_enabled_features() - core_feature_power_save_test" );
+        }
+    if( features & core_feature_802dot11k )
+        {
+        DEBUG( "core_settings_c::set_enabled_features() - core_feature_802dot11k" );
+        }
+    if( features & core_feature_802dot11n )
+        {
+        DEBUG( "core_settings_c::set_enabled_features() - core_feature_802dot11n" );
+        }
+
+    features_m = features;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+u32_t core_settings_c::enabled_features() const
+    {
+    return features_m;
     }
 
 // ---------------------------------------------------------------------------

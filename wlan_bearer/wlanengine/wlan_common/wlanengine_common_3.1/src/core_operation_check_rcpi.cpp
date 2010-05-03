@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 21 %
+* %version: 22 %
 */
 
 #include "core_operation_check_rcpi.h"
@@ -299,24 +299,6 @@ core_error_e core_operation_check_rcpi_c::next_state()
 
             DEBUG( "core_operation_check_rcpi_c::next_state() - roamed successfully" );
                         
-            /**
-             * If moving from weak level to normal, notify client.
-             */
-            if ( server_m->get_connection_data()->last_rcp_class() != core_rcp_normal )
-                {
-                DEBUG( "core_operation_check_rcpi_c::next_state() - sending a notification about the normal signal level" );
-
-                u8_t buf[5];
-                buf[0] = static_cast<u8_t>( core_rcp_normal );
-                buf[1] = server_m->get_connection_data()->current_ap_data()->rcpi();
-                
-                adaptation_m->notify(
-                    core_notification_rcp_changed,
-                    sizeof( buf ),
-                    buf );
-                server_m->get_connection_data()->set_last_rcp_class( core_rcp_normal );
-                }
-
             /** 
              * Send an indication to adaptation to indicate that this
              * roam attempt has been completed.

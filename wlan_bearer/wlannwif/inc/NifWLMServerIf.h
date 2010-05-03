@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 8 %
+* %version: 9 %
 */
 
 #ifndef __NIFWLMSERVERIF_H__
@@ -222,7 +222,9 @@ private: // Data
  * This class implements the callback interface for
  * asynchronous notifications from WLAN engine.  
  */
-NONSHARABLE_CLASS ( CLANNifWLMServerCommon ) : public MWLMNotify
+NONSHARABLE_CLASS ( CLANNifWLMServerCommon ) :
+    public CBase,
+    public MWLMNotify
     {
 
 public:

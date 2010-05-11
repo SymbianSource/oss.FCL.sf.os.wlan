@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 5 %
+* %version: 6 %
 */
 
 #include <wlanosa.h>
@@ -37,7 +37,7 @@ inline list<T>::~list()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::iterator list<T>::begin()
+inline typename list<T>::iterator list<T>::begin()
     {
     // for empty ranges begin() == end()
     return ( !(empty()) ? list_iterator<Node, T>( iFirst ) : end() );
@@ -48,7 +48,7 @@ inline list<T>::iterator list<T>::begin()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::const_iterator list<T>::begin() const
+inline typename list<T>::const_iterator list<T>::begin() const
     {
     // for empty ranges begin() == end()
     return ( !(empty()) ? list_iterator<Node, T>( iFirst ) : end() );
@@ -59,7 +59,7 @@ inline list<T>::const_iterator list<T>::begin() const
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::iterator list<T>::end()
+inline typename list<T>::iterator list<T>::end()
     {
     return list_iterator<Node, T>();
     }
@@ -69,7 +69,7 @@ inline list<T>::iterator list<T>::end()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::const_iterator list<T>::end() const
+inline typename list<T>::const_iterator list<T>::end() const
     {
     return list_iterator<Node, T>();
     }
@@ -79,7 +79,7 @@ inline list<T>::const_iterator list<T>::end() const
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::size_type list<T>::size() const
+inline typename list<T>::size_type list<T>::size() const
     {
     return iNumOfElems;
     }
@@ -99,7 +99,7 @@ inline TBool list<T>::empty() const
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::reference list<T>::front()
+inline typename list<T>::reference list<T>::front()
     {
     // front() for empty sequence is undefined so assert
     MWlanOsa::Assert( 
@@ -112,7 +112,7 @@ inline list<T>::reference list<T>::front()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::const_reference list<T>::front()  const
+inline typename list<T>::const_reference list<T>::front()  const
     {
     // front() for empty sequence is undefined so assert
     MWlanOsa::Assert( 
@@ -125,7 +125,7 @@ inline list<T>::const_reference list<T>::front()  const
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::reference list<T>::back()
+inline typename list<T>::reference list<T>::back()
     {
     // back() for empty sequence is undefined so assert
     MWlanOsa::Assert( 
@@ -138,7 +138,7 @@ inline list<T>::reference list<T>::back()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::const_reference list<T>::back() const
+inline typename list<T>::const_reference list<T>::back() const
     {
     // back() for empty sequence is undefined so assert
     MWlanOsa::Assert( 
@@ -304,7 +304,9 @@ inline void list<T>::pop_front()
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::iterator list<T>::insert( iterator aPos, const T& aElem )
+inline typename list<T>::iterator list<T>::insert( 
+    iterator aPos, 
+    const T& aElem )
     {
     // allocate a new node for the element
     Node* node = new Node( aElem );
@@ -355,7 +357,7 @@ inline list<T>::iterator list<T>::insert( iterator aPos, const T& aElem )
 // -----------------------------------------------------------------------------
 //
 template<class T>
-inline list<T>::iterator list<T>::erase( iterator aPos )
+inline typename list<T>::iterator list<T>::erase( iterator aPos )
     {
     // extract node to be erased
     Node* node = aPos();

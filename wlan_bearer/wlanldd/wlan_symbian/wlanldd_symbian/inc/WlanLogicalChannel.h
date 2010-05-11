@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 31 %
+* %version: 32 %
 */
 
 #ifndef DWLANLOGICALCHANNEL_H
@@ -667,12 +667,12 @@ private:
 
 private:    // data
 
-    const TUint32   KFreeOpenParamsMask            = ( 1 << 0 );
-    const TUint32   KFreeScanResponseFramebodyMask = ( 1 << 1 );    
-    const TUint32   KDfcCancelledMask              = ( 1 << 2 );
-    const TUint32   KFreeIeDataMask                = ( 1 << 3 );
-    const TUint32   KPowerHandlerRegistered        = ( 1 << 4 );
-    const TUint32   KTxTriggerArmed                = ( 1 << 5 );
+    static const TUint32   KFreeOpenParamsMask            = ( 1 << 0 );
+    static const TUint32   KFreeScanResponseFramebodyMask = ( 1 << 1 );    
+    static const TUint32   KDfcCancelledMask              = ( 1 << 2 );
+    static const TUint32   KFreeIeDataMask                = ( 1 << 3 );
+    static const TUint32   KPowerHandlerRegistered        = ( 1 << 4 );
+    static const TUint32   KTxTriggerArmed                = ( 1 << 5 );
 
     TOpenParam      iOpenParam;
 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 55 %
+* %version: 55.1.1 %
 */
 
 #ifndef WLMSERVER_H
@@ -43,6 +43,7 @@
 class CWlmDriverIf;
 class CWlanSsidListDb;
 class CWlanTimerServices;
+class CWlanTickTimer;
 
 /**
  * Command Ids to be used un the asynchronous core service requests
@@ -61,6 +62,9 @@ const TInt KBackgroundScanIntervalNever = 0;
 
 /** UID for WLAN Power Save Test Notifier */
 const TUid KUidWlanPowerSaveTestNote = { 0x101F6D4F };
+
+/** Multiplier for converting seconds into microseconds */
+const TUint KWlanSecsToMicrosecsMultiplier( 1000000 );
 
 /**
 * The server for WLAN services. Counterpart of RWLMServer.
@@ -90,7 +94,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
             TAny* iParam1;
             TAny* iParam2;
             TAny* iParam3;
-            TTime* iTime;
+            TUint* iTime;
 
             SRequestMapEntry() :
                 iRequestId( 0 ),
@@ -907,7 +911,21 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * @return error code
          */       
         static TInt ScanSchedulingTimerExpired( TAny* aThisPtr );
-        
+
+        /**
+         * Method called by the scan scheduling timer when it expires.
+         * @param aThisPtr Pointer to the server instance.
+         * @return error code
+         */
+        static TInt ScanSchedulingTimerCanceled( TAny* aThisPtr );
+
+        /**
+         * A callback method that does absolutely nothing.
+         * @param aThisPtr Pointer to the server instance.
+         * @return error code
+         */
+        static TInt EmptyCb( TAny* aThisPtr );
+
         /**
          * Handles the conversion of IAP data list.
          * @param aCoreIapDataList Converted IAP data list.
@@ -949,11 +967,11 @@ NONSHARABLE_CLASS( CWlmServer ) :
 
         /**
          * Updates the scan scheduling timer.
-         * @param aScanTime specifies when the scan should be started.
+         * @param aScanTime specifies when the scan should be started in system ticks.
          * @param aTriggeringRequestId the id of that request which updates the timer.
          */        
         void UpdateScanSchedulingTimer( 
-        	TTime aScantime,
+        	TUint aScantime,
         	TUint aTriggeringRequestId );
 
         /**
@@ -1091,7 +1109,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * @param aDelay Number of seconds to add to current moment in time.
          * @return Calculated time.
          */
-        inline TTime CalculateScanStartTime(
+        inline TUint CalculateScanStartTime(
             const TInt aDelay ) const;
 
         /**
@@ -1195,7 +1213,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * Timer creating periodic expirations.
          * Used for starting scheduled scans
          */
-        CPeriodic* iScanSchedulingTimer;
+        CWlanTickTimer* iScanSchedulingTimer;
 
         /**
          * Cache for scanresults etc.
@@ -1298,12 +1316,17 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * EAPOL callback handler in core. Not owned by this pointer.
          */        
         abs_wlan_eapol_callback_c* iEapolHandler;
-       
-        /**
-         * Time when the scan scheduling timer is set to expire.
+
+        /** 
+         * The amount of microseconds per a system tick.
          */
-        TTime iScanSchedulingTimerExpiration;
-        
+        TInt iSystemTickPeriod;
+
+        /**
+         * Time in system ticks when the scan scheduling timer is set to expire.
+         */
+        TUint iScanSchedulingTimerExpiration;
+
         /**
          * Request id to that request in the iRequestMap which has set the scan scheduling timer.
          */

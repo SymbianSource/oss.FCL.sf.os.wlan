@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 105 %
+* %version: 106 %
 */
 
 #include <e32def.h>
@@ -463,6 +463,19 @@ void CWlmServer::Connect(
     const RMessage2& aMessage )
     {
     DEBUG( "CWlmServer::Connect()" );
+
+    // Check that WLAN is ON
+    TWlanOnOffState wlanState( iPlatform->GetWlanOnOffState() );
+	if( wlanState != EWlanOn )
+	    {
+		// WLAN is OFF
+		DEBUG1( "CWlmServer::Connect() refused due to WLAN is OFF (%d)",
+		    wlanState );
+		// WLAN state enumerations map one to one to WLAN error code
+		aMessage.Complete( wlanState );
+		
+		return;
+		}
 
     // Get WlanSettings and secondarySSID list
     // (lanServiceId specifies the table row in wlansettings)
@@ -1814,9 +1827,11 @@ void CWlmServer::notify(
                         iAggressiveScanningAfterLinkLoss = EFalse;
                         }
                     
-                    // If background scan is on, this call will cause a background scan to occur.
-					// The icon is updated after the background scan is completed.
-                    iBgScanProvider->WlanStateChanged( MWlanBgScanProvider::EWlanStateDisconnected );
+					// If WLAN is ON, enable background scanning
+					if( iPlatform->GetWlanOnOffState() == EWlanOn )
+					    {
+                        iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+                        }
                     
                     break;
                 case EWlanStateInfrastructure:
@@ -2325,7 +2340,7 @@ void CWlmServer::request_complete(
                 // If background scan is currently on, background scan
                 // will be disabled and it's request will be removed
                 // from the request map.
-                iBgScanProvider->WlanStateChanged( MWlanBgScanProvider::EWlanStateConnected );
+                iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
                 
                 }
             }
@@ -3505,12 +3520,15 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
     DEBUG1( "CWlmServer::ScanSchedulingTimerExpired() - iRequestId %u", self->iRequestMap[index].iRequestId );
     
     TUint indexNextScan( 0 );
-    // If roaming is ongoing, scanning is not started for GetScanResults. 
-    if ( self->iRequestMap[index].iRequestId >= KWlanExtCmdBase && 
-         self->iRequestMap[index].iFunction == EGetScanResults && 
-    	 self->IsRoaming() )
+    // If roaming is ongoing or WLAN is OFF, scanning is not started for
+    // GetScanResults but instead empty scan list is returned. 
+    if ( ( self->iRequestMap[index].iRequestId >= KWlanExtCmdBase && 
+           self->iRequestMap[index].iFunction == EGetScanResults ) && 
+    	 ( self->IsRoaming() || self->iPlatform->GetWlanOnOffState() != EWlanOn ) )
         {
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetScanResults, roam in progress, returning empty scan results" );
+        DEBUG2( "CWlmServer::ScanSchedulingTimerExpired() - GetScanResults, returning empty list; roaming: %d, WLAN on/off: %d",
+            self->IsRoaming(),
+            self->iPlatform->GetWlanOnOffState() );
 
         ScanList* completedScanList = reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam0 );
         core_ssid_s* completedSsid =  reinterpret_cast<core_ssid_s*>( self->iRequestMap[index].iParam1 );
@@ -3553,19 +3571,27 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
     if ( self->iRequestMap[index].iRequestId >= KWlanExtCmdBase && 
          self->iRequestMap[index].iFunction == EGetAvailableIaps )
         {
-        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps requested" );
-
+        DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps" );
+            
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
         core_type_list_c<u32_t>* iapIdList =  reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
         ScanList* scanList =  reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam2 );
         core_type_list_c<core_ssid_entry_s>* iapSsidList =  reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
         TTime* scanTime =  reinterpret_cast<TTime*>( self->iRequestMap[index].iTime );        
-        
-        // If the device is roaming OR there are not WLAN IAPs defined in the device
+
+        // If the device is roaming OR
+        // there are not WLAN IAPs defined in the device OR
+        // WLAN is OFF
         // --> return empty list
-        if( self->IsRoaming() || iapDataList->count() == 0 )
+        if( self->IsRoaming() ||
+            iapDataList->count() == 0 ||
+            self->iPlatform->GetWlanOnOffState() != EWlanOn )
             {
-            DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - Device is roaming or no IAPs defined, returning empty list" );
+            DEBUG3( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps, returning empty list; roaming: %d, iaps: %d, WLAN on/off: %d",
+                self->IsRoaming(),
+                iapDataList->count(),
+                self->iPlatform->GetWlanOnOffState() );    
+            
             // Only the triggering request is completed and then scan scheduling timer is set again 
             if( self->IsSessionActive( self->iRequestMap[index] ) )
                 {
@@ -4351,6 +4377,18 @@ void CWlmServer::RunProtectedSetup(
     {
     DEBUG( "CWlmServer::RunProtectedSetup()" );
     
+    // Check that WLAN is ON
+	TWlanOnOffState wlanState( iPlatform->GetWlanOnOffState() );
+	if( wlanState != EWlanOn )
+	    {
+		// WLAN is OFF and therefore request is not served.
+		DEBUG1( "CWlmServer::RunProtectedSetup() rejected due to WLAN is OFF (%d)",
+		    wlanState );
+		// WLAN states map one to one to WLAN error codes.
+		aMessage.Complete( wlanState );
+		return;
+		}
+    
     // Get WlanSettings and secondarySSID list
     // (lanServiceId specifies the table row in wlansettings)
     SWLANSettings iapData;
@@ -4972,6 +5010,12 @@ void CWlmServer::StartupComplete()
      */
     UpdateWlanSettings();
 
+    // If WLAN is set ON, enable background scanning
+    if( iPlatform->GetWlanOnOffState() == EWlanOn )
+        {
+        iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+        }
+
     iPlatform->InitializeSystemTimeHandler();
     }
 
@@ -5174,3 +5218,87 @@ void CWlmServer::PublishBgScanInterval( TUint32& aInterval )
     iPlatform->PublishBgScanInterval( aInterval );
     }
     
+// ---------------------------------------------------------
+// CWlmServer::WlanOn
+// ---------------------------------------------------------
+//
+void CWlmServer::WlanOn()
+    {
+	DEBUG( "CWlmServer::WlanOn()" );
+	
+	// BG scan can be set ON only after BG scan interval has been
+	// set and that does not happen until startup has been
+	// completed.
+	if( iIsStartupComplete )
+	    {
+	    // Enable background scanning
+	    iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+	    }
+	}
+
+// ---------------------------------------------------------
+// CWlmServer::WlanOff
+// ---------------------------------------------------------
+//
+void CWlmServer::WlanOff()
+    {
+	DEBUG( "CWlmServer::WlanOff()" );
+	
+	// Disable background scanning
+	iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
+	
+	// Cancel all running operations that are forbidden in WLAN OFF
+    CancelExternalRequestsByType( ERunProtectedSetup );
+    CancelExternalRequestsByType( EJoinByProfileId );
+    
+	// If WLAN is connected...
+    if( iConnectionState != EWlanStateNotConnected )
+        {
+        //...send out disconnected indication, which brings down
+        // the connection gracefully
+        TBuf8<KMaxNotificationLength> buf;
+        buf.Append( static_cast<u8_t>( EWlanStateNotConnected ) );
+        SendNotification( EWlmNotifyConnectionStateChanged, buf );
+        }
+	}
+    
+// ---------------------------------------------------------
+// CWlmServer::CancelRequestsByType
+// ---------------------------------------------------------
+//
+void CWlmServer::CancelExternalRequestsByType(
+    const TWLMCommands aCommand )
+    {
+    DEBUG1( "CWlmServer::CancelExternalRequestsByType( aCommand=%u )", aCommand );
+
+    // Go through request map and cancel the command given as a parameter
+    for( TInt i( 0 ); i < iRequestMap.Count(); i++ )
+        {
+        if( iRequestMap[i].iFunction == aCommand )
+            {
+            DEBUG1( "CWlmServer::CancelExternalRequestsByType() - request found (id=%u), cancelling",
+                iRequestMap[i].iRequestId );
+            
+            iCoreServer->cancel_request( iRequestMap[i].iRequestId );
+            }
+        }
+    }
+
+// ---------------------------------------------------------
+// CWlmServer::SendNotification
+// ---------------------------------------------------------
+//
+void CWlmServer::SendNotification(
+    TWlmNotify amNotification,
+    TBuf8<KMaxNotificationLength>& aParams )
+    {
+    DEBUG1( "CWlmServer::SendNotification( notification=%u )",
+        amNotification );
+    
+    // Notify subscribees
+    for ( TInt i = 0; i < iNotificationArray.Count(); i++ )
+        {
+        iNotificationArray[i]->AddNotification( amNotification, aParams );
+        }
+    }
+ 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 11 %
 */
 
 #ifndef WLANBGSCAN_H
@@ -93,7 +93,7 @@ public:
      * 
      * @param aState New WLAN state
      */
-    void WlanStateChanged( const MWlanBgScanProvider::TWlanBgScanWlanState &aState );
+    void WlanSetBgScanState( const MWlanBgScanProvider::TWlanBgScanState &aState );
     
     /**
      * From MWlanBgScanProvider.

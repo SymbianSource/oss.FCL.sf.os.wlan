@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 56 %
+* %version: 57 %
 */
 
 #include "config.h"
@@ -267,7 +267,16 @@ void Umac::FinitSystem()
     {
     OsTracePrint( KInitLevel, (TUint8*)("UMAC: * FinitSystem()"));  
     iManagementRequestPending = ETrue;
-    iPimpl->CurrentState().FinitSystem( *iPimpl );
+
+    if ( iPimpl )
+        {
+        iPimpl->CurrentState().FinitSystem( *iPimpl );
+        }
+    else
+        {
+        // nothing to do. Just complete the WLAN Mgmt client request 
+        CompleteManagementCommand( KErrNone );
+        }
     }
 
 // ---------------------------------------------------------------------------

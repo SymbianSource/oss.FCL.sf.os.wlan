@@ -18,7 +18,7 @@
 */
 
 /*
-* %version: 6 %
+* %version: 7 %
 */
 
 #ifndef WLANINTERNALPSKEYS_H
@@ -66,6 +66,23 @@ enum TPSWlanIndicator
 */
 const TUint KPSWlanBgScanInterval = 0x00000003;
 const RProperty::TType KPSWlanBgScanIntervalType = RProperty::EInt;
+
+/**
+ * WLAN on/off state
+ */
+const TUint KPSWlanOnOffState = 0x00000004;
+const RProperty::TType KPSWlanOnOffStateType = RProperty::EInt;
+
+/**
+ * Possible values for WLAN on/off state
+ */
+enum TPSWlanOnOff
+    {
+    /** WLAN is OFF */
+    EPSWlanOff = 0,
+    /** WLAN is ON */
+    EPSWlanOn
+    };
 
 #endif // WLANINTERNALPSKEYS_H
            

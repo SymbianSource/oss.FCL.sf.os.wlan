@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #ifndef WLMPLATFORMDATA_H
@@ -26,6 +26,7 @@
 #include "802dot11.h"
 #include "wlmsystemnotify.h"
 #include "wlmplatformsubscriber.h"
+#include "wlaninternalpskeys.h"
 
 /**
 * Interface class to PubSub and CenRep.
@@ -99,6 +100,12 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
          */
         TInt PublishBgScanInterval(
             TUint32& aInterval );
+            
+        /**
+         * Method for reading WLAN on/off state.
+         * @return WLAN on/off state
+         */
+        TWlanOnOffState GetWlanOnOffState();
 
     private:   // Methods
 
@@ -112,6 +119,31 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
         * Symbian 2nd phase constructor.
         */
         void ConstructL();
+        
+        /**
+         * Notifies WLAN on/off observer of the changes
+         */
+        void NotifyWlanOnOffObserver();
+        
+        /**
+         * Method for publishing WLAN on/off state.
+         * @since S60^4
+         * @param aWlanState WLAN state to be published.
+         * @return Symbian error code.
+         */
+        TInt PublishWlanOnOff( TPSWlanOnOff aWlanState );
+
+    private:  // Definitions
+        
+        /**
+         * Last WLAN on/off state notified to the observer.
+         */
+        enum TWlanNotifiedState
+            {
+            EWlanNotifiedNone,  // Initial value, Observer not yet notified anything
+            EWlanNotifiedOff,   // Observer notified that WLAN is set OFF
+            EWlanNotifiedOn     // Observer notified that WLAN is set ON
+            };
 
     private:  // Data
         
@@ -124,6 +156,12 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
         /** Subscriber for watching KCTSYEmergencyCallInfo via P&S. */
         CWlmPlatformSubscriber* iEmergencyCall;
 
+        /** Subscriber for watching WLAN master switch via CenRep. */
+        CWlmPlatformSubscriber* iWlanOnOff;
+        
+        /** Subscriber for watching WLAN force disable switch via CenRep. */
+        CWlmPlatformSubscriber* iWlanForceDisable;
+
         /** Handle to KPropertyWlanMacAddress property via P&S. */
         RProperty iPsMacAddress;
         
@@ -132,6 +170,9 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
         
         /** Handle to KPropertyWlanBgScanInterval property via P&S. */
         RProperty iPsBgScanInterval;
+
+        /** Handle to KPropertyWlanOnOffState property via P&S. */
+        RProperty iPsOnOffState;
 
         /** Callback for notifications. */
         MWlmSystemNotify& iCallback;
@@ -153,6 +194,9 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
 
         /** Whether Emergency Call is active. */
         TBool iIsEmergencyCall;
+        
+        /** Last WLAN on/off state notified to the observer. */
+        TWlanNotifiedState iNotifiedWlanState;
                 
     };
 

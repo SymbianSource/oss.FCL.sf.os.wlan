@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 71 %
+* %version: 72 %
 */
 
 #include "config.h"
@@ -60,7 +60,7 @@ struct SWsaCommands
     WlanWsaSetPsMode                iWsaSetPsMode;
     WlanWhaConfigureQueue           iWhaConfigureQueue;
     WlanWhaConfigureAc              iWhaConfigureAc;
-    WlanWhaRelease                  iWlanWhaRelease;
+    WlanWhaRelease                  iWhaRelease;
     };
 
 // ================= MEMBER FUNCTIONS =======================
@@ -281,9 +281,9 @@ WlanWhaConfigureAc& WlanContextImpl::WhaConfigureAc()
 // 
 // ---------------------------------------------------------------------------
 //
-WlanWhaRelease& WlanContextImpl::WlanWhaRelease()
+WlanWhaRelease& WlanContextImpl::WhaRelease()
     {
-    return iWsaCommands->iWlanWhaRelease;
+    return iWsaCommands->iWhaRelease;
     }
 
 // ---------------------------------------------------------------------------

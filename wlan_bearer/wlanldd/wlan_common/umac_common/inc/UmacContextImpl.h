@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 104 %
+* %version: 105 %
 */
 
 #ifndef WLANCONTEXTIMPL_H
@@ -473,7 +473,7 @@ public:
     WlanWhaConfigureQueue&          WhaConfigureQueue();
     WlanWsaSetPsMode&               WsaSetPsMode();
     WlanWhaConfigureAc&             WhaConfigureAc();
-    WlanWhaRelease&                 WlanWhaRelease();
+    WlanWhaRelease&                 WhaRelease();
 
     inline void WHASettings( const WHA::SSettings& aSettings );
     inline WHA::SSettings& WHASettings();

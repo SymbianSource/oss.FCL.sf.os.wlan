@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 35 %
+* %version: 36 %
 */
 
 #include "config.h"
@@ -416,7 +416,7 @@ void WlanDot11InitPhase1::OnWhaCommandResponse(
             }
         else    // -- aCommandId == WHA::EReadMIBResponse
             {
-            // nothing else is no interest to us
+            // nothing else is of interest to us
             }
         }
     else    // -- aAct != WlanDot11State::KCompleteManagementRequest
@@ -617,6 +617,8 @@ void WlanDot11InitPhase1::BootUp(
         os_memcpy( iPda, aPda, iPdaLen );
         // set ctx for fw upload
         aCtxImpl.WsaInitiliaze().Set( aCtxImpl, aFw, aFwLength );
+        // manually start the fsm
+        Entry( aCtxImpl );
         }
     else
         {
@@ -625,9 +627,6 @@ void WlanDot11InitPhase1::BootUp(
             ("UMAC * dot11-initphase * pda memory allocation failure") );
         Fsm( aCtxImpl, EABORT );
         }
-
-    // manually start the fsm
-    Entry( aCtxImpl );
     }
 
 // -----------------------------------------------------------------------------

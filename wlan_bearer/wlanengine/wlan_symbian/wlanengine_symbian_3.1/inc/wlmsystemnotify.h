@@ -20,6 +20,7 @@
 #define WLMSYSTEMNOTIFY_H
 
 #include "wlmclientserver.h"
+#include "wlanerrorcodes.h"
 
 enum TWlmIconStatus
     {
@@ -27,6 +28,18 @@ enum TWlmIconStatus
     EWlmIconStatusAvailable,
     EWlmIconStatusConnected,
     EWlmIconStatusConnectedSecure
+    };
+
+/**
+ * WLAN on/off states are used as status codes for status
+ * requests and therefore they are mapped directly to
+ * corresponding error codes.
+ */
+enum TWlanOnOffState
+    {
+    EWlanOff = KErrWlanOff,
+    EWlanForceOff = KErrWlanForceOff,
+    EWlanOn = 0
     };
 
 /** 
@@ -67,6 +80,16 @@ class MWlmSystemNotify
         * BT connection has been disconnected.        
         */
         virtual void BtConnectionDisabled() = 0;
+        
+        /**
+         * WLAN has been set ON.
+         */
+        virtual void WlanOn() = 0;
+        
+        /**
+         * WLAN has been set OFF.
+         */
+        virtual void WlanOff() = 0;
     };
 
 #endif // WLMSYSTEMNOTIFY_H

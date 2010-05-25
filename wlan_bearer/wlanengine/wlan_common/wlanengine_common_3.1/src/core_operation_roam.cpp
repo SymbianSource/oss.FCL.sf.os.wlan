@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76.1.2 %
+* %version: 76.1.3 %
 */
 
 #include "core_operation_roam.h"
@@ -432,6 +432,12 @@ core_error_e core_operation_roam_c::next_state()
                     DEBUG6( "core_operation_roam_c::next_state() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
                         bssid.addr[0], bssid.addr[1], bssid.addr[2],
                         bssid.addr[3], bssid.addr[4], bssid.addr[5] );
+
+                    /**
+                     * is_eapol_disconnecting is not updated here because this disassociation
+                     * is for the previous AP and thus we don't really care when this
+                     * request gets completed.
+                     */
 
                     server_m->get_eapol_instance().disassociation( &network );
                     }

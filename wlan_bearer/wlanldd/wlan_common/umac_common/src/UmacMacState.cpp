@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76 %
+* %version: 77 %
 */
 
 #include "config.h"
@@ -97,13 +97,15 @@ TBool WlanMacState::ChangePowerMgmtMode(
 // -----------------------------------------------------------------------------
 //
 TBool WlanMacState::SetRcpiTriggerLevel(
-    WlanContextImpl& /*aCtxImpl*/,
+    WlanContextImpl& aCtxImpl,
     TUint32 /*aRcpiTrigger*/ )          
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
@@ -111,7 +113,7 @@ TBool WlanMacState::SetRcpiTriggerLevel(
 // -----------------------------------------------------------------------------
 //
 TBool WlanMacState::AddBroadcastWepKey(
-    WlanContextImpl& /*aCtxImpl*/,
+    WlanContextImpl& aCtxImpl,
     TUint32 /*aKeyIndex*/, 
     TBool /*aUseAsDefaulKey*/,        
     TUint32 /*aKeyLength*/,                      
@@ -119,8 +121,11 @@ TBool WlanMacState::AddBroadcastWepKey(
     const TMacAddress& /*aMac*/ )    
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
@@ -197,7 +202,7 @@ TBool WlanMacState::OnDot11PwrMgmtTransitRequired( WlanContextImpl& /*aCtxImpl*/
 // ---------------------------------------------------------------------------
 //
 TBool WlanMacState::Connect(
-    WlanContextImpl& /*aCtxImpl*/,
+    WlanContextImpl& aCtxImpl,
     const TSSID& /*aSSID*/,                 
     const TMacAddress& /*aBSSID*/,          
     TUint16 /*aAuthAlgorithmNbr*/,      
@@ -209,19 +214,25 @@ TBool WlanMacState::Connect(
     TUint16 /*aIeDataLength*/ )
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
 // 
 // -----------------------------------------------------------------------------
 //
-TBool WlanMacState::Disconnect( WlanContextImpl& /*aCtxImpl*/ )
+TBool WlanMacState::Disconnect( WlanContextImpl& aCtxImpl )
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
@@ -321,7 +332,7 @@ TBool WlanMacState::AddUnicastWapiKey(
 // -----------------------------------------------------------------------------
 //
 TBool WlanMacState::StartIBSS(
-    WlanContextImpl& /*aCtxImpl*/,
+    WlanContextImpl& aCtxImpl,
     const TSSID& /*aSSID*/,                 
     TUint32 /*aBeaconInterval*/,            
     TUint32 /*aAtim*/,                      
@@ -329,8 +340,11 @@ TBool WlanMacState::StartIBSS(
     TEncryptionStatus /*aEncryptionStatus*/ )
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
@@ -366,8 +380,7 @@ TBool WlanMacState::RealScan(
     TUint32 /*aMaxChannelTime*/,
     TBool /*aSplitScan*/ )
     {
-    OnOidComplete( aCtxImpl, KErrGeneral );
-    
+    OnOidComplete( aCtxImpl, KErrNotSupported );
     return EFalse; // no state change
     }
 
@@ -400,7 +413,7 @@ TBool WlanMacState::SetTxPowerLevel(
 // -----------------------------------------------------------------------------
 //
 TBool WlanMacState::Configure(
-    WlanContextImpl& /*aCtxImpl*/,
+    WlanContextImpl& aCtxImpl,
     TUint32 /*aRTSThreshold*/,              
     TUint32 /*aMaxTxMSDULifetime*/,
     TUint32 /*aVoiceCallEntryTimeout*/,
@@ -413,8 +426,11 @@ TBool WlanMacState::Configure(
     TUint32 /*aSpMinIndicationInterval*/ )         
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------
@@ -580,14 +596,17 @@ TBool WlanMacState::ConfigureUapsd(
 // -----------------------------------------------------------------------------
 //
 TBool WlanMacState::ConfigureTxQueueIfNecessary( 
-        WlanContextImpl& /*aCtxImpl*/,
-        TQueueId /*aQueueId*/,
-        TUint16 /*aMediumTime*/,
-        TUint32 /*aMaxTxMSDULifetime*/ )
+    WlanContextImpl& aCtxImpl,
+    TQueueId /*aQueueId*/,
+    TUint16 /*aMediumTime*/,
+    TUint32 /*aMaxTxMSDULifetime*/ )
     {
     // not supported in default handler
+#ifndef NDEBUG                
     OsAssert( (TUint8*)("UMAC: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-    return EFalse;            
+#endif
+    OnOidComplete( aCtxImpl, KErrNotSupported );
+    return EFalse; // no state change
     }
 
 // -----------------------------------------------------------------------------

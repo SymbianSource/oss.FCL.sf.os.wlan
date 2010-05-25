@@ -53,7 +53,7 @@ EXPORTS
 	_ZThn12_N27CWlanMetaConnectionProviderD1Ev @ 52 NONAME ; #<thunk>#
 	_ZThn20_N14CLANLinkCommon9ReceivedLERKN8Messages13TRuntimeCtxIdERKNS0_7TNodeIdERNS0_14TSignatureBaseE @ 53 NONAME ; #<thunk>#
 	_ZThn20_N27CWlanMetaConnectionProvider9ReceivedLERKN8Messages13TRuntimeCtxIdERKNS0_7TNodeIdERNS0_14TSignatureBaseE @ 54 NONAME ; #<thunk>#
-	_ZThn96_N14CLANLinkCommon11GetControlLERK6TDesC8 @ 55 NONAME ; #<thunk>#
-	_ZThn96_N14CLANLinkCommon5BindLERK6TDesC8PN5ESock18MUpperDataReceiverEPNS3_13MUpperControlE @ 56 NONAME ; #<thunk>#
-	_ZThn96_N14CLANLinkCommon6UnbindEPN5ESock18MUpperDataReceiverEPNS0_13MUpperControlE @ 57 NONAME ; #<thunk>#
+	_ZThn100_N14CLANLinkCommon11GetControlLERK6TDesC8 @ 55 NONAME ; #<thunk>#
+	_ZThn100_N14CLANLinkCommon5BindLERK6TDesC8PN5ESock18MUpperDataReceiverEPNS3_13MUpperControlE @ 56 NONAME ; #<thunk>#
+	_ZThn100_N14CLANLinkCommon6UnbindEPN5ESock18MUpperDataReceiverEPNS0_13MUpperControlE @ 57 NONAME ; #<thunk>#
 

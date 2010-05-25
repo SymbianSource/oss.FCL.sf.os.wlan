@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 9 %
+* %version: 10 %
 */
 
 #include "core_operation_handle_delete_ts.h"
@@ -125,6 +125,7 @@ core_error_e core_operation_handle_delete_ts_c::next_state()
             server_m->get_wpx_adaptation_instance().handle_ts_delete(
                 tid_m, user_priority );           
             ts_iter.remove();
+            stream = NULL;
 
             if( direction == core_traffic_stream_direction_uplink ||
                 direction == core_traffic_stream_direction_bidirectional )

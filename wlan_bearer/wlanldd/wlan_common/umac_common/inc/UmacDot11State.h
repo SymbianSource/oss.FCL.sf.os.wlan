@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 57 %
+* %version: 58 %
 */
 
 #ifndef WLANDOT11STATE_H
@@ -859,6 +859,37 @@ private:
         const TMacAddress& aMacAddr );
 
     /**
+    * Adds a multicast MAC address and starts to filter (Rx) multicast 
+    * traffic sent to any other MAC addresses than those that have been 
+    * specified using this method
+    * @param aCtxImpl statemachine context
+    * @param aMacAddr The address to be added
+    * @return ETrue if a state change occurred in the state machine 
+    *         EFalse otherwise
+    */
+    virtual TBool AddMulticastAddr(
+        WlanContextImpl& aCtxImpl,
+        const TMacAddress& aMacAddr );
+        
+    /**
+    * Removes a multicast MAC address from multicast (Rx) filtering
+    * configuration. So any packet that we receive and which has been sent
+    * to the multicast address in question is not accepted any more (i.e. 
+    * it is filtered).
+    * However, if there are no addresses left in the multicast (Rx) filtering
+    * configuration after this remove, the multicast filtering is disabled
+    * and all (otherwise acceptable) multicast packets are accepted again.
+    * @param aCtxImpl statemachine context
+    * @param aMacAddr The address to be removed
+    * @return ETrue if a state change occurred in the state machine 
+    *         EFalse otherwise
+    */
+    virtual TBool RemoveMulticastAddr(
+        WlanContextImpl& aCtxImpl,
+        TBool aRemoveAll,
+        const TMacAddress& aMacAddr );
+
+    /**
     * Set transmission power level. 
     * This has to be legal at the current region.
     * @param aCtxImpl statemachine context
@@ -1120,6 +1151,16 @@ private:
     virtual TBool ConfigureProprietarySnapHdr(
         WlanContextImpl& aCtxImpl, 
         const TSnapHeader& aSnapHeader );        
+
+    /**
+    * Sets the WHA::KMibDot11GroupAddressesTable MIB
+    * 
+    * @param aCtxImpl statemachine context
+    * @return ETrue if a state change occurred in the state machine 
+    *         EFalse otherwise
+    */
+    TBool SetGroupAddressesTableMib(
+        WlanContextImpl& aCtxImpl );
 
     /**
      * Sets the beacon lost count value

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 105 %
+* %version: 106 %
 */
 
 #ifndef WLANCONTEXTIMPL_H
@@ -945,7 +945,7 @@ public:
     * @since S60 3.2
     * @return length of the frame body
     */
-    inline const TUint16 ScanResponseFrameBodyLength() const;
+    inline TUint16 ScanResponseFrameBodyLength() const;
 
     /**
     * Stores the IE(s) to be included into the (re-)association request.

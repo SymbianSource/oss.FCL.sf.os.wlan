@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: %
+* %version: 4 %
 */
 
 #include "core_traffic_stream_list_iter.h"
@@ -85,5 +85,15 @@ core_traffic_stream_c* core_traffic_stream_list_iter_c::current() const
 //
 core_error_e core_traffic_stream_list_iter_c::remove()
     {
-    return iter_m.remove();
+    core_traffic_stream_list_c::entry_s* entry = iter_m.current();
+    core_error_e ret = iter_m.remove();
+    if( ret == core_error_ok &&
+        entry )
+        {
+        delete entry->traffic_stream;        
+        delete entry;
+        entry = NULL;
+        }
+
+    return ret;
     }

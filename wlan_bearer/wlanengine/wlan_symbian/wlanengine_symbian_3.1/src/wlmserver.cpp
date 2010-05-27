@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 106 %
+* %version: 108 %
 */
 
 #include <e32def.h>
@@ -24,6 +24,7 @@
 #include <featmgr.h>
 #include <in_sock.h>
 #include <bldvariant.hrh> // for feature definitions
+#include <hal.h>
 
 #include "wlmserver.h"
 #include "wlmdriverif.h"
@@ -38,6 +39,7 @@
 #include "wlandevicesettingsinternalcrkeys.h"
 #include "wlanbgscan.h"
 #include "wlantimerservices.h"
+#include "wlanticktimer.h"
 #include "am_debug.h"
 
 /** Panic codes for WlanEngine */
@@ -89,9 +91,6 @@ const TUint KWlanStaticFeatures =
     CWlmServer::EWlanStaticFeature802dot11k |
     CWlmServer::EWlanStaticFeature802dot11n;
 
-/** Multiplier for converting seconds into microseconds */
-const TUint KWlanSecsToMicrosecsMultiplier( 1000000 );
-
 /** Minimum value for aggressive background scan interval, in seconds */
 const TUint KWlanAggressiveBgScanMinInterval( 1 );
 
@@ -141,6 +140,7 @@ CWlmServer::CWlmServer() :
     iIsStartupComplete( EFalse ),
     iEapolClient( NULL ),
     iEapolHandler( NULL ),
+    iSystemTickPeriod( 0 ),
     iScanSchedulingTimerExpiration( 0 ),
     iRequestTriggeringScanning( 0 ),
     iCoreHandlingScanRequest( EFalse ),
@@ -163,6 +163,12 @@ void CWlmServer::ConstructL()
     DEBUG( "CWlmServer::ConstructL()" );
     User::LeaveIfError( User::RenameThread( KWLMDataServerName ) );
     StartL( KWLMDataServerName );    
+
+    HAL::Get( HAL::ESystemTickPeriod, iSystemTickPeriod );
+    DEBUG1( "CWlmServer::ConstructL() - system tick period is %d",
+        iSystemTickPeriod );
+    DEBUG1( "CWlmServer::ConstructL() - current system tick count is %u",
+        User::TickCount( ) );
 
     // Consult FeatureManager whether startup is allowed
     FeatureManager::InitializeLibL();
@@ -220,7 +226,13 @@ void CWlmServer::ConstructL()
 
     // Create scan timer
     DEBUG( "CWlmServer::ConstructL() - create backgroundscan timer" );
-    iScanSchedulingTimer = CPeriodic::NewL( CActive::EPriorityStandard );
+    TCallBack expiredCb( ScanSchedulingTimerExpired, this );
+    TCallBack canceledCb( ScanSchedulingTimerCanceled, this );
+    TCallBack emptyCb( EmptyCb, NULL );
+    iScanSchedulingTimer = CWlanTickTimer::NewL(
+        expiredCb,
+        canceledCb,
+        emptyCb );
 
     // Create scan cache
     iCache = CWlanScanResultCache::NewL();
@@ -469,7 +481,7 @@ void CWlmServer::Connect(
 	if( wlanState != EWlanOn )
 	    {
 		// WLAN is OFF
-		DEBUG1( "CWlmServer::Connect() refused due to WLAN is OFF (%d)",
+		DEBUG1( "CWlmServer::Connect() - refused due to WLAN is OFF (%d)",
 		    wlanState );
 		// WLAN state enumerations map one to one to WLAN error code
 		aMessage.Complete( wlanState );
@@ -1100,15 +1112,15 @@ void CWlmServer::GetScanResult(
         return;
         }    
 
-    TTime* scanTime( NULL );
+    TUint* scanTime( NULL );
     if( scanScheduling.maxDelay != KWlmInfiniteScanDelay )
         {
-        scanTime = new TTime(
-            CalculateScanStartTime( scanScheduling.maxDelay ).Int64() );
+        scanTime = new TUint(
+            CalculateScanStartTime( scanScheduling.maxDelay ) );
         if( !scanTime )
             {
-            DEBUG( "CWlmServer::GetScanResult() - unable to instantiate TTime" );
-    
+            DEBUG( "CWlmServer::GetScanResult() - unable to instantiate TUint" );
+
             delete coreSsid;
             delete scanList;
             aMessage.Complete( KErrNoMemory );
@@ -1338,14 +1350,14 @@ void CWlmServer::GetAvailableIaps(
         return;
         }
 
-    TTime* scanTime( NULL );
+    TUint* scanTime( NULL );
     if( maxDelayPckg() != KWlmInfiniteScanDelay )
         {
-        scanTime = new TTime(
-            CalculateScanStartTime( maxDelayPckg() ).Int64() );
+        scanTime = new TUint(
+            CalculateScanStartTime( maxDelayPckg() ) );
         if( !scanTime )
             {
-            DEBUG( "CWlmServer::GetAvailableIaps() - unable to instantiate TTime" );
+            DEBUG( "CWlmServer::GetAvailableIaps() - unable to instantiate TUint" );
     
             aMessage.Complete( KErrNoMemory );
             delete iapDataList;
@@ -1555,7 +1567,7 @@ TInt CWlmServer::UpdateWlanSettings()
 // ---------------------------------------------------------
 //
 void CWlmServer::UpdateScanSchedulingTimer( 
-	TTime aScanTime, 
+    TUint aScanTime, 
 	TUint aTriggeringRequestId )
     {
     DEBUG1( "CWlmServer::UpdateScanSchedulingTimer() - aTriggeringRequestId = %u ", aTriggeringRequestId );
@@ -1568,32 +1580,22 @@ void CWlmServer::UpdateScanSchedulingTimer(
         return;
         }
 
-    TTime timeNow;
-    timeNow.UniversalTime();
-
-    TTimeIntervalMicroSeconds difference( aScanTime.MicroSecondsFrom( timeNow ) );
-    if( difference.Int64() < 0 )
+    TUint currentTickCount(
+        User::TickCount() );
+    TUint difference( 0 );
+    if( aScanTime > currentTickCount )
         {
-        difference = TTimeIntervalMicroSeconds( 0 );
+        difference = aScanTime - currentTickCount;  
         }
-    TTimeIntervalMicroSeconds32 differenceMicroseconds(
-        difference.Int64() );
 
     iScanSchedulingTimer->Cancel();
     iScanSchedulingTimerExpiration = aScanTime;
     iRequestTriggeringScanning = aTriggeringRequestId;
-    TCallBack callback( ScanSchedulingTimerExpired, this );
-
-	DEBUG1( "CWlmServer::UpdateScanSchedulingTimer() - scheduling the timer to %u second(s)",
-	    differenceMicroseconds.Int() / SECONDS_FROM_MICROSECONDS );
-	
-	TTimeIntervalMicroSeconds32 intervalMicroseconds( KWlmMaxScanDelay * SECONDS_FROM_MICROSECONDS );
-
-    iScanSchedulingTimer->Start(
-            differenceMicroseconds,
-            intervalMicroseconds,
-            callback );
     
+    DEBUG2( "CWlmServer::UpdateScanSchedulingTimer() - scheduling the timer to %u system ticks(s) [%u s]",
+        difference, difference * iSystemTickPeriod / KWlanSecsToMicrosecsMultiplier );
+
+    iScanSchedulingTimer->After( difference );
     }
 
 // ---------------------------------------------------------
@@ -1606,14 +1608,14 @@ TBool CWlmServer::FindNextTimedScanSchedulingRequest(
     DEBUG( "CWlmServer::FindNextTimedScanSchedulingRequest()" );
     
     TBool pendingScanRequestsFound( EFalse );
-    TTime closestTime = TTime( 0 );
+    TUint closestTime( 0 );
     aTriggeringRequestIndex = 0;
     
     for(TInt i=0; i < iRequestMap.Count(); i++)
         {
         if( IsPendingTimedScanRequest( i ) )
             {
-            TTime* checkedTime = reinterpret_cast<TTime*>( iRequestMap[i].iTime );
+            TUint* checkedTime = reinterpret_cast<TUint*>( iRequestMap[i].iTime );
             if( pendingScanRequestsFound == EFalse || closestTime > *checkedTime )
                 {
                 closestTime = *checkedTime;
@@ -1627,7 +1629,7 @@ TBool CWlmServer::FindNextTimedScanSchedulingRequest(
         {
         // clear the scan scheduling related variables
         iRequestTriggeringScanning = KWlanIntCmdNull;
-        iScanSchedulingTimerExpiration = TTime( 0 );
+        iScanSchedulingTimerExpiration = 0;
         }
     else
         {
@@ -1830,7 +1832,7 @@ void CWlmServer::notify(
 					// If WLAN is ON, enable background scanning
 					if( iPlatform->GetWlanOnOffState() == EWlanOn )
 					    {
-                        iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+                        iBgScanProvider->SetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
                         }
                     
                     break;
@@ -2340,7 +2342,7 @@ void CWlmServer::request_complete(
                 // If background scan is currently on, background scan
                 // will be disabled and it's request will be removed
                 // from the request map.
-                iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
+                iBgScanProvider->SetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
                 
                 }
             }
@@ -2458,7 +2460,7 @@ void CWlmServer::request_complete(
 
     	if( FindNextTimedScanSchedulingRequest( indexNextScan ) )
             {
-            TTime* nextScanTime = reinterpret_cast<TTime*>( iRequestMap[indexNextScan].iTime );
+            TUint* nextScanTime = reinterpret_cast<TUint*>( iRequestMap[indexNextScan].iTime );
             UpdateScanSchedulingTimer( *nextScanTime, iRequestMap[indexNextScan].iRequestId );
             }
         }
@@ -2628,7 +2630,7 @@ void CWlmServer::CompleteInternalRequest(
             delete iapDataList;
             iapDataList = NULL;
             
-            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
+            TUint* completedScanTime = reinterpret_cast<TUint*>( aRequest.iTime );
             delete completedScanTime;
             completedScanTime = NULL;
 
@@ -2693,7 +2695,7 @@ void CWlmServer::CompleteExternalRequest(
             {
             ScanList* tmp( NULL );
             core_ssid_s* ssid = reinterpret_cast<core_ssid_s*>( aRequest.iParam1 );
-            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
+            TUint* completedScanTime = reinterpret_cast<TUint*>( aRequest.iTime );
             ScanList* completedScanList = reinterpret_cast<ScanList*>( aRequest.iParam0 );
 
             if( aTriggerRequest == NULL )
@@ -2793,7 +2795,7 @@ void CWlmServer::CompleteExternalRequest(
             iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( aRequest.iParam3 );
             iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( aRequest.iParam0 );
             
-            TTime* completedScanTime = reinterpret_cast<TTime*>( aRequest.iTime );
+            TUint* completedScanTime = reinterpret_cast<TUint*>( aRequest.iTime );
             ScanList* completedScanList = reinterpret_cast<ScanList*>( aRequest.iParam2);
             core_type_list_c<u32_t>* completedIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
             
@@ -3451,11 +3453,11 @@ TInt CWlmServer::BackgroundScanRequest(
         return KErrNoMemory;
         }
 
-    TTime* scanTime = new TTime(
-        CalculateScanStartTime( aScanStartInterval ).Int64() );
+    TUint* scanTime = new TUint(
+        CalculateScanStartTime( aScanStartInterval ) );
     if( !scanTime )
         {
-        DEBUG( "CWlmServer::BackgroundScanRequest() - unable to instantiate TTime" );
+        DEBUG( "CWlmServer::BackgroundScanRequest() - unable to instantiate TUint" );
 
         delete iapDataList;
         delete iapSsidList;
@@ -3532,7 +3534,7 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
 
         ScanList* completedScanList = reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam0 );
         core_ssid_s* completedSsid =  reinterpret_cast<core_ssid_s*>( self->iRequestMap[index].iParam1 );
-        TTime* completedScanTime = reinterpret_cast<TTime*>( self->iRequestMap[index].iTime );
+        TUint* completedScanTime = reinterpret_cast<TUint*>( self->iRequestMap[index].iTime );
         
         // Only the triggering request is completed and then scan scheduling timer is set again 
         TPckgBuf<TUint32> pckgCount( 0 );
@@ -3559,7 +3561,7 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
 
         if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
             {
-            TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
+            TUint* nextScanTime = reinterpret_cast<TUint*>( self->iRequestMap[indexNextScan].iTime );
         	self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
             }
         
@@ -3577,7 +3579,7 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         core_type_list_c<u32_t>* iapIdList =  reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
         ScanList* scanList =  reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam2 );
         core_type_list_c<core_ssid_entry_s>* iapSsidList =  reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
-        TTime* scanTime =  reinterpret_cast<TTime*>( self->iRequestMap[index].iTime );        
+        TUint* scanTime =  reinterpret_cast<TUint*>( self->iRequestMap[index].iTime );        
 
         // If the device is roaming OR
         // there are not WLAN IAPs defined in the device OR
@@ -3616,7 +3618,7 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
 
             if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
                 {
-                TTime* nextScanTime = reinterpret_cast<TTime*>( self->iRequestMap[indexNextScan].iTime );
+                TUint* nextScanTime = reinterpret_cast<TUint*>( self->iRequestMap[indexNextScan].iTime );
                 self->UpdateScanSchedulingTimer( *nextScanTime, self->iRequestMap[indexNextScan].iRequestId );
                 }
         
@@ -3707,7 +3709,43 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         }
     self->iCoreHandlingScanRequest = ETrue;
     return KErrNone;
+   }
+
+// ---------------------------------------------------------
+// CWlmServer::ScanSchedulingTimerCanceled()
+// ---------------------------------------------------------
+//
+TInt CWlmServer::ScanSchedulingTimerCanceled(
+    TAny* aThisPtr )
+    {
+    DEBUG( "CWlmServer::ScanSchedulingTimerCanceled()" );
+
+    CWlmServer* self = reinterpret_cast<CWlmServer*>( aThisPtr );
+
+    /**
+     * Scan scheduling timer was canceled, re-arm the timer. 
+     */
+    TUint indexNextScan( 0 );
+    if( self->FindNextTimedScanSchedulingRequest( indexNextScan ) )
+        {
+        self->UpdateScanSchedulingTimer(
+            *(self->iRequestMap[indexNextScan].iTime),
+            self->iRequestMap[indexNextScan].iRequestId );
+        }
+
+    return 0;
     }
+
+// ---------------------------------------------------------
+// CWlmServer::EmptyCb()
+// ---------------------------------------------------------
+//
+TInt CWlmServer::EmptyCb(
+    TAny* /* aThisPtr */ )
+    {
+    return 0;
+    }
+
     
 // ---------------------------------------------------------
 // CWlmServer::GetIapDataList()
@@ -3923,38 +3961,6 @@ void CWlmServer::SystemTimeChanged()
     	iTimerServices->HandleTimeout();
         DEBUG("CWlmServer::SystemTimeChanged() - refreshing settings to BgScan provider");
         iBgScanProvider->NotifyChangedSettings( iBgScanProviderSettings );
-    	
-    	// Pending scan requests should be handled because after the system time change all the
-    	// timestamps are invalid. Change the scan start times to start immediately
-
-        DEBUG("CWlmServer::SystemTimeChanged() - set all pending requests to expire immediately");
-        
-    	TInt i( 0 );
-    	for( i = 0; i < iRequestMap.Count(); i++ )
-    	    {
-    	    if( IsPendingTimedScanRequest(i) )
-    	        {
-                DEBUG1( "CWlmServer::SystemTimeChanged() - setting iTime to current time for request %i",
-                        iRequestMap[i].iRequestId );
-                
-    	        TTime* requestedScanTime = reinterpret_cast<TTime*>( iRequestMap[i].iTime );
-                requestedScanTime->UniversalTime();              
-    	        }
-    	    }
-        if( !iCoreHandlingScanRequest )
-            {
-            // Core is not handling any scan request so update the timer
-            DEBUG("CWlmServer::SystemTimeChanged() - Core is not currently handling any scan requests");
-            DEBUG("CWlmServer::SystemTimeChanged() - Cancel timer and set it again to new value");
-
-            iScanSchedulingTimer->Cancel();
-            TUint indexNextScan;
-            if( FindNextTimedScanSchedulingRequest( indexNextScan ) )
-                {
-                TTime* nextScanTime = reinterpret_cast<TTime*>( iRequestMap[indexNextScan].iTime );
-                UpdateScanSchedulingTimer( *nextScanTime, iRequestMap[indexNextScan].iRequestId );
-                }
-            }
     	}
     }
 
@@ -4100,7 +4106,7 @@ void CWlmServer::CancelScan()
             delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
             delete reinterpret_cast<ScanList*>( entry.iParam2);
             delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
-            delete reinterpret_cast<TTime*>( entry.iTime );
+            delete reinterpret_cast<TUint*>( entry.iTime );
             iRequestMap.Remove( index );
 
             DEBUG( "CWlmServer::CancelScan() - find next possible timed scan scheduling request" );
@@ -4137,7 +4143,7 @@ void CWlmServer::CancelScan()
                 delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
                 delete reinterpret_cast<ScanList*>( entry.iParam2);
                 delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
-                delete reinterpret_cast<TTime*>( entry.iTime );                
+                delete reinterpret_cast<TUint*>( entry.iTime );                
                 iRequestMap.Remove( index );
                 }
             }
@@ -4382,7 +4388,7 @@ void CWlmServer::RunProtectedSetup(
 	if( wlanState != EWlanOn )
 	    {
 		// WLAN is OFF and therefore request is not served.
-		DEBUG1( "CWlmServer::RunProtectedSetup() rejected due to WLAN is OFF (%d)",
+		DEBUG1( "CWlmServer::RunProtectedSetup() - rejected due to WLAN is OFF (%d)",
 		    wlanState );
 		// WLAN states map one to one to WLAN error codes.
 		aMessage.Complete( wlanState );
@@ -5013,7 +5019,7 @@ void CWlmServer::StartupComplete()
     // If WLAN is set ON, enable background scanning
     if( iPlatform->GetWlanOnOffState() == EWlanOn )
         {
-        iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+        iBgScanProvider->SetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
         }
 
     iPlatform->InitializeSystemTimeHandler();
@@ -5232,7 +5238,7 @@ void CWlmServer::WlanOn()
 	if( iIsStartupComplete )
 	    {
 	    // Enable background scanning
-	    iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
+	    iBgScanProvider->SetBgScanState( MWlanBgScanProvider::EWlanBgScanOn );
 	    }
 	}
 
@@ -5242,10 +5248,11 @@ void CWlmServer::WlanOn()
 //
 void CWlmServer::WlanOff()
     {
-	DEBUG( "CWlmServer::WlanOff()" );
+	DEBUG1( "CWlmServer::WlanOff() - ConnectionState=%d",
+	    iConnectionState );
 	
 	// Disable background scanning
-	iBgScanProvider->WlanSetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
+	iBgScanProvider->SetBgScanState( MWlanBgScanProvider::EWlanBgScanOff );
 	
 	// Cancel all running operations that are forbidden in WLAN OFF
     CancelExternalRequestsByType( ERunProtectedSetup );

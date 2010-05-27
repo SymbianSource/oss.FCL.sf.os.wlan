@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 18 %
+*/
 
 #include "am_debug.h"
 
@@ -129,15 +132,13 @@ inline TBool CWlmServer::IsSessionActive(
 // CWlmServer::CalculateScanStartTime
 // ---------------------------------------------------------
 //
-inline TTime CWlmServer::CalculateScanStartTime(
+inline TUint CWlmServer::CalculateScanStartTime(
     const TInt aDelay ) const
     {
-    TTime scanTime;
-    scanTime.UniversalTime();
-    TTimeIntervalSeconds delay( aDelay );
-    scanTime += delay;
+    TUint ticks(
+        aDelay * KWlanSecsToMicrosecsMultiplier / iSystemTickPeriod );
 
-    return scanTime;
+    return User::TickCount() + ticks; 
     }
 
 // ---------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 15 %
+* %version: 16 %
 */
 
 #ifndef MGMTFRAMEMMNGR_H
@@ -44,6 +44,9 @@ public:
         TBool aUseCachedMemory,
         TInt aRxFrameBufAllocationUnit ) : 
         DEthernetFrameMemMngr( aParent, aRxFrameMemoryPool ),
+        iFrameXferBlock( NULL ),
+        iChunkKernelAddr( 0 ),
+        iTxDataBuffer( NULL ),
         iUseCachedMemory( aUseCachedMemory ),
         iRxFrameBufAllocationUnit ( aRxFrameBufAllocationUnit ),
         iChunkSize( 
@@ -52,7 +55,11 @@ public:
         {};
 
     /** Dtor */
-    virtual ~MgmtFrameMemMngr() {};
+    virtual ~MgmtFrameMemMngr()
+        {
+        iFrameXferBlock = NULL;
+        iTxDataBuffer = NULL;
+        };
 
 protected:
 
@@ -107,38 +114,8 @@ protected:
     *         EFalse otherwise
     */
     virtual TBool DoEthernetFrameRxComplete( 
-        const TDataBuffer*& aBufferStart, 
+        TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers );
-
-    /**
-    * From DEthernetFrameMemMngr
-    * Gets start address of Rx buffers (their offset addresses)
-    * that are waiting for completion to user mode
-    *
-    * @since S60 3.1
-    * @return see above statement
-    */
-    virtual TUint32* DoGetTobeCompletedBuffersStart();
-
-    /**
-    * From DEthernetFrameMemMngr
-    * Gets start address of Rx buffers (their offset addresses)
-    * that have been completed to user mode
-    *
-    * @since S60 3.1
-    * @return see above statement
-    */
-    virtual TUint32* DoGetCompletedBuffersStart();
-
-    /**
-    * From DEthernetFrameMemMngr
-    * Gets called when user mode client issues a frame receive request 
-    * and Rx buffers have been completed to it. The completed Rx frame 
-    * buffers are freed.
-    *
-    * @since S60 3.1
-    */
-    virtual void DoFreeRxBuffers();
 
     /**
     * From DEthernetFrameMemMngr
@@ -148,8 +125,42 @@ protected:
     * @param aBufferToFree The buffer to free
     */
     virtual void DoMarkRxBufFree( TUint8* aBufferToFree );
+    
+    /**
+    * From DEthernetFrameMemMngr
+    * To be called when user mode client issues a frame Rx request
+    *
+    * @return ETrue if callee should complete the request immediately 
+    *         as there exists Rx frame(s) which can be retrieved by the user
+    *         mode client.
+    *         EFalse otherwise
+    */
+    virtual TBool OnReadRequest();
+    
+    /**
+     * From DEthernetFrameMemMngr
+     * Gets the next frame (contained in a buffer allocated from
+     * the shared memory) from the Rx queue.
+     * Optionally frees the memory associated to a previously received frame. 
+     * 
+     * @param aFrameToFree User space pointer to previously received frame 
+     *        which can now be freed.
+     *        NULL if nothing to free.
+     * @return User space pointer to the Rx frame to be handled next.
+     *         NULL, if there are no frames available.
+     */ 
+    virtual TDataBuffer* GetRxFrame( TDataBuffer* aFrameToFreeInUserSpace );
 
 private:
+
+    /**
+    * Gets a memory block that can be used for tx frame write
+    *
+    * @since S60 3.1
+    * @return memory block that can be used for tx frame write, 
+    *         NULL upon failure
+    */
+    virtual TDataBuffer* OnWriteEthernetFrame() const;
 
     /**
     * Returns the number of extra bytes required to align Rx buffer start
@@ -171,27 +182,20 @@ private:
     // Prohibit copy constructor.
     MgmtFrameMemMngr( const MgmtFrameMemMngr& );
     // Prohibit assigment operator.
-    MgmtFrameMemMngr& operator= ( const MgmtFrameMemMngr & ); 
+    MgmtFrameMemMngr& operator= ( const MgmtFrameMemMngr& ); 
     
 private:    // Data
+
+    /** kernel address of frame xfer block */
+    RFrameXferBlock* iFrameXferBlock;
 
     /** 
     * kernel address of the shared memory chunk
     */
     TLinAddr iChunkKernelAddr;
 
-    /** 
-    * array of TDataBuffer offset addresses, denoting Rx buffers,
-    * which are waiting here in kernel mode to be completed 
-    * to user mode, when the next frame receive request arrives
-    */
-    TUint32  iTobeCompletedBuffers[KMaxToBeCompletedRxBufs];
-
-    /** 
-    * array of TDataBuffer offset addresses, denoting Rx buffers, that are
-    * currently under processing in user mode
-    */
-    TUint32  iCompletedBuffers[KMaxCompletedRxBufs];
+    /** kernel address of Tx data buffer */
+    TDataBuffer* iTxDataBuffer;
 
     /** 
     * ETrue if cached frame transfer memory shall be used,

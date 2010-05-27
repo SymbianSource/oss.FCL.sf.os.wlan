@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 77 %
+* %version: 78 %
 */
 
 #include "umacconnectcontext.h"
@@ -420,7 +420,7 @@ inline void WlanContextImpl::SetScanResponseFrameBodyLength( TUint16 aLength )
 // 
 // ---------------------------------------------------------------------------
 //
-inline const TUint16 WlanContextImpl::ScanResponseFrameBodyLength() const
+inline TUint16 WlanContextImpl::ScanResponseFrameBodyLength() const
     {
     return iConnectContext.iScanResponseFrameBodyLength;
     }

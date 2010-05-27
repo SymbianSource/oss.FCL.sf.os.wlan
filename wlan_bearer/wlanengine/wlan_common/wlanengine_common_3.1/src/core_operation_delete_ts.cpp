@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 8 %
+* %version: 9 %
 */
 
 #include "core_operation_delete_ts.h"
@@ -121,6 +121,7 @@ core_error_e core_operation_delete_ts_c::next_state()
              * Delete the virtual traffic stream.
              */
             virtual_ts_iter.remove();
+            virtual_stream = NULL;
             
             /**
              * Locate the actual traffic stream based on the TID.
@@ -279,6 +280,7 @@ core_error_e core_operation_delete_ts_c::next_state()
              * Delete the actual traffic stream.
              */
             ts_iter.remove();
+            stream = NULL;
 
             if( direction == core_traffic_stream_direction_uplink ||
                 direction == core_traffic_stream_direction_bidirectional )

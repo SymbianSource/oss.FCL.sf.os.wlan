@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 14 %
 */
 
 #ifndef WLMPLATFORMDATA_H
@@ -127,11 +127,9 @@ NONSHARABLE_CLASS( CWlmPlatformData ) :
         
         /**
          * Method for publishing WLAN on/off state.
-         * @since S60^4
          * @param aWlanState WLAN state to be published.
-         * @return Symbian error code.
          */
-        TInt PublishWlanOnOff( TPSWlanOnOff aWlanState );
+        void PublishWlanOnOff( TPSWlanOnOff aWlanState );
 
     private:  // Definitions
         

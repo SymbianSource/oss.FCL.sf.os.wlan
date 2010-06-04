@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 72 %
+* %version: 73 %
 */
 
 #include "config.h"
@@ -104,10 +104,7 @@ WlanContextImpl::WlanContextImpl( Umac& aUmac ) :
 
     os_memset( &iWHASettings, 0, sizeof( iWHASettings ) );
 
-    os_memset( 
-        &iOurBssMembershipFeatureArray, 
-        KUnallocated, 
-        sizeof( iOurBssMembershipFeatureArray ) );
+    ClearBssMembershipFeatureList();
 
     os_memset( 
         &iHtBlockAckConfigure, 
@@ -1764,6 +1761,34 @@ void WlanContextImpl::AddBssMembershipFeature(
             (TUint8*)(WLAN_FILE), __LINE__ );            
         }
 #endif
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+void WlanContextImpl::RemoveBssMembershipFeature( TUint8 aItem )
+    {
+    TUint8 i ( 0 );
+
+    do
+        {
+        if ( aItem == iOurBssMembershipFeatureArray[i] )
+            {
+            iOurBssMembershipFeatureArray[i] = KUnallocated;
+
+            OsTracePrint( KUmacDetails, (TUint8*)
+                ("UMAC: WlanContextImpl::RemoveBssMembershipFeature: "
+                 "feature %d removed"),
+                aItem );
+
+            break;
+            }
+        else
+            {
+            ++i;
+            }
+        } while ( i != KMaxNumOfWlanFeatures );
     }
 
 // -----------------------------------------------------------------------------

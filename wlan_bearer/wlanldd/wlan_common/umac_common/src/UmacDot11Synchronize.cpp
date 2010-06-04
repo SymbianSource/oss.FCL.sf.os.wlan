@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 29 %
+* %version: 30 %
 */
 
 #include "config.h"
@@ -497,6 +497,9 @@ TBool WlanDot11Synchronize::InitActions( WlanContextImpl& aCtxImpl )
     // Light PS is the initial desired PS mode configuration
     aCtxImpl.SetDesiredPsModeConfig( 
         aCtxImpl.ClientLightPsModeConfig() );
+    // also make sure that the dynamic power mode managemen parameters are in
+    // their WLAN Mgmt Client provided values
+    aCtxImpl.RestorePwrModeMgmtParameters();
     
     // check do we meet the requirements for the network
     // and construct necessary objects for doing the connection

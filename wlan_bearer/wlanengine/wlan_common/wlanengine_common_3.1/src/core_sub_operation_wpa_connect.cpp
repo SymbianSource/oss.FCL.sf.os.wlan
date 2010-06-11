@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 59 %
+* %version: 59.1.1 %
 */
 
 #include "core_sub_operation_wpa_connect.h"
@@ -102,6 +102,8 @@ core_error_e core_sub_operation_wpa_connect_c::next_state()
                 true_t );
             server_m->get_connection_data()->set_eapol_auth_bssid(
                 ZERO_MAC_ADDR );
+            server_m->get_connection_data()->set_eapol_auth_failure(
+                core_error_ok );
 
             eapol_auth_type_m = core_tools_c::eap_authentication_type(
                 server_m->get_connection_data()->iap_data(),
@@ -634,9 +636,17 @@ core_error_e core_sub_operation_wpa_connect_c::next_state()
             DEBUG6( "core_sub_operation_wpa_connect_c::next_state() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
                 current_bssid_m.addr[0], current_bssid_m.addr[1], current_bssid_m.addr[2],
                 current_bssid_m.addr[3], current_bssid_m.addr[4], current_bssid_m.addr[5] );
+            DEBUG( "core_sub_operation_wpa_connect_c::next_state() - marking is_eapol_disconnecting as true" );
+            server_m->get_connection_data()->set_eapol_disconnecting(
+                true );
 
             server_m->get_eapol_instance().disassociation( &network );
-
+            operation_state_m = core_state_user_cancel_disassociated;
+            
+            break;
+            }
+        case core_state_user_cancel_disassociated:
+            {
             /** The connection attempt failed, we are no longer connected. */
             is_connected_m = false_t;            
 
@@ -770,10 +780,28 @@ core_error_e core_sub_operation_wpa_connect_c::associate(
 // ---------------------------------------------------------------------------
 //
 core_error_e core_sub_operation_wpa_connect_c::disassociate(
-    network_id_c * /*receive_network_id*/,
+    network_id_c * receive_network_id,
     const bool_t /* self_disassociation */ )
     {
     DEBUG( "core_sub_operation_wpa_connect_c::disassociate()" );
+
+    const core_mac_address_s bssid(
+        receive_network_id->source() );
+    DEBUG6( "core_sub_operation_wpa_connect_c::disassociate() - function BSSID is %02X:%02X:%02X:%02X:%02X:%02X",
+        bssid.addr[0], bssid.addr[1], bssid.addr[2], 
+        bssid.addr[3], bssid.addr[4], bssid.addr[5] );
+    DEBUG6( "core_sub_operation_wpa_connect_c::disassociate() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
+        current_bssid_m.addr[0], current_bssid_m.addr[1], current_bssid_m.addr[2],
+        current_bssid_m.addr[3], current_bssid_m.addr[4], current_bssid_m.addr[5] );
+    if( operation_state_m == core_state_req_state_notification &&
+        bssid == current_bssid_m )
+        {
+        DEBUG( "core_sub_operation_wpa_connect_c::disassociate() - marking is_eapol_disconnecting as true" );
+        server_m->get_connection_data()->set_eapol_disconnecting(
+            true );
+
+        server_m->get_eapol_instance().disassociation( receive_network_id );
+        }
     
     return core_error_ok;
     }
@@ -932,6 +960,18 @@ core_error_e core_sub_operation_wpa_connect_c::new_protected_setup_credentials(
     return core_error_ok;
     }
 
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+core_error_e core_sub_operation_wpa_connect_c::complete_disassociation(
+    network_id_c * /* receive_network_id */ )
+    {
+    DEBUG( "core_sub_operation_wpa_connect_c::complete_disassociation()" );
+
+    ASSERT( false_t );
+
+    return core_error_ok;
+    }
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -960,9 +1000,10 @@ void core_sub_operation_wpa_connect_c::handle_error(
 
             asynch_goto( core_state_init, CORE_TIMER_IMMEDIATELY );
             }
-        else if ( function == wlan_eapol_if_message_type_function_complete_association
+        else if ( ( function == wlan_eapol_if_message_type_function_complete_association
                || function == wlan_eapol_if_message_type_function_complete_reassociation
-               || function == wlan_eapol_if_message_type_function_complete_wpx_fast_roam_reassociation  )
+               || function == wlan_eapol_if_message_type_function_complete_wpx_fast_roam_reassociation  ) &&
+               eapol_auth_type_m == wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam )
             {
             DEBUG( "core_sub_operation_wpa_connect_c::handle_error() - (WPX fast-roam) (re-)association failed" );
             asynch_goto( core_state_req_association_failed, CORE_TIMER_IMMEDIATELY );
@@ -1011,22 +1052,13 @@ bool_t core_sub_operation_wpa_connect_c::notify(
         DEBUG6( "core_sub_operation_wpa_connect_c::notify() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
             current_bssid_m.addr[0], current_bssid_m.addr[1], current_bssid_m.addr[2],
             current_bssid_m.addr[3], current_bssid_m.addr[4], current_bssid_m.addr[5] );
+        DEBUG( "core_sub_operation_wpa_connect_c::next_state() - marking is_eapol_disconnecting as true" );
+        server_m->get_connection_data()->set_eapol_disconnecting(
+            true );
+        server_m->get_connection_data()->set_eapol_auth_failure(
+            core_error_eapol_failure );
 
         server_m->get_eapol_instance().disassociation( &network );
-
-        if ( indication != core_am_indication_wlan_media_disconnect )
-            {
-            DEBUG( "core_sub_operation_wpa_connect_c::notify() - marking is_eapol_authenticating as false" );
-            server_m->get_connection_data()->set_eapol_authenticating(
-                false_t );
-            DEBUG( "core_sub_operation_wpa_connect_c::notify() - marking is_eapol_authentication_started as false" );
-            server_m->get_connection_data()->set_eapol_authentication_started(
-                false_t );
-
-            asynch_goto( core_state_bss_lost );
-
-            return true_t;
-            }
 
         /**
          * EAPOL indication will move the state machine forward.

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 33 %
+* %version: 34 %
 */
 
 #include "core_operation_handle_bss_lost.h"
@@ -151,34 +151,6 @@ core_error_e core_operation_handle_bss_lost_c::next_state()
                 }
 
             /**
-             * If the connection is lost when EAPOL is doing (re-)authentication,
-             * EAPOL must be notified.
-             */
-            if ( server_m->get_connection_data()->is_eapol_authenticating() &&
-                 ( server_m->get_connection_data()->iap_data().is_eap_used() ||
-                   server_m->get_connection_data()->iap_data().is_wapi_used() ) )
-                {
-                network_id_c network_id(
-                    &bssid.addr[0],
-                    MAC_ADDR_LEN,
-                    &server_m->own_mac_addr().addr[0],
-                    MAC_ADDR_LEN,
-                    server_m->get_eapol_instance().ethernet_type() );
-
-                DEBUG( "core_operation_handle_bss_lost_c::next_state() - marking is_eapol_authenticating as false" );
-                server_m->get_connection_data()->set_eapol_authenticating(
-                    false_t );
-
-                DEBUG6( "core_operation_handle_bss_lost_c::next_state() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
-                    bssid.addr[0], bssid.addr[1], bssid.addr[2],
-                    bssid.addr[3], bssid.addr[4], bssid.addr[5] );
-
-                server_m->get_eapol_instance().disassociation( &network_id );
-                }
-
-            operation_state_m = core_state_set_tx_level;            
-
-            /**
              * Check the channels that were previously reported to be active.
              */
             server_m->get_scan_list().get_channels_by_ssid(
@@ -200,6 +172,47 @@ core_error_e core_operation_handle_bss_lost_c::next_state()
             DEBUG( "core_operation_handle_bss_lost_c::next_state() - removing current AP entries from scan list" );
             server_m->get_scan_list().remove_entries_by_bssid(
                 bssid );
+
+            /**
+             * If the connection is lost when EAPOL is doing (re-)authentication,
+             * EAPOL must be notified.
+             */
+            if ( ( server_m->get_connection_data()->is_eapol_authenticating() ||
+                   reason_m == core_bss_lost_reason_failed_reauthentication ) &&
+                 ( server_m->get_connection_data()->iap_data().is_eap_used() ||
+                   server_m->get_connection_data()->iap_data().is_wapi_used() ) )
+                {
+                network_id_c network_id(
+                    &bssid.addr[0],
+                    MAC_ADDR_LEN,
+                    &server_m->own_mac_addr().addr[0],
+                    MAC_ADDR_LEN,
+                    server_m->get_eapol_instance().ethernet_type() );
+
+                DEBUG( "core_operation_handle_bss_lost_c::next_state() - marking is_eapol_authenticating as false" );
+                server_m->get_connection_data()->set_eapol_authenticating(
+                    false_t );
+
+                DEBUG6( "core_operation_handle_bss_lost_c::next_state() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
+                    bssid.addr[0], bssid.addr[1], bssid.addr[2],
+                    bssid.addr[3], bssid.addr[4], bssid.addr[5] );
+                DEBUG( "core_operation_handle_bss_lost_c::next_state() - marking is_eapol_disconnecting as true" );
+                server_m->get_connection_data()->set_eapol_disconnecting(
+                    true );
+                server_m->get_connection_data()->set_eapol_auth_failure(
+                    core_error_eapol_failure );
+
+                server_m->get_eapol_instance().disassociation( &network_id );
+                operation_state_m = core_state_eapol_disassociated;
+
+                return core_error_request_pending;
+                }
+
+            return goto_state( core_state_eapol_disassociated );
+            }            
+        case core_state_eapol_disassociated:
+            {            
+            operation_state_m = core_state_set_tx_level;            
 
             server_m->get_core_settings().roam_metrics().set_roam_ts_userdata_disabled();
 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 29 %
 */
 
 #ifndef CORE_SUB_OPERATION_WPA_CONNECT_H
@@ -65,6 +65,7 @@ public:
         core_state_req_state_notification,
         core_state_bss_lost,
         core_state_user_cancel,
+        core_state_user_cancel_disassociated,
         core_state_MAX
         };
 
@@ -187,6 +188,12 @@ protected:
     core_error_e new_protected_setup_credentials(
         core_type_list_c< protected_setup_credential_c > & credential_list );
 
+    /**
+     * From abs_wlan_eapol_callback_interface_c
+     */
+    core_error_e complete_disassociation(
+        network_id_c * receive_network_id );
+    
     /**
      * From abs_wlan_eapol_callback_interface_c
      */

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 14 %
 */
 
 #include "core_wlan_eapol_if_message.h"
@@ -4059,4 +4059,43 @@ core_error_e core_wlan_eapol_if_function_c::parse_new_protected_setup_credential
     return core_error_ok;
     }
 
+core_error_e core_wlan_eapol_if_function_c::parse_complete_disassociation(
+    network_id_c * receive_network_id )
+    {
+    DEBUG( "core_wlan_eapol_if_function_c::parse_complete_disassociation()" );
+    ASSERT( receive_network_id );
 
+    core_error_e error( core_error_ok );
+
+    first();
+    if ( is_done() )
+        {
+        DEBUG( "core_wlan_eapol_if_function_c::parse_complete_disassociation() - message is empty" );
+        return core_error_not_found;
+        }
+
+    // Check function
+    if ( current()->get_parameter_type() != wlan_eapol_if_message_type_function )
+        {
+        return core_error_not_found;
+        }
+
+    u32_t function_value(0);
+    current()->get_parameter_data( &function_value );
+    wlan_eapol_if_message_type_function_e func( static_cast<wlan_eapol_if_message_type_function_e>( function_value ) );
+    if ( func != wlan_eapol_if_message_type_function_complete_disassociation )
+        {
+        return core_error_not_found;
+        }
+    
+    next();
+
+    // Check function parameters
+    error = parse_network_id( receive_network_id );
+    if ( error != core_error_ok )
+        {
+        return error;
+        }
+
+    return core_error_ok;
+    }

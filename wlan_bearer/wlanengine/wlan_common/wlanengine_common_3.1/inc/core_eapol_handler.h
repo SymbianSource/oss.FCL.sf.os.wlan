@@ -192,6 +192,12 @@ public:
         core_type_list_c< protected_setup_credential_c > & credential_list );
 
     /**
+     * From abs_wlan_eapol_callback_interface_c 
+     */
+    virtual core_error_e complete_disassociation(
+        network_id_c * receive_network_id );
+
+    /**
      * From abs_wlan_eapol_callback_interface_c
      */
     virtual void handle_error(

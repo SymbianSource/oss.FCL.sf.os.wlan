@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 33 %
+* %version: 34 %
 */
 
 #ifndef CORE_CONNECTION_DATA_H
@@ -468,6 +468,23 @@ public:
         const core_mac_address_s& bssid );
 
     /**
+     * Get the status of the ongoing authentication.
+     *
+     * @since S60 v3.1
+     * @return The status of the ongoing authentication. 
+     */
+    core_error_e eapol_auth_failure() const;
+
+    /**
+     * Set the status of the ongoing authentication.
+     *
+     * @since S60 v3.1
+     * @param error The status of the ongoing authentication. 
+     */
+    void set_eapol_auth_failure(
+        core_error_e error );
+
+    /**
      * Return the list of active traffic streams.
      *
      * @since S60 v3.2
@@ -500,6 +517,23 @@ public:
     void set_eapol_connecting(
         bool_t is_eapol_connecting );
 
+    /**
+     * Check whether EAPOL is disconnecting.
+     *
+     * @since S60 v3.1
+     * @return Whether EAPOL is disconnecting.
+     */    
+    bool_t is_eapol_disconnecting() const;
+    
+    /**
+     * Set the status of EAPOL disconnecting.
+     *
+     * @since S60 v3.1
+     * @param is_eapol_disconnecting Whether EAPOL is disconnecting.
+     */
+    void set_eapol_disconnecting(
+        bool_t is_eapol_disconnecting );
+    
     /**
      * Check whether disconnection is ongoing.
      *
@@ -751,15 +785,21 @@ private: // data
     /** The BSSID currently being authenticated against. */
     core_mac_address_s eapol_auth_bssid_m;
 
+    /** Status of the currently ongoing authentication. */
+    core_error_e eapol_auth_failure_m;
+
     /** List of active traffic streams. */
     core_traffic_stream_list_c traffic_stream_list_m;
 
     /** List of virtual traffic streams. */
     core_virtual_traffic_stream_list_c virtual_traffic_stream_list_m;
-    
+
     /** Whether EAPOL is connecting. */
     bool_t is_eapol_connecting_m;
-    
+
+    /** Whether EAPOL is disconnecting. */
+    bool_t is_eapol_disconnecting_m;
+
     /** Whether disconnection is ongoing. */
     bool_t is_disconnecting_m;
 

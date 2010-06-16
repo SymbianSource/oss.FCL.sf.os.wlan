@@ -24,7 +24,7 @@ UID             0x1000008d 0x101f8e46
 CAPABILITY      CAP_GENERAL_DLL
 VENDORID        VID_DEFAULT
 
-#if defined( ARMCC )
+#if defined( EABI )
 DEFFILE         ../eabi/ 
 #else
 DEFFILE         ../bwinscw/ 

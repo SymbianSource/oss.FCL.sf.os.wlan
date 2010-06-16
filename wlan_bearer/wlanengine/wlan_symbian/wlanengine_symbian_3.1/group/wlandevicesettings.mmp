@@ -28,7 +28,7 @@ VENDORID        VID_DEFAULT
 SOURCEPATH      ../src
 SOURCE          wlandevicesettings.cpp
 
-#if defined( ARMCC )
+#if defined( EABI )
 DEFFILE         ../eabi/ 
 #else
 DEFFILE         ../bwinscw/ 

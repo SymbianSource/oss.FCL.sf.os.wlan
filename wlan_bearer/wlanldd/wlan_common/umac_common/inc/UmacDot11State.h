@@ -267,7 +267,7 @@ public:
 
 protected:
 
-    static const TUint32 KCompleteManagementRequest = 0xACDCACDC;
+    enum { KCompleteManagementRequest = 0xACDCACDC };
 
     /**
     * C++ default constructor.

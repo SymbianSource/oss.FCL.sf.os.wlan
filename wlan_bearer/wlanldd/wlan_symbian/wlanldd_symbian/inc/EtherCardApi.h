@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #if !defined(__ETHERAPI_H__)
@@ -69,6 +69,7 @@ public:
 	    {
 	    EControlFastAllocTxBuffer = 0x0F000000,
 	    EControlFastAddTxFrame,
+	    EControlFastGetRxFrame
 	    };
 	
 public:
@@ -119,12 +120,9 @@ public:
     * is able to access the memory.
     *
     * @since S60 3.1
-    * @param aFrameXferBlock FrameXferBlock to be initialized by 
-    *        the device driver
     * @return KErrNone on success, any other on failure
     */
-    inline TInt InitialiseBuffers( 
-        RFrameXferBlockProtocolStack*& aFrameXferBlock );
+    inline TInt InitialiseBuffers();
 
     /**
     * Unmap memory mapped by InitiliazeBuffers method from the client 
@@ -182,6 +180,21 @@ public:
      *         ResumeTx asynchronous request completes.
 	 */
 	inline TBool AddTxFrame( TDataBuffer* aPacket );
+	
+    /**
+     * Gets the highest priority frame (contained in a buffer allocated from
+     * the shared memory) from the Rx queues.
+     * Optionally frees the memory associated to a previously received frame. 
+     * 
+     * @param aFrameToFree Previously received frame which can now be freed.
+     *        NULL if nothing to free.
+     * @return Pointer to the Rx frame to be handled next.
+     *         NULL, if there are no frames available. If NULL is returned
+     *         the client should re-issue the asynchronous frame Rx request
+     *         (i.e. RequestFrame())
+     */ 
+	inline TDataBuffer* GetRxFrame( TDataBuffer* aFrameToFree );
+	
 	
 #ifndef __KERNEL_MODE__
 private:

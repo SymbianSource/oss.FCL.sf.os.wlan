@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 9 %
+* %version: 10 %
 */
 
 
@@ -137,7 +137,7 @@ public:
      * 
      * @param aState New WLAN state
      */
-    virtual void WlanSetBgScanState( const TWlanBgScanState &aState ) = 0;
+    virtual void SetBgScanState( const TWlanBgScanState &aState ) = 0;
     
     /**
      * Whether background scan is enabled.

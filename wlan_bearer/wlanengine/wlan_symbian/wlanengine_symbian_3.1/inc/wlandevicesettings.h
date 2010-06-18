@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 23 %
+* %version: 24 %
 */
 
 #ifndef WLANDEVICESETTINGS_H
@@ -88,7 +88,7 @@ const TUint32 KWlanDefaultBssLostRoamAttemptsPerInterval = 2;
 const TUint32 KWlanDefaultBssLostRoamNextIntervalFactor = 1;
 const TUint32 KWlanDefaultBssLostRoamNextIntervalAddition = 500000; // 500 ms
 const TUint32 KWlanDefaultBssLostRoamMaxTriesToFindNw = 5;
-const TUint32 KWlanDefaultTrafficStreamCreationTimeout = 1000000;   // 1 minute
+const TUint32 KWlanDefaultTrafficStreamCreationTimeout = 1000000;   // 1 second
 const TUint32 KWlanDefaultBeaconLostThreshold = 15;
 const TUint32 KWlanDefaultBtBeaconLostThreshold = 20;
 const TUint32 KWlanDefaultTxFailThreshold = 4;

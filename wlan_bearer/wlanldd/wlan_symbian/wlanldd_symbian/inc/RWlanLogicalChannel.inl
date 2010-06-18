@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17 %
+* %version: 18 %
 */
 
 // -----------------------------------------------------------------------------
@@ -39,9 +39,7 @@ inline TInt RWlanLogicalChannel::Open(
     TWlanUnit aUnit, 
     TOpenParam& aOpenParam )
     {
-    iWlanSystemInitialized = EFalse;
-    
-	TInt err = DoCreate(
+    TInt err = DoCreate(
         LDD_NAME, 
         VersionRequired(), 
         aUnit, 
@@ -54,12 +52,6 @@ inline TInt RWlanLogicalChannel::Open(
         // driver load sequence success
         // do system init
         err = InitWlanSystem( aOpenParam  );
-        
-        if ( err == KErrNone )
-            {
-            // WLAN system successfully initialized
-            iWlanSystemInitialized = ETrue;
-            }
         }
 
     return err;
@@ -71,21 +63,12 @@ inline TInt RWlanLogicalChannel::Open(
 //
 inline void RWlanLogicalChannel::CloseChannel()
     {
-    // release WLAN system resources only if we have been able to do the 
-    // initialization successfully.
-    // This check is done to prevent a release attempt in a case where the 
-    // device driver framework has not been properly initialized to be able to 
-    // handle requests
-    if ( iWlanSystemInitialized )
-        {
-        TRequestStatus status;
-        DoRequest( EWlanFinitSystem, status );
-        User::WaitForRequest(status);
-
-        // not initialized any more. This is needed to handle the case
-        // that this method is called multiple times
-        iWlanSystemInitialized = EFalse;
-        }
+    // request WLAN system resources to be released
+    //
+    TRequestStatus status;
+    DoRequest( EWlanFinitSystem, status );
+    User::WaitForRequest(status);
+    
     // internally call close
     Close();
     }
@@ -237,12 +220,12 @@ inline TInt RWlanLogicalChannel::InitialiseBuffers(
             + KMgmtSideTxBufferLength
             + KProtocolStackSideTxDataChunkSize );
 
-        aFrameXferBlock->SetRxDataChunkField( reinterpret_cast<TLinAddr>(
-            baseAddress) );
-
         aFrameXferBlock->SetTxDataBufferField( reinterpret_cast<TLinAddr>(
             baseAddress
             + KRxDataChunkSize ) );
+        
+        aFrameXferBlock->UserInitialize( 
+            reinterpret_cast<TUint32>(aFrameXferBlock) );
         }
     
     return status;
@@ -278,4 +261,16 @@ inline void RWlanLogicalChannel::RequestFrame(
     TRequestStatus &aStatus )
     {
     DoRequest( EWlanRequestFrame, aStatus );
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline TDataBuffer* RWlanLogicalChannel::GetRxFrame(
+    TDataBuffer* aFrameToFree )
+    {
+    return reinterpret_cast<TDataBuffer*>(DoControl( 
+        EWlanControlFastGetRxFrame,
+        reinterpret_cast<TAny*>(aFrameToFree) ));
     }

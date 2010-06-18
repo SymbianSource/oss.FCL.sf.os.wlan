@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 16 %
+* %version: 17 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -32,83 +32,12 @@
 //
 void RFrameXferBlockBase::KeInitialize()
     {
-    iRxDataChunk = NULL;
-
-    for ( TUint32 i = 0; i < KMaxCompletedRxBufs; ++i )
-        {
-        iRxCompletedBuffers[i] = 0;
-        }
+    iThisAddrKernelSpace = reinterpret_cast<TUint32>(this);
 
     for ( TUint j = 0; j < TDataBuffer::KFrameTypeMax; ++j )
         {
         iTxOffset[j] = 0;
         }
-
-    iNumOfCompleted = 0;
-    iCurrentRxBuffer = 0;
-    iFirstRxBufferToFree = 0;    
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void RFrameXferBlockBase::KeRxComplete( 
-    const TUint32* aRxCompletionBuffersArray, 
-    TUint32 aNumOfCompleted )
-    {
-    if ( aNumOfCompleted > KMaxCompletedRxBufs )
-        {
-        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-        }
-
-    assign( aRxCompletionBuffersArray, iRxCompletedBuffers, aNumOfCompleted );
-    iNumOfCompleted = aNumOfCompleted;
-    iCurrentRxBuffer = 0;
-    iFirstRxBufferToFree = 0;
-
-    for ( TUint i = 0; i < iNumOfCompleted; ++i )
-        {
-        TraceDump( RX_FRAME, 
-            (("WLANLDD: RFrameXferBlockBase::KeRxComplete: completed offset addr: 0x%08x"), 
-            iRxCompletedBuffers[i]) );
-        }    
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void RFrameXferBlockBase::KeGetHandledRxBuffers( 
-    const TUint32*& aRxHandledBuffersArray, 
-    TUint32& aNumOfHandled )
-    { 
-    TUint32 numHandled ( iCurrentRxBuffer - iFirstRxBufferToFree );
-
-    // make sure that if an Rx buffer is currently being processed by the user
-    // side client, that buffer is not regarded as being already handled
-    numHandled = numHandled ? numHandled - 1 : numHandled;
-    
-    if ( numHandled )
-        {
-        aRxHandledBuffersArray = &(iRxCompletedBuffers[iFirstRxBufferToFree]);
-        aNumOfHandled = numHandled;
-        
-        iFirstRxBufferToFree += numHandled;
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void RFrameXferBlockBase::KeAllUserSideRxBuffersFreed()
-    {
-    iFirstRxBufferToFree = 0;
-    // need to reset also the current index, so that the difference of these
-    // two indexes is zero, and it then correctly indicates, that there are no
-    // Rx buffers which could be freed incrementally
-    iCurrentRxBuffer = 0;
     }
 
 // ---------------------------------------------------------------------------
@@ -133,16 +62,109 @@ void RFrameXferBlockBase::KeSetTxOffsets(
         }
     }
 
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+void RFrameXferBlock::Initialize( TUint32 aTxBufLength )
+    {
+    // perform base class initialization first
+    KeInitialize();
+    
+    iTxDataBuffer = NULL;
+    iTxBufLength = aTxBufLength;
+    
+    iRxQueueFront = NULL;
+    iRxQueueRear = NULL;
+    }
+
 // -----------------------------------------------------------------------------
 // 
 // -----------------------------------------------------------------------------
 //
-void RFrameXferBlockProtocolStack::Initialise()
+void RFrameXferBlock::AddRxFrame( TDataBuffer* aFrame )
+    {
+    if ( aFrame )
+        {
+        aFrame->iNext = NULL;
+    
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlock::AddRxFrame: "
+              "add to queue metahdr addr: 0x%08x"), 
+            aFrame));
+        
+        if ( iRxQueueRear )
+            {
+            iRxQueueRear->iNext = aFrame;
+            iRxQueueRear = aFrame;
+            }
+        else
+            {
+            iRxQueueFront = aFrame;
+            iRxQueueRear = aFrame;
+            }
+        }
+    }
+
+// -----------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// -----------------------------------------------------------------------------
+//
+TDataBuffer* RFrameXferBlock::GetRxFrame()
+    {
+    TDataBuffer* aPacketInKernSpace( NULL );
+
+    if ( iRxQueueFront )
+        {
+        aPacketInKernSpace = iRxQueueFront;
+        
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlock::GetRxFrame: "
+              "krn metahdr addr: 0x%08x"), 
+            reinterpret_cast<TUint32>(aPacketInKernSpace)));
+        
+        iRxQueueFront = iRxQueueFront->iNext;
+        
+        if ( !iRxQueueFront )
+            {
+            // the queue became empty
+            iRxQueueRear = NULL;
+            }
+        
+        return reinterpret_cast<TDataBuffer*>(
+                   reinterpret_cast<TUint8*>(aPacketInKernSpace) 
+                   - iUserToKernAddrOffset);
+        }
+    else
+        {
+        // the Rx queue is empty
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlock::GetRxFrame: "
+              "no frames available")));
+        
+        // return NULL
+        return aPacketInKernSpace;
+        }
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+TBool RFrameXferBlock::RxFrameAvailable() const
+    {
+    return reinterpret_cast<TBool>( iRxQueueFront );
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+void RFrameXferBlockProtocolStack::Initialize()
     {
     // perform base class initialization
     KeInitialize();
-    
-    iThisAddrKernelSpace = reinterpret_cast<TUint32>(this);
     
     iVoiceTxQueue.DoInit();
     iVideoTxQueue.DoInit();
@@ -161,10 +183,23 @@ void RFrameXferBlockProtocolStack::Initialise()
         
         iFreeQueue.PutPacket( &iDataBuffers[i] );
         }
+    
+    iVoiceRxQueueFront = NULL;
+    iVoiceRxQueueRear = NULL;
+
+    iVideoRxQueueFront = NULL;
+    iVideoRxQueueRear = NULL;
+    
+    iBestEffortRxQueueFront = NULL;
+    iBestEffortRxQueueRear = NULL;
+    
+    iBackgroundRxQueueFront = NULL;
+    iBackgroundRxQueueRear = NULL;
     }
 
 // -----------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // -----------------------------------------------------------------------------
 //
 TDataBuffer* RFrameXferBlockProtocolStack::AllocTxBuffer( 
@@ -209,7 +244,8 @@ TDataBuffer* RFrameXferBlockProtocolStack::AllocTxBuffer(
     }
 
 // -----------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // -----------------------------------------------------------------------------
 //
 TBool RFrameXferBlockProtocolStack::AddTxFrame( 
@@ -219,6 +255,15 @@ TBool RFrameXferBlockProtocolStack::AddTxFrame(
     {
     TBool ret( ETrue );
     aPacketInKernSpace = NULL;
+
+    if ( !aPacketInUserSpace )
+        {
+#ifndef NDEBUG
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+#endif        
+        return ETrue;
+        }
+    
     TDataBuffer* metaHdrInKernSpace ( reinterpret_cast<TDataBuffer*>(
         reinterpret_cast<TUint8*>(aPacketInUserSpace) + iUserToKernAddrOffset) );
     
@@ -449,6 +494,197 @@ TBool RFrameXferBlockProtocolStack::ResumeClientTx(
 #endif        
     
     return ret;
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+void RFrameXferBlockProtocolStack::AddRxFrame( TDataBuffer* aFrame )
+    {
+    if ( !aFrame )
+        {
+#ifndef NDEBUG
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+#endif        
+        return;
+        }
+    
+    aFrame->iNext = NULL;
+
+    if ( aFrame->UserPriority() == 7 || aFrame->UserPriority() == 6 )
+        {
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::AddRxFrame: "
+              "add to VO queue metahdr addr: 0x%08x"), 
+            aFrame));
+        
+        if ( iVoiceRxQueueRear )
+            {
+            iVoiceRxQueueRear->iNext = aFrame;
+            iVoiceRxQueueRear = aFrame;
+            }
+        else
+            {
+            iVoiceRxQueueFront = aFrame;
+            iVoiceRxQueueRear = aFrame;
+            }
+        }
+    else if ( aFrame->UserPriority() == 5 || aFrame->UserPriority() == 4 )
+        {
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::AddRxFrame: "
+              "add to VI queue metahdr addr: 0x%08x"), 
+            aFrame));
+        
+        if ( iVideoRxQueueRear )
+            {
+            iVideoRxQueueRear->iNext = aFrame;
+            iVideoRxQueueRear = aFrame;
+            }
+        else
+            {
+            iVideoRxQueueFront = aFrame;
+            iVideoRxQueueRear = aFrame;
+            }
+        }
+    else if ( aFrame->UserPriority() == 2 || aFrame->UserPriority() == 1 )
+        {
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::AddRxFrame: "
+              "add to BG queue metahdr addr: 0x%08x"), 
+            aFrame));
+        
+        if ( iBackgroundRxQueueRear )
+            {
+            iBackgroundRxQueueRear->iNext = aFrame;
+            iBackgroundRxQueueRear = aFrame;
+            }
+        else
+            {
+            iBackgroundRxQueueFront = aFrame;
+            iBackgroundRxQueueRear = aFrame;
+            }
+        }
+    else 
+        {
+        // user priority is 3 or 0 or invalid
+
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::AddRxFrame: "
+              "add to BE queue metahdr addr: 0x%08x"), 
+            aFrame));
+        
+        if ( iBestEffortRxQueueRear )
+            {
+            iBestEffortRxQueueRear->iNext = aFrame;
+            iBestEffortRxQueueRear = aFrame;
+            }
+        else
+            {
+            iBestEffortRxQueueFront = aFrame;
+            iBestEffortRxQueueRear = aFrame;
+            }
+        }
+    }
+
+// -----------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// -----------------------------------------------------------------------------
+//
+TDataBuffer* RFrameXferBlockProtocolStack::GetRxFrame()
+    {
+    TDataBuffer* aPacketInKernSpace( NULL );
+
+    if ( iVoiceRxQueueFront )
+        {
+        aPacketInKernSpace = iVoiceRxQueueFront;
+        
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::GetRxFrame: from VO "
+              "queue; krn metahdr addr: 0x%08x"), 
+            reinterpret_cast<TUint32>(aPacketInKernSpace)));
+        
+        iVoiceRxQueueFront = iVoiceRxQueueFront->iNext;
+        
+        if ( !iVoiceRxQueueFront )
+            {
+            // the queue became empty
+            iVoiceRxQueueRear = NULL;
+            }
+        }
+    else if ( iVideoRxQueueFront )
+        {
+        aPacketInKernSpace = iVideoRxQueueFront;
+        
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::GetRxFrame: from VI "
+              "queue; krn metahdr addr: 0x%08x"), 
+            reinterpret_cast<TUint32>(aPacketInKernSpace)));
+        
+        iVideoRxQueueFront = iVideoRxQueueFront->iNext;
+        
+        if ( !iVideoRxQueueFront )
+            {
+            // the queue became empty        
+            iVideoRxQueueRear = NULL;
+            }
+        }
+    else if ( iBestEffortRxQueueFront )
+        {
+        aPacketInKernSpace = iBestEffortRxQueueFront;
+        
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::GetRxFrame: from BE "
+              "queue; krn metahdr addr: 0x%08x"), 
+            reinterpret_cast<TUint32>(aPacketInKernSpace)));
+        
+        iBestEffortRxQueueFront = iBestEffortRxQueueFront->iNext;
+        
+        if ( !iBestEffortRxQueueFront )
+            {
+            // the queue became empty        
+            iBestEffortRxQueueRear = NULL;
+            }
+        }
+    else if ( iBackgroundRxQueueFront )
+        {
+        aPacketInKernSpace = iBackgroundRxQueueFront;
+        
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::GetRxFrame: from BG "
+              "queue; krn metahdr addr: 0x%08x"), 
+            reinterpret_cast<TUint32>(aPacketInKernSpace)));
+        
+        iBackgroundRxQueueFront = iBackgroundRxQueueFront->iNext;
+        
+        if ( !iBackgroundRxQueueFront )
+            {
+            // the queue became empty
+            iBackgroundRxQueueRear = NULL;
+            }
+        }
+    else
+        {
+        // all Rx queues are empty; no action
+        }
+    
+    if ( aPacketInKernSpace )
+        {
+        return reinterpret_cast<TDataBuffer*>(
+                   reinterpret_cast<TUint8*>(aPacketInKernSpace) 
+                   - iUserToKernAddrOffset);
+        }
+    else
+        {
+        TraceDump( RX_FRAME, 
+            (("WLANLDD: RFrameXferBlockProtocolStack::GetRxFrame: "
+              "no frames available")));
+        
+        // return NULL
+        return aPacketInKernSpace;
+        }
     }
 
 // -----------------------------------------------------------------------------

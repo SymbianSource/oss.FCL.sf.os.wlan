@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 14 %
 */
 
 // INCLUDE FILES
@@ -131,6 +131,8 @@ void CWlmPlatformData::ConstructL()
     User::LeaveIfError( iPsOnOffState.Attach( KPSUidWlan,
         KPSWlanOnOffState, EOwnerThread ) );
     
+    // Publish initial value for WLAN on/off as WLAN OFF
+    PublishWlanOnOff( EPSWlanOff );
     }
 
 // ---------------------------------------------------------
@@ -160,6 +162,8 @@ CWlmPlatformData::~CWlmPlatformData()
     RProperty::Delete( KPSUidWlan, KPSWlanMacAddress );
     iPsBgScanInterval.Close();
     RProperty::Delete( KPSUidWlan, KPSWlanBgScanInterval );
+    iPsOnOffState.Close();
+    RProperty::Delete( KPSUidWlan, KPSWlanOnOffState );
     delete iPropertySystemState;
     delete iBtConnections;
     delete iEmergencyCall;
@@ -491,31 +495,20 @@ TWlanOnOffState CWlmPlatformData::GetWlanOnOffState()
 //
 void CWlmPlatformData::NotifyWlanOnOffObserver()
     {
-	DEBUG( "CWlmPlatformData::NotifyWlanOnOffObserver()" );
-	
-	// Read WLAN master switch
-	TInt wlanOn( EFalse );
-	iWlanOnOff->Get( wlanOn );
-	
-	// Read WLAN force disable switch
-	TInt wlanForceDisable( EFalse );
-	iWlanForceDisable->Get( wlanForceDisable );
-	
-	DEBUG3( "    WlanOnOff: %d, WlanForceDisable: %d, NotifiedToObserver: %d",
-	    wlanOn, wlanForceDisable, iNotifiedWlanState );
+	DEBUG1( "CWlmPlatformData::NotifyWlanOnOffObserver() - last notified state=%d",
+	    iNotifiedWlanState );
 	
 	// Note that the observer is only notified if the
 	// state really changes 
 	
-	// If WLAN is set ON and it is not forcibly disabled
-	if( wlanOn &&                        // WLAN set ON
-	    wlanForceDisable == EFalse &&    // WLAN force disable not set
+	// If WLAN is set ON
+	if( GetWlanOnOffState() == EWlanOn &&    // WLAN set ON
 	    iNotifiedWlanState != CWlmPlatformData::EWlanNotifiedOn ) // WLAN ON not notified yet
 	    {
 		// Notify observer that WLAN is set ON
 		iCallback.WlanOn();
 		iNotifiedWlanState = CWlmPlatformData::EWlanNotifiedOn;
-		(void)PublishWlanOnOff( EPSWlanOn );
+		PublishWlanOnOff( EPSWlanOn );
 		// Note! P&S write operation return value is not checked
 		DEBUG( "CWlmPlatformData::NotifyWlanOnOffObserver() - WLAN ON notified, P&S updated" );
 		}
@@ -525,7 +518,7 @@ void CWlmPlatformData::NotifyWlanOnOffObserver()
 		// Notify observer that WLAN is set OFF
 	    iCallback.WlanOff();
 	    iNotifiedWlanState = CWlmPlatformData::EWlanNotifiedOff;
-	    (void)PublishWlanOnOff( EPSWlanOff );
+	    PublishWlanOnOff( EPSWlanOff );
 	    // Note! P&S write operation return value is not checked
 	    DEBUG( "CWlmPlatformData::NotifyWlanOnOffObserver() - WLAN OFF notified, P&S updated" );
 		}
@@ -536,10 +529,17 @@ void CWlmPlatformData::NotifyWlanOnOffObserver()
 // Status : Draft
 // ---------------------------------------------------------
 //
-TInt CWlmPlatformData::PublishWlanOnOff( TPSWlanOnOff aWlanState )
+void CWlmPlatformData::PublishWlanOnOff( TPSWlanOnOff aWlanState )
     {
     DEBUG1( "CWlmPlatformData::PublishWlanOnOff( wlanState = %d )",
         aWlanState );
 
-    return iPsOnOffState.Set( aWlanState );
+    TInt err( KErrNone );
+    err = iPsOnOffState.Set( aWlanState );
+    
+    if( err != KErrNone )
+        {
+        DEBUG1( "CWlmPlatformData::PublishWlanOnOff() - ERROR: update failed, err=%d",
+            err );
+        }
     }

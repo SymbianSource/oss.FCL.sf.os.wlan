@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 16 %
+* %version: 17 %
 */
 
 #ifndef WLANMGMTINTERFACE_H
@@ -215,13 +215,16 @@ class MWlanMgmtInterface
          * @param aStatus Status of the calling active object. On successful
          *                completion contains KErrNone, otherwise one of the
          *                system-wide error codes.
-         * @param aId Service ID of network which user has selected to be configured.
+         * @param aSsid SSID of the network to configure.
+         * @param aWpsPin PIN value to be used. "00000000" (string of eight zeros)
+         *                if push button method is used.
          * @param aCredentials Results of a successful Protected Setup operation.
          * @sa \link psetup Protected Setup-specific error codes \endlink.
          */
         virtual void RunProtectedSetup(
             TRequestStatus& aStatus,
-            TUint32 aId,
+            const TWlanSsid& aSsid,
+            const TWlanWpsPin& aWpsPin,
             CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& aCredentials ) = 0;
 
         /**
@@ -410,6 +413,7 @@ class MWlanMgmtInterface
          */
         virtual TInt StartAggressiveBgScan(
             TUint aInterval ) = 0;
+
     };
 
 #endif // WLANMGMTINTERFACE_H

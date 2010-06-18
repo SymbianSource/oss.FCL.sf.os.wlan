@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #include "core_sub_operation_roam_update_ts.h"
@@ -154,14 +154,25 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
             core_virtual_traffic_stream_c* virtual_iter = virtual_ts_iter.first();
             while( virtual_iter )
                 {
-                if( is_ac_required[virtual_iter->access_class()] &&
-                    virtual_iter->status() != core_traffic_stream_status_active )
+                if( virtual_iter->status() != core_traffic_stream_status_active )
                     {
-                    DEBUG1( "core_sub_operation_roam_update_ts_c::next_state() - virtual traffic stream with ID %u needs to created",
-                        virtual_iter->id() );
+                    if( is_ac_required[virtual_iter->access_class()] )
+                        {
+                        DEBUG1( "core_sub_operation_roam_update_ts_c::next_state() - virtual traffic stream with ID %u needs to created",
+                            virtual_iter->id() );
 
-                    virtual_stream_list_m.add_traffic_stream(
-                        *virtual_iter );
+                        virtual_stream_list_m.add_traffic_stream(
+                            *virtual_iter );
+                        }
+                    else
+                        {
+                        /**
+                         * Send a status update to all affected virtual traffic streams. 
+                         */
+                        set_virtual_traffic_stream_inactive_by_id(
+                            virtual_iter->id(),
+                            core_traffic_stream_status_inactive_not_required );
+                        }
                     }
 
                 virtual_iter = virtual_ts_iter.next();
@@ -188,7 +199,7 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
                      */
                     set_virtual_traffic_stream_inactive_by_tid(
                         iter->tid(),
-                        core_traffic_stream_status_inactive_not_required );                    
+                        core_traffic_stream_status_inactive_not_required );
                     
                     /**
                      * Delete the actual traffic stream.
@@ -196,6 +207,7 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
                     server_m->get_wpx_adaptation_instance().handle_ts_delete(
                         iter->tid(), iter->user_priority() );                   
                     ts_iter.remove();
+                    iter = NULL;
                     }
                 else if( iter->status() == core_traffic_stream_status_undefined )
                     {
@@ -222,6 +234,7 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
                     server_m->get_wpx_adaptation_instance().handle_ts_delete(
                         iter->tid(), iter->user_priority() );                   
                     ts_iter.remove();
+                    iter = NULL;
                     }
 
                 iter = ts_iter.next();
@@ -301,6 +314,7 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
              * Move to the next entry.
              */
             stream_iter_m.remove();
+            iter = NULL;
             (void)stream_iter_m.first();
 
             return goto_state( core_state_recreate_next );
@@ -439,7 +453,9 @@ core_error_e core_sub_operation_roam_update_ts_c::next_state()
              * Move to the next entry.
              */
             stream_iter_m.remove();
+            iter = NULL;
             virtual_stream_iter_m.remove();
+            virtual_iter = NULL;
             (void)virtual_stream_iter_m.first();
 
             return goto_state( core_state_recreate_virtual_next );

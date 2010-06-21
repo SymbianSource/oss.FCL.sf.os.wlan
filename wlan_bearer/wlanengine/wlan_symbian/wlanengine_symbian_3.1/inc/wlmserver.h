@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 55.1.1 %
+* %version: 55.1.2 %
 */
 
 #ifndef WLMSERVER_H
@@ -94,6 +94,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
             TAny* iParam1;
             TAny* iParam2;
             TAny* iParam3;
+            TAny* iParam4;
             TUint* iTime;
 
             SRequestMapEntry() :
@@ -104,6 +105,7 @@ NONSHARABLE_CLASS( CWlmServer ) :
                 iParam1( NULL ),
                 iParam2( NULL ),
                 iParam3( NULL ),
+                iParam4( NULL ),
                 iTime( NULL )
                 { }
             };
@@ -983,11 +985,11 @@ NONSHARABLE_CLASS( CWlmServer ) :
         	TUint& aTriggeringRequestIndex );        
 
         /**
-        * Notify the server that a background scan has been done.
-        */
+         * Notify the server that a background scan has been done.
+         */
         void NotifyBackgroundScanDone( 
             ScanList* aScanList, 
-            core_type_list_c<u32_t>* aIapIdList );
+            core_type_list_c<core_iap_availability_data_s>& aIapAvailabilityData );
 
         /**
          * Check if this request can be completed.
@@ -1377,7 +1379,22 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * Flag indicating whether aggressive scanning has to be performed
          * after link loss.
          */   
-        TBool iAggressiveScanningAfterLinkLoss;        
+        TBool iAggressiveScanningAfterLinkLoss;
+
+        /**
+         * WLAN device settings. 
+         */
+        CWlanDeviceSettings::SWlanDeviceSettings iDeviceSettings;
+
+        /**
+         * List of "weak" IAP IDs. 
+         */
+        RArray<TUint> iIapWeakList;
+        
+        /**
+         * IAP ID of the connection.
+         */
+        TUint iConnectionIapId;
     };
     
 

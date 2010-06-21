@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 26 %
+*/
 
 #include "core_settings.h"
 #include "core_settings_default.h"
@@ -45,7 +48,6 @@ core_settings_c::core_settings_c(
     uapsd_settings_m( DEFAULT_UAPSD_SETTINGS ),
     power_save_settings_m( DEFAULT_POWER_SAVE_SETTINGS ),
     block_ack_usage_m( DEFAULT_BLOCK_ACK_USAGE ),
-    weak_iap_list_m( ),
 	features_m( features )
     {
     DEBUG1( "core_settings_c::core_settings_c() - features: 0x%08X",
@@ -67,7 +69,6 @@ core_settings_c::~core_settings_c()
     
     perm_whitelist_m.clear();
     perm_blacklist_m.clear();
-    weak_iap_list_m.clear();
     }
 
 // ---------------------------------------------------------------------------
@@ -686,61 +687,6 @@ void core_settings_c::set_block_ack_usage(
     const core_block_ack_usage_s& usage )
     {
     block_ack_usage_m = usage;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// 
-void core_settings_c::add_iap_id_to_weak_iap_list( u32_t iap_id )
-    {
-    if ( !is_iap_id_in_weak_list( iap_id ) )
-        {
-        u32_t* weak_iap_id = new u32_t;
-        if ( weak_iap_id )
-            {
-            *weak_iap_id = iap_id;
-            weak_iap_list_m.append( weak_iap_id );
-            }                        
-        }       
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// 
-bool_t core_settings_c::is_iap_id_in_weak_list( u32_t iap_id )
-    {
-    u32_t* iap_id_p = weak_iap_list_m.first();    
-    while ( iap_id_p )
-        {
-        if ( *iap_id_p == iap_id )
-            {
-            return true_t;
-            }
-        
-        iap_id_p = weak_iap_list_m.next();
-        }        
-
-    return false_t;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// 
-void core_settings_c::remove_iap_id_from_weak_list( u32_t iap_id )
-    {
-    u32_t* iap_id_p = weak_iap_list_m.first();        
-    while ( iap_id_p )
-        {
-        if ( *iap_id_p == iap_id )
-            {
-            weak_iap_list_m.remove( iap_id_p );
-            delete iap_id_p;
-
-            return;
-            }
-        
-        iap_id_p = weak_iap_list_m.next();
-        }       
     }
 
 // ---------------------------------------------------------------------------

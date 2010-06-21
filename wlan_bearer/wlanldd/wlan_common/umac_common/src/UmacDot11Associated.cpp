@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 96.1.1 %
+* %version: 96.1.2 %
 */
 
 #include "config.h"
@@ -1996,7 +1996,7 @@ TBool WlanDot11Associated::TxData(
         const TPowerMgmtModeChange KPowerMgmtModeChange ( 
             aCtxImpl.OnFrameTx( queue_id, etherType ) );
         
-        // if any change change is needed regarding our power mgmt mode,
+        // if any change is needed regarding our power mgmt mode,
         // proceed with it
         stateChange = PowerMgmtModeChange( aCtxImpl, KPowerMgmtModeChange );        
         }
@@ -2236,7 +2236,7 @@ TBool WlanDot11Associated::PowerMgmtModeChange(
         
         if ( aPowerMgmtModeChange == EToActive )
             {
-            aCtxImpl.DesiredDot11PwrMgmtMode( WHA::KPsDisable );                
+            aCtxImpl.DesiredDot11PwrMgmtMode( WHA::KPsDisable );
             }
         else if ( aPowerMgmtModeChange == EToLightPs )
             {

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 15 %
 */
 
 #include "config.h"
@@ -50,6 +50,28 @@ TBool WlanDot11InfrastructureNormalMode::ChangePowerMgmtMode(
         aCtxImpl.iStates.iPwrMgmtTransitionMode     // next state
         );
     return ETrue; // signal caller that a state change occurred                          
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+void WlanDot11InfrastructureNormalMode::DoPsModeErrorIndication( 
+    WlanContextImpl& aCtxImpl )
+    {
+    OsTracePrint( KWlmIndication, (TUint8*)
+        ("UMAC: WlanDot11InfrastructureMode::DoPsModeErrorIndication") );
+    
+    // as the lower layers indicate that there is a problem with the PS
+    // operation of the current AP, we want to be in CAM mode for as long
+    // as there's data activity. So, check if we need a mode change to be
+    // in CAM now
+    const TPowerMgmtModeChange KPowerMgmtModeChange ( 
+        aCtxImpl.OnPsModeErrorIndication() );
+    
+    // if any change is needed regarding our power mgmt mode,
+    // proceed with it
+    PowerMgmtModeChange( aCtxImpl, KPowerMgmtModeChange );
     }
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 86.1.1 %
+* %version: 86.1.3 %
 */
 
 #include "config.h"
@@ -3241,14 +3241,24 @@ TBool WlanDot11State::RemoveMulticastAddr(
 // 
 // -----------------------------------------------------------------------------
 //
-TBool WlanDot11State::InitNetworkConnect( 
+TInt WlanDot11State::InitNetworkConnect( 
     WlanContextImpl& aCtxImpl,
     TUint16 aScanResponseFrameBodyLength,
     const TUint8* aScanResponseFrameBody ) const
     {
     OsTracePrint( KUmacDetails, 
         (TUint8*)("UMAC: WlanDot11State::InitNetworkConnect") );
-
+    
+    // 1st clear our BSS Membership feature list
+    aCtxImpl.ClearBssMembershipFeatureList();
+    
+    if ( aCtxImpl.WHASettings().iCapability & WHA::SSettings::KHtOperation )
+        {
+        // wlanpdd indicates HT support. Record that in our BSS Membership
+        // features
+        aCtxImpl.AddBssMembershipFeature( E802Dot11HtPhy );
+        }
+    
     const SScanResponseFixedFields* scanResponseFixedFields = 
         reinterpret_cast<const SScanResponseFixedFields*>( 
             aScanResponseFrameBody );
@@ -3283,7 +3293,7 @@ TBool WlanDot11State::InitNetworkConnect(
         OsTracePrint( KWarningLevel, (TUint8*)
             ("UMAC: WlanDot11State::InitNetworkConnect: WAPI requested but not supported by wlanpdd -> abort") );
         
-        return EFalse;
+        return KErrNotSupported;
         }
         
     //=============================================
@@ -3297,11 +3307,8 @@ TBool WlanDot11State::InitNetworkConnect(
         OsTracePrint( KWarningLevel, (TUint8*)
             ("UMAC: WlanDot11State::InitNetworkConnect: network capabilities not met -> abort") );
 
-        return EFalse;
+        return KWlanErrUnsupportedNwConf;
         }
-
-    // network capabilities are met -> proceed
-
 
     // initialize element locator for locating IEs from the scan response 
     // frame body
@@ -3312,69 +3319,7 @@ TBool WlanDot11State::InitNetworkConnect(
 
     TUint8 elementDatalength( 0 );
     const TUint8* elementData( NULL );
-    
-    //=============================================
-    // do we meet mandatory network rates
-    //=============================================
-
-    // locate supported rates IE
-    if ( elementLocator.InformationElement( 
-        E802Dot11SupportedRatesIE,
-        elementDatalength, 
-        &elementData ) == WlanElementLocator::EWlanLocateOk )
-        {
-        // ...and store it to our context
-        aCtxImpl.GetApSupportedRatesIE().SetIeData( 
-            elementData, 
-            elementDatalength );        
-        }
-    else
-        {
-        OsTracePrint( KWarningLevel, (TUint8*)
-            ("UMAC: WlanDot11State::InitNetworkConnect: supported rates IE not found -> abort") );
-
-        return EFalse;
-        }
-
-    // locate extended supported rates information element
-    if ( elementLocator.InformationElement( 
-        E802Dot11ExtendedRatesIE,
-        elementDatalength, 
-        &elementData ) == WlanElementLocator::EWlanLocateOk )
-        {
-        OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::InitNetworkConnect: E802Dot11ExtendedRatesIE present") );
-
-        // ...and store it to our context
-        aCtxImpl.GetApExtendedSupportedRatesIE().SetIeData( elementData, elementDatalength );
-
-        // check if we meet mandatory rates; in this case check also extended supported rates
-        if ( !AreSupportedRatesMet( aCtxImpl, ETrue ) )
-            {
-            OsTracePrint( KWarningLevel, (TUint8*)
-                ("UMAC: WlanDot11State::InitNetworkConnect: rates not met -> abort") );
-
-            return EFalse;
-            }
-        }
-    else
-        {
-        OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::InitNetworkConnect: E802Dot11ExtendedRatesIE not present") );
-
-        // check if we meet mandatory rates; in this case extended supported rates 
-        // don't need to be checked
-        if ( !AreSupportedRatesMet( aCtxImpl, EFalse ) )
-            {
-            OsTracePrint( KWarningLevel, 
-                (TUint8*)("UMAC: WlanDot11State::InitNetworkConnect: rates not met -> abort") );
-
-            return EFalse;
-            }            
-        }
-
-    // mandatory network rates are met -> proceed
-    
+        
     //=============================================
     // determine the channel of the network
     //=============================================
@@ -3393,7 +3338,7 @@ TBool WlanDot11State::InitNetworkConnect(
         OsTracePrint( KWarningLevel, (TUint8*)
             ("UMAC: WlanDot11State::InitNetworkConnect: 802Dot11DsParameterSetIE not found -> abort") );
 
-        return EFalse;
+        return KWlanErrUnsupportedNwConf;
         }
 
     //=============================================
@@ -3412,7 +3357,7 @@ TBool WlanDot11State::InitNetworkConnect(
         OsTracePrint( KWarningLevel, 
             (TUint8*)("UMAC: WlanDot11State::InitNetworkConnect: zero beacon interval -> abort") );
 
-        return EFalse;        
+        return KWlanErrUnsupportedNwConf;
         }
 
     //=============================================
@@ -3522,7 +3467,7 @@ TBool WlanDot11State::InitNetworkConnect(
                 OsTracePrint( KWarningLevel, (TUint8*)
                     ("UMAC: WlanDot11State::InitNetworkConnect: Nw's 802.11n requirements not met -> abort") );
         
-                return EFalse;
+                return KWlanErrUnsupportedNwConf;
                 }
             }
         else
@@ -3573,11 +3518,72 @@ TBool WlanDot11State::InitNetworkConnect(
         }
 
     //=============================================
+    // do we meet mandatory network rates
+    //=============================================
+
+    // locate supported rates IE
+    if ( elementLocator.InformationElement( 
+        E802Dot11SupportedRatesIE,
+        elementDatalength, 
+        &elementData ) == WlanElementLocator::EWlanLocateOk )
+        {
+        // ...and store it to our context
+        aCtxImpl.GetApSupportedRatesIE().SetIeData( 
+            elementData, 
+            elementDatalength );        
+        }
+    else
+        {
+        OsTracePrint( KWarningLevel, (TUint8*)
+            ("UMAC: WlanDot11State::InitNetworkConnect: supported rates IE not found -> abort") );
+
+        return KWlanErrUnsupportedNwConf;
+        }
+
+    // locate extended supported rates information element
+    if ( elementLocator.InformationElement( 
+        E802Dot11ExtendedRatesIE,
+        elementDatalength, 
+        &elementData ) == WlanElementLocator::EWlanLocateOk )
+        {
+        OsTracePrint( KInfoLevel, (TUint8*)
+            ("UMAC: WlanDot11State::InitNetworkConnect: E802Dot11ExtendedRatesIE present") );
+
+        // ...and store it to our context
+        aCtxImpl.GetApExtendedSupportedRatesIE().SetIeData( elementData, elementDatalength );
+
+        // check if we meet mandatory rates; in this case check also extended
+        // supported rates
+        if ( !AreSupportedRatesMet( aCtxImpl, ETrue ) )
+            {
+            OsTracePrint( KWarningLevel, (TUint8*)
+                ("UMAC: WlanDot11State::InitNetworkConnect: rates not met -> abort") );
+
+            return KWlanErrUnsupportedNwConf;
+            }
+        }
+    else
+        {
+        OsTracePrint( KInfoLevel, (TUint8*)
+            ("UMAC: WlanDot11State::InitNetworkConnect: E802Dot11ExtendedRatesIE not present") );
+
+        // check if we meet mandatory rates; in this case extended supported
+        // rates don't need to be checked
+        if ( !AreSupportedRatesMet( aCtxImpl, EFalse ) )
+            {
+            OsTracePrint( KWarningLevel, 
+                (TUint8*)("UMAC: WlanDot11State::InitNetworkConnect: rates not met -> abort") );
+
+            return KWlanErrUnsupportedNwConf;
+            }            
+        }
+
+    //=============================================
     // determine U-APSD usage for the ACs/Tx queues
     //=============================================
     DetermineAcUapsdUsage( aCtxImpl );
     
-    return ETrue;
+    return KErrNone;
     }
 
 // -----------------------------------------------------------------------------
@@ -4921,7 +4927,8 @@ TBool WlanDot11State::HandleHtCapabilities(
         aCtxImpl.HtSupportedByNw( ETrue ); 
 
         OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::HandleHtCapabilities: HT capabilities element present => HT supported by nw") );
+            ("UMAC: WlanDot11State::HandleHtCapabilities: HT capabilities "
+             "element present") );
         }
     else
         {
@@ -4929,7 +4936,8 @@ TBool WlanDot11State::HandleHtCapabilities(
         aCtxImpl.HtSupportedByNw( EFalse ); 
         
         OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::HandleHtCapabilities: HT capabilities element not found") );
+            ("UMAC: WlanDot11State::HandleHtCapabilities: HT capabilities "
+             "element not found => HT not supported") );
         }
     
     return status;
@@ -4959,16 +4967,22 @@ TBool WlanDot11State::HandleHtOperation(
             elementDatalength );
 
         OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::HandleHtOperation: element present") );
+            ("UMAC: WlanDot11State::HandleHtOperation: element present. "
+             "HT supported") );
         }
     else
         {
-        // not found even though HT capabilities element is present => 
-        // protocol error
-        status = EFalse;
+        // not found even though HT capabilities element is present. That's a 
+        // protocol error. The only way we can try to cope with that is to 
+        // handle the target nw as a non-HT nw
+        aCtxImpl.HtSupportedByNw( EFalse );
+        // in this case we need to remove HT also from our BSS membership 
+        // feature list
+        aCtxImpl.RemoveBssMembershipFeature( E802Dot11HtPhy );
         
         OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::HandleHtOperation: element not found => protocol error") );
+            ("UMAC: WlanDot11State::HandleHtOperation: element not found; "
+             "protocol error => HT disabled ") );
         }
     
     return status;
@@ -4998,6 +5012,9 @@ TBool WlanDot11State::HandleDot11n(
         // nw supported it. We achieve that by handling the target nw as
         // a non-HT nw
         aCtxImpl.HtSupportedByNw( EFalse );
+        // in this case we need to remove HT also from our BSS membership 
+        // feature list
+        aCtxImpl.RemoveBssMembershipFeature( E802Dot11HtPhy );
         
         OsTracePrint( KInfoLevel, (TUint8*)
             ("UMAC: WlanDot11State::HandleDot11n: TKIP as pairwise cipher "

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 11 %
 */
 
 // Default Voice Call Entry timeout
@@ -38,7 +38,7 @@ const TUint32 KDefaultNoVoiceTimeout = 1000000; // 1 s
 
 // Default Keep Alive timeout
 // This value is used if no other value has been provided
-const TUint32 KDefaultKeepAliveTimeout = 200000000; // 200 s
+const TUint32 KDefaultKeepAliveTimeout = 60000000; // 60 s
 
 // Default value for frame payload length threashold of a potential 
 // carrier of downlink Voice over WLAN Call data, which is erroneously 
@@ -220,4 +220,13 @@ inline void WlanNullSendController::OnNullDataTxCompleted()
         // NullTimer is running, because there's frequent frame Tx activity
         // during a Voice Call
         }
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline TBool WlanNullSendController::InVoiceCallState() const
+    {
+    return static_cast<TBool>(iFlags & KInVoiceCallState);
     }

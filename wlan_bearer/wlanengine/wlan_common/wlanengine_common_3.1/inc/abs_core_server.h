@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 31 %
+* %version: 32 %
 */
 
 #ifndef ABS_CORE_SERVER_H
@@ -106,7 +106,7 @@ public:
      * @param request_id An unique identification for the request.
      * @param is_active_scan_allowed specifies whether active scanning is allowed.
      * @param iap_data_list containing list of iap data structures.
-     * @param iap_id_list list of iap ids are stored here on completion.
+     * @param iap_availability_list List of available IAPs.
      * @param iap_ssid_list List of possible secondary SSIDs.
      * @param scan_data contains the scan results
      */
@@ -114,7 +114,7 @@ public:
         u32_t request_id,
         bool_t is_active_scan_allowed,
         core_type_list_c<core_iap_data_s>& iap_data_list,
-        core_type_list_c<u32_t>& iap_id_list,
+        core_type_list_c<core_iap_availability_data_s>& iap_availability_list,
         core_type_list_c<core_ssid_entry_s>* iap_ssid_list,
         ScanList& scan_data ) = 0;
 

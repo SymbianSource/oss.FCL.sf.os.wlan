@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 90 %
+* %version: 91 %
 */
 
 #include "core_server.h"
@@ -1104,7 +1104,7 @@ void core_server_c::get_available_iaps(
     u32_t request_id,
     bool_t is_active_scan_allowed,
     core_type_list_c<core_iap_data_s>& iap_data_list,
-    core_type_list_c<u32_t>& iap_id_list,
+    core_type_list_c<core_iap_availability_data_s>& iap_availability_list,
     core_type_list_c<core_ssid_entry_s>* iap_ssid_list,
     ScanList& scan_data )
     {
@@ -1117,7 +1117,7 @@ void core_server_c::get_available_iaps(
         &callback_m, 
         is_active_scan_allowed, 
         iap_data_list, 
-        iap_id_list,
+        iap_availability_list,
         iap_ssid_list,
         scan_data );
 

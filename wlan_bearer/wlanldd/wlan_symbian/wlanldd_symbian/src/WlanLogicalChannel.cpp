@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 59 %
+* %version: 59.1.1 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -633,7 +633,6 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
 #else
     iOsa->MutexAcquire();
 #endif
-    NKern::ThreadLeaveCS();
     
     TraceDump(MUTEX, 
         (("WLANLDD: DWlanLogicalChannel::DoControlFast: mutex acquired")));
@@ -705,14 +704,12 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
         }
     
     // release mutex
-    // Enter critical section before releasing the mutex as
-    // we are executing in the context of a user mode thread
-    NKern::ThreadEnterCS();    
 #ifndef RD_WLAN_DDK
     Kern::MutexSignal( iMutex );
 #else
     iOsa->MutexRelease();
 #endif 
+    // and exit from critical section
     NKern::ThreadLeaveCS();
     
     TraceDump(MUTEX, 

@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 13 %
+*/
 
 #ifndef WLANSCANRESULTCACHE_H
 #define WLANSCANRESULTCACHE_H
@@ -33,6 +36,7 @@ struct TWlanAvailableNetwork
     TBuf8<KMaxSSIDLength> ssid;
     EConnectionMode networkType;
     WlanSecurityMode securityMode;
+    TUint8 rcpi;
     };
 
 /**
@@ -75,7 +79,7 @@ public:  // Constructors and destructor
     
     /**
      * Updates the list of available networks (IAPs and SSIDs)
-     * @param aIapIdList List of available IAPs.
+     * @param aIapAvailabilityList List of available IAPs.
      * @param aNetworkList List of available networks.
      * @param aNewIapsAvailable is set to ETrue on completion if
      *        new networks or IAPs were detected since the last update.
@@ -83,7 +87,7 @@ public:  // Constructors and destructor
      *        networks or IAPs have been lost since the last update.
      */
     void UpdateAvailableNetworksList(
-        core_type_list_c<u32_t>& aIapIdList,
+        core_type_list_c<core_iap_availability_data_s>& aIapAvailabilityList,
         RArray<TWlanAvailableNetwork>& aNetworkList,
         TBool& aNewIapsAvailable,
         TBool& aOldIapsLost );
@@ -96,7 +100,7 @@ public:  // Constructors and destructor
      * @return Pointer to list of available IAPs or NULL if they are not available
      * or they are too old.
      */
-    RArray<TUint>* AvailableIaps(
+    RArray<TWlmAvailabilityData>* AvailableIaps(
         RArray<TWlanLimitedIapData>& aIapList,
         TUint aCacheLifetime );
 
@@ -144,13 +148,23 @@ private: // Functions
         const TWlanAvailableNetwork& aSecond );
 
     /**
+     * Method for determining whether two IAPs are equal.
+     * @param aFirst First IAP.
+     * @param aSecond Second IAP.
+     * @return Result of comparison.
+     */
+    static TBool IsIapEqual(
+        const TWlmAvailabilityData& aFirst,
+        const TWlmAvailabilityData& aSecond );
+
+    /**
      * Check whether the given IAP list is equal with the given IAP data list.
      *
      * @param aIapList IAP list to compare.
      * @param aIapDataList IAP data list to compare against.
      * @return ETrue is the lists are equal, EFalse otherwise.
      */
-    TBool IsIapListEqual(
+    static TBool IsIapListEqual(
         const RArray<TWlanLimitedIapData>& aFirst,
         const RArray<TWlanLimitedIapData>& aSecond );
 
@@ -177,7 +191,7 @@ private: // Data
     RArray<TWlanLimitedIapData> iIapList;
 
     /** Latest list of available IAPs */
-    RArray<TUint> iAvailableIapList;
+    RArray<TWlmAvailabilityData> iAvailableIapList;
 
     /** Latest list of available networks */
     RArray<TWlanAvailableNetwork> iAvailableNetworkList;

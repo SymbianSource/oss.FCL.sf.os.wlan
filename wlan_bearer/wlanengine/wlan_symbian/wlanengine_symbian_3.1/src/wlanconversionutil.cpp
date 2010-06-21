@@ -16,12 +16,12 @@
 */
 
 /*
-* %version: 86 %
+* %version: 86.1.1 %
 */
 
 #include <in_sock.h>
 #include <e32math.h>
-
+#include <in_iface.h>
 #include "wlanconversionutil.h"
 #include "wlmserver.h"
 #include "wlmtsparams.h"
@@ -428,6 +428,8 @@ TInt TWlanConversionUtil::ConvertConnectStatus(
             return KErrWlanInternalError;
         case core_connect_wapi_certificate_failure:
             return KErrWlanInternalError;
+        case core_connect_ap_unsupported_configuration:
+            return KErrIfAuthenticationFailure;
         default:
             return KErrUnknown;
         }
@@ -1000,6 +1002,7 @@ TInt TWlanConversionUtil::ConvertErrorCode( const core_error_e aError )
         case core_error_challenge_failure:
         case core_error_not_connected:
         case core_error_general:
+        case core_error_unsupported_config:
         default:
             return KErrGeneral;
         }
@@ -1031,6 +1034,8 @@ core_error_e TWlanConversionUtil::ConvertErrorCode( const TInt aError )
             return core_error_cancel;
         case KErrAlreadyExists:
             return core_error_already_exists;
+        case KWlanErrUnsupportedNwConf:
+            return core_error_unsupported_config;
         default:
             return core_error_general;    
         }

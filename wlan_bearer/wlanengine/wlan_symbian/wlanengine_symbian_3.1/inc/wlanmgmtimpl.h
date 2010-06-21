@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 21 %
+* %version: 21.1.1 %
 */
 
 #ifndef WLANMGMTIMPL_H
@@ -375,6 +375,7 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             TWlanConnectionExtentedSecurityMode& aMode );        
 
         /**
+         * (From MWlanMgmtInterface)
          * Activate the extended notification service.
          * 
          * After the client has enabled the notification service, it can
@@ -389,6 +390,7 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             TUint aCallbackInterfaceVersion );
 
         /**
+         * (From MWlanMgmtInterface)
          * Create a virtual traffic stream.
          *
          * @param aStatus Status of the calling active object. On successful
@@ -407,11 +409,13 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             TWlanTrafficStreamStatus& aStreamStatus );
 
         /**
+         * (From MWlanMgmtInterface)
          * Cancel an outstanding traffic stream creation request.
          */
         virtual void CancelCreateTrafficStream();
 
         /**
+         * (From MWlanMgmtInterface)
          * Delete a virtual traffic stream.
          *
          * @param aStatus Status of the calling active object. On successful
@@ -424,11 +428,13 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             TUint aStreamId );
 
         /**
+         * (From MWlanMgmtInterface)
          * Cancel an outstanding traffic stream deletion request.
          */
         virtual void CancelDeleteTrafficStream();
 
         /**
+         * (From MWlanMgmtInterface)
          * Initiate a roam to the given BSSID.
          *
          * @param aStatus Status of the calling active object. On successful
@@ -442,6 +448,7 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             const TWlanBssid& aBssid );
 
         /**
+         * (From MWlanMgmtInterface)
          * Cancel an outstanding directed roam request.
          */
         virtual void CancelDirectedRoam();
@@ -454,12 +461,44 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
             TInt aStatus );
 
         /**
+         * (From MWlanMgmtInterface)
          * Start aggressive background scanning.
          * @param aInterval Scan interval for aggressive mode (in seconds).
          *                  Valid range: 1-120 seconds.
          */
         virtual TInt StartAggressiveBgScan(
             TUint aInterval );
+
+        /**
+         * (From MWlanMgmtInterface)
+         * Get the available WLAN IAPs.
+         *
+         * @param aCacheLifetime Defines how many seconds old cached results the client
+         *                       is willing to accept. The valid is range is from 0 to
+         *                       60 seconds. The value of -1 means the system default will
+         *                       be used. The aCacheLifetime parameter has a meaning only
+         *                       when the aMaxDelay parameter is zero.
+         *                       Value will be changed to the actual value used by the
+         *                       system.
+         * @param aMaxDelay Maximum amount of seconds the client is willing to wait for
+         *                  the availability results. The valid range is from 0 to 1200
+         *                  seconds or KWlanInfiniteScanDelay. KWlanInfiniteScanDelay
+         *                  will never cause a scan, but the request will be
+         *                  completed when any other broadcast scan request is completed.
+         *                  Value will be changed to the actual value used by the system.
+         * @param aFilteredResults Whether availability is filtered based on signal strength.
+                                   ETrue if filtering is allowed, EFalse if not.
+         * @param aStatus Status of the calling active object. On successful
+         *                completion contains KErrNone, otherwise one of the
+         *                system-wide error codes.
+         * @param aAvailableIaps Array of IAPs available.
+         */
+        virtual void GetAvailableIaps(
+            TInt& aCacheLifetime,
+            TUint& aMaxDelay,
+            TBool aFilteredResults,
+            TRequestStatus& aStatus,
+            RArray<TWlanIapAvailabilityData>& aAvailableIaps );
 
 	protected: // Methods
 
@@ -686,6 +725,23 @@ class CWlanAvailableIapsRequest : public CActive
             TUint& aMaxDelay );
 
         /**
+         * C++ default constructor.
+         * @param aCallback Callback interface to CWlanMgmtImpl.
+         * @param aServer Interface to RWLMServer. 
+         * @param aAvailableIaps Available IAPs are stored here.
+         * @param aCacheLifetime how old cached results (in seconds) the client is willing to accept.
+         * @param aMaxDelay maximum time the client is willing to wait for the scan results.
+         * @param aFilteredResults Whether availability is filtered based on signal strength.
+         */
+        CWlanAvailableIapsRequest(
+            CWlanMgmtImpl& aCallback,
+            RWLMServer& aServer,
+            RArray<TWlanIapAvailabilityData>& aAvailableIaps,
+            TInt& aCacheLifetime,
+            TUint& aMaxDelay,
+            TBool aFilteredResults );
+
+        /**
          * Destructor.
          */
         virtual ~CWlanAvailableIapsRequest();
@@ -728,12 +784,17 @@ class CWlanAvailableIapsRequest : public CActive
         // Interface to RWLMServer
         RWLMServer& iServer;
 
-        // Handle to client storage for available IAPs
-		RArray<TUint>& iPendingAvailableIaps;
-		
+        // Handle to client storage for available IAP IDs for legacy methods.
+        // Not owned by this pointer.
+        RArray<TUint>* iPendingAvailableIapIds;
+
+        // Handle to client storage for available IAPs.
+        // Not owned by this pointer.
+        RArray<TWlanIapAvailabilityData>* iPendingAvailableIaps;
+
 		// Storage for available IAPs
 		TWlmAvailableIaps iAvailableIaps;
-		
+
 		// The package buffer needed for the asynchronous request
 		TPckg<TWlmAvailableIaps> iAvailableIapsBuf;
 		
@@ -743,6 +804,8 @@ class CWlanAvailableIapsRequest : public CActive
 		// The package buffer needed for the asynchronous request
 		TPckg<TUint> iMaxDelayBuf;
 		
+		// Whether availability is filtered based on signal strength.
+		TBool iFilteredResults;
     };
 
 

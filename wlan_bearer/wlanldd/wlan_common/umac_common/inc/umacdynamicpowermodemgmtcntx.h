@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 14 %
 */
 
 #ifndef WLAN_DYNAMIC_POWER_MODE_MGMT_CNTX
@@ -66,11 +66,13 @@ public:
     * @since S60 3.1
     * @param aQueueId Id of the queue/AC via which the frame will be transmitted
     * @param aEtherType Ethernet type of the frame
+    * @param aDot11FrameType 802.11 frame type
     * @return To which power management mode to change; if any at all
     */
     TPowerMgmtModeChange OnFrameTx( 
         WHA::TQueueId aQueueId, 
-        TUint16 aEtherType );
+        TUint16 aEtherType,
+        T802Dot11FrameControlTypeMask aDot11FrameType );
 
     /** 
     * To be called when accepting an Rx frame
@@ -88,6 +90,14 @@ public:
         TUint aPayloadLength,
         TDaType aDaType );
                         
+    /**
+    * To be called upon receiving the PS Mode Error indication
+    * Determines the need to make a power mode transition
+    *
+    * @return To which power management mode to change; if any at all
+    */
+    TPowerMgmtModeChange OnPsModeErrorIndication();
+    
     /**
     * To be called upon Active to Light PS timer timeout
     *
@@ -194,6 +204,12 @@ public:
     */
     void FreezeTrafficOverride();
 
+    /**
+    * Restores the Active mode parameters back to their WLAN Mgmt Client 
+    * provided values
+    */
+    inline void RestoreActiveModeParameters();
+    
 private:
     
     /** 
@@ -322,7 +338,25 @@ private:
     * @return ETrue if Background AC traffic shall be ignored
     */
     inline TBool StayInPsDespiteLegacyBackgroundTraffic() const;
-        
+    
+    /** 
+    * Sets special parameters for the Active mode.
+    * To be used when switching to Active upen receiving PsModeError 
+    * indication from WHA layer.
+    * The Wlan Mgmt Client provided Active mode parameters can be restored
+    * with RestoreActiveModeParameters()
+    */
+    inline void SetPsModeErrorActiveModeParameters();
+
+    /** 
+    * Sets special parameters for the Active mode.
+    * To be used when switching to Active upon transmitting our keep alive 
+    * frame or an ARP frame.
+    * The Wlan Mgmt Client provided Active mode parameters can be restored
+    * with RestoreActiveModeParameters()
+    */
+    inline void SetKeepAliveActiveModeParameters();
+    
     // Prohibit copy constructor
     WlanDynamicPowerModeMgmtCntx( 
         const WlanDynamicPowerModeMgmtCntx& );
@@ -331,7 +365,15 @@ private:
         ( const WlanDynamicPowerModeMgmtCntx& );
 
 private:    // Data
-        
+
+    /** for backing up the parameters related to Active mode */
+    struct SActiveParamsBackup
+        {
+        TUint32 iToLightPsTimeout;
+        TUint16 iToLightPsFrameThreshold;
+        TUint16 iUapsdRxFrameLengthThreshold;
+        };
+    
     /** flag value to store state transition need internally */
     TBool                       iStateChange; 
     /** stores the flags defined below */
@@ -383,18 +425,27 @@ private:    // Data
     /** ToDeepPsTimer started */
     static const TUint32 KToDeepPsTimerStarted = ( 1 << 10 );
     
-    // time interval in microseconds after which transition from Active
-    // mode to Light PS mode is considered. 
+    /** 
+    * time interval in microseconds after which transition from Active
+    * mode to Light PS mode is considered.
+    */ 
     TUint32 iToLightPsTimeout;
 
-    // time interval in microseconds after which the frame counter
-    // used when considering transition from Light PS to Active mode is reset.
+    /**
+    * time interval in microseconds after which the frame counter
+    * used when considering transition from Light PS to Active mode is reset.
+    */
     TUint32 iToActiveTimeout;
 
-    // time interval in microseconds after which transition from Light PS
-    // mode to Deep PS mode is considered. 
+    /**
+    * time interval in microseconds after which transition from Light PS
+    * mode to Deep PS mode is considered.
+    */ 
     TUint32 iToDeepPsTimeout;
-
+    
+    /** for backing up the parameters related to Active mode */
+    SActiveParamsBackup iActiveParamsBackup;
+    
     /** currently active power management mode context */
     WlanPowerModeMgrBase*       iActiveCntx;
     /** context for active mode */

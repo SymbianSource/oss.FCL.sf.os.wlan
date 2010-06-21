@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 15 %
 */
 
 #include "config.h"
@@ -55,6 +55,11 @@ WlanDynamicPowerModeMgmtCntx::WlanDynamicPowerModeMgmtCntx(
     iActiveCntx( NULL ),
     iWlanContextImpl( aWlanCtxImpl ) 
     {
+    iActiveParamsBackup.iToLightPsTimeout = KDefaultToLightPsTimeout;
+    iActiveParamsBackup.iToLightPsFrameThreshold = 
+        WlanActiveModePowerModeMgr::KDefaultToLightPsFrameThreshold;
+    iActiveParamsBackup.iUapsdRxFrameLengthThreshold = 
+        WlanPowerModeMgrBase::KDefaultUapsdRxFrameLengthThreshold;
     os_memset( iIgnoreTraffic, 0, sizeof( iIgnoreTraffic ) );
     }
 
@@ -158,7 +163,8 @@ void WlanDynamicPowerModeMgmtCntx::StopPowerModeManagement()
 //
 TPowerMgmtModeChange WlanDynamicPowerModeMgmtCntx::OnFrameTx( 
     WHA::TQueueId aQueueId,
-    TUint16 aEtherType )
+    TUint16 aEtherType,
+    T802Dot11FrameControlTypeMask aDot11FrameType )
     {
     TPowerMgmtModeChange powerMgmtModeChange( ENoChange );
 
@@ -172,13 +178,23 @@ TPowerMgmtModeChange WlanDynamicPowerModeMgmtCntx::OnFrameTx(
                 iWlanContextImpl, 
                 aQueueId,
                 aEtherType,
+                aDot11FrameType,
                 iIgnoreTraffic[aQueueId] );
             
             if ( powerMgmtModeChange != ENoChange )
                 {
+                iStateChange = ETrue;
+            
                 // as we will do a mode change, cancel any possibly running 
                 // power mode management timers
                 CancelTimeouts();
+                
+                if ( aDot11FrameType == E802Dot11FrameTypeDataNull ||
+                     aEtherType == KArpType )
+                    {
+                    // modify temporarily the Active mode parameters
+                    SetKeepAliveActiveModeParameters();
+                    }
                 }
             }        
         else
@@ -230,6 +246,8 @@ TPowerMgmtModeChange WlanDynamicPowerModeMgmtCntx::OnFrameRx(
             
             if ( powerMgmtModeChange != ENoChange )
                 {
+                iStateChange = ETrue;
+            
                 // as we will do a mode change, cancel any possibly running 
                 // power mode management timers
                 CancelTimeouts();
@@ -260,6 +278,57 @@ TPowerMgmtModeChange WlanDynamicPowerModeMgmtCntx::OnFrameRx(
 // 
 // ---------------------------------------------------------------------------
 //
+TPowerMgmtModeChange WlanDynamicPowerModeMgmtCntx::OnPsModeErrorIndication()
+    {
+    TPowerMgmtModeChange powerMgmtModeChange( ENoChange );
+
+    if ( iActiveCntx )
+        {
+        // we have an active context, i.e. we are doing power mode mgmt
+        
+        if ( !iStateChange )
+            {
+            powerMgmtModeChange = iActiveCntx->OnPsModeErrorIndication();
+            
+            if ( powerMgmtModeChange != ENoChange )
+                {
+                iStateChange = ETrue;
+                
+                // as we will do a mode change, cancel any possibly running 
+                // power mode management timers
+                CancelTimeouts();
+                
+                // modify temporarily the Active mode parameters
+                SetPsModeErrorActiveModeParameters();
+                }
+            }
+        else
+            {
+            // state change already signalled from this power mode context, 
+            // don't do it more than once. No action needed
+            OsTracePrint( KPwrStateTransition, (TUint8*)
+                ("UMAC: WlanDynamicPowerModeMgmtCntx::OnPsModeErrorIndication: "
+                 "statechange already signalled") );
+            }
+        }
+    else
+        {
+        // dynamic power mode mgmt is not active => "No change" will be 
+        // returned. No action needed
+        }
+        
+    OsTracePrint( KPwrStateTransition, (TUint8*)
+        ("UMAC: WlanDynamicPowerModeMgmtCntx::OnPsModeErrorIndication: "
+         "statechange: %d"),
+        powerMgmtModeChange );
+    
+    return powerMgmtModeChange;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
 TBool WlanDynamicPowerModeMgmtCntx::OnActiveToLightPsTimerTimeout()
     {
     if ( ( iActiveCntx == &iActiveModeCntx ) && 
@@ -273,6 +342,11 @@ TBool WlanDynamicPowerModeMgmtCntx::OnActiveToLightPsTimerTimeout()
         OsTracePrint( KPwrStateTransition, (TUint8*)
             ("UMAC: WlanDynamicPowerModeMgmtCntx::OnActiveToLightPsTimerTimeout: change state: %d"),
             iStateChange );
+        
+        // make sure that the WLAN Mgmt Client provided Active mode 
+        // parameter values are again used the next time by default
+        //
+        RestoreActiveModeParameters();
         
         if ( !iStateChange )
             {
@@ -292,6 +366,11 @@ TBool WlanDynamicPowerModeMgmtCntx::OnActiveToLightPsTimerTimeout()
         // In all these cases the timeout is not relevant and we take no action
         OsTracePrint( KPwrStateTransition, (TUint8*)
             ("UMAC: WlanDynamicPowerModeMgmtCntx::OnActiveToLightPsTimerTimeout: not relevant timeout") );
+        
+        // however, make sure that the WLAN Mgmt Client provided Active mode
+        // parameter values are again used the next time by default
+        //
+        RestoreActiveModeParameters();        
         }
     
     return iStateChange;
@@ -406,6 +485,15 @@ void WlanDynamicPowerModeMgmtCntx::SetParameters(
         aToActiveFrameThreshold,
         aToDeepPsFrameThreshold,
         aUapsdRxFrameLengthThreshold );
+    
+    iDeepPsModeCntx.SetParameters( aUapsdRxFrameLengthThreshold );
+    
+    // take also a backup of the Active mode parameters
+    //
+    iActiveParamsBackup.iToLightPsTimeout = aToLightPsTimeout;
+    iActiveParamsBackup.iToLightPsFrameThreshold = aToLightPsFrameThreshold;
+    iActiveParamsBackup.iUapsdRxFrameLengthThreshold = 
+        aUapsdRxFrameLengthThreshold;    
     }
 
 // ---------------------------------------------------------------------------

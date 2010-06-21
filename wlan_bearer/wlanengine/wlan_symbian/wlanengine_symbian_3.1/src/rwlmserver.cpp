@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 28.1.1 %
 */
 
 #include <in_sock.h>
@@ -366,16 +366,17 @@ EXPORT_C TInt RWLMServer::Release()
 EXPORT_C TInt RWLMServer::GetAvailableIaps(
     TWlmAvailableIaps& aAvailableIaps,
     TInt& aCacheLifetime,
-    TUint& aMaxDelay )
+    TUint& aMaxDelay,
+    TBool aFilteredResults )
     {
-    DEBUG2( "RWLMServer::GetAvailableIaps( aAvailableIaps, aCacheLifetime(%d), aMaxDelay(%u) )",
-            aCacheLifetime, aMaxDelay );
+    DEBUG3( "RWLMServer::GetAvailableIaps( aAvailableIaps, aCacheLifetime(%d), aMaxDelay(%u), aFilteredResult(%u) )",
+        aCacheLifetime, aMaxDelay, aFilteredResults );
 
     TRequestStatus status;
     TPckg<TWlmAvailableIaps> inPckg( aAvailableIaps );
     TPckg<TInt> inPckg2( aCacheLifetime );
     TPckg<TUint> inPckg3( aMaxDelay );
-    GetAvailableIaps( inPckg, inPckg2, inPckg3, status );
+    GetAvailableIaps( inPckg, inPckg2, inPckg3, aFilteredResults, status );
     User::WaitForRequest( status );
     DEBUG1( "RWLMServer::GetAvailableIaps() - Server returned status %d", status.Int() );    
 
@@ -389,12 +390,14 @@ EXPORT_C void RWLMServer::GetAvailableIaps(
     TDes8& aAvailableIaps,
     TDes8& aCacheLifetime,
     TDes8& aMaxDelay,
+    TBool aFilteredResults,
     TRequestStatus& aStatus )
     {
-    DEBUG( "RWLMServer::GetAvailableIaps( aAvailableIaps, aCacheLifetime, aMaxDelay, aStatus )" );
-    
+    DEBUG1( "RWLMServer::GetAvailableIaps( aAvailableIaps, aCacheLifetime, aMaxDelay, aFilteredResult(%u), aStatus )",
+        aFilteredResults );
+
     aStatus = KRequestPending;
-    TIpcArgs params( &aAvailableIaps, &aCacheLifetime, &aMaxDelay );
+    TIpcArgs params( &aAvailableIaps, &aCacheLifetime, &aMaxDelay, aFilteredResults );
     SendReceive( EGetAvailableIaps, params, aStatus );
     }
 

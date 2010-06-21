@@ -29,7 +29,7 @@ CWlmScanRequest* CWlmScanRequest::NewL(
     {
     DEBUG( "CWlmScanRequest::NewL()" );
 
-    CWlmScanRequest* self = new CWlmScanRequest(
+    CWlmScanRequest* self = new (ELeave) CWlmScanRequest(
         aClient );
     CleanupStack::PushL( self );
     self->ConstructL();

@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 18 %
+*/
 
 #ifndef CORE_OPERATION_GET_AVAILABLE_IAPS_H
 #define CORE_OPERATION_GET_AVAILABLE_IAPS_H
@@ -43,6 +46,9 @@ NONSHARABLE_CLASS( core_operation_get_available_iaps_c ) :
 
 public:
 
+    /**
+     * The possible states of the state machine.
+     */
     enum core_state_e
         {
         core_state_init = core_base_state_next,
@@ -64,12 +70,6 @@ public:
         core_state_MAX
         };
 
-    struct core_scan_list_entry
-        {
-        core_mac_address_s bssid;
-        core_ssid_s ssid;
-        };
-
     /**
      * Constructor.
      *
@@ -80,9 +80,9 @@ public:
      * @param adaptation pointer to upper adaptation
      * @param is_active_scan_allowed specifies whether to use probes or just listen to beacons
      * @param iap_data_list contains list of IAP data structures
-     * @param iap_ssid_list List of possible secondary SSIDs
-     * @param list of available IAP IDs on return
-     * @param scan data of found networks on return
+     * @param iap_availability_list List of available IAPs.
+     * @param iap_ssid_list List of possible secondary SSIDs.
+     * @param scan_data scan data of found networks on return
      */
     core_operation_get_available_iaps_c(
         u32_t request_id,
@@ -91,7 +91,7 @@ public:
         abs_core_server_callback_c* adaptation,
         bool_t is_active_scan_allowed,
         core_type_list_c<core_iap_data_s>& iap_data_list,
-        core_type_list_c<u32_t>& iap_id_list,
+        core_type_list_c<core_iap_availability_data_s>& iap_availability_list,
         core_type_list_c<core_ssid_entry_s>* iap_ssid_list,
         ScanList& scan_data );
 
@@ -145,11 +145,6 @@ protected:
         core_am_indication_e indication );
 
 private: // functions
-
-    /**
-     * Remove IAPs that are not marked hidden from the list of IAPs to search.
-     */
-    void remove_non_hidden_iaps();
 
     /**
      * Process the scan results using the given tag.
@@ -210,6 +205,39 @@ private: // functions
         const core_ssid_s& ssid,
         const ScanList& scan_data );
 
+    /**
+     * Check whether the given SSID is present in the SSID list.
+     *
+     * @param ssid SSID to match.
+     * @param ssid_list SSID list to search.
+     * @return true_t if matching SSID is found, false_t otherwise.
+     */
+    bool_t is_ssid_in_list(
+        const core_ssid_s& ssid,
+        core_type_list_c<core_ssid_s>& ssid_list ) const;
+
+    /**
+     * Check whether the given IAP is present in the IAP availability list.
+     *
+     * @param iap_id IAP ID to match.
+     * @param iap_list IAP availability list to search.
+     * @return true_t if matching IAP is found, false_t otherwise.
+     */
+    bool_t is_iap_in_availability_list(
+        u32_t iap_id,
+        core_type_list_c<core_iap_availability_data_s>& iap_list ) const;
+
+    /**
+     * Add the given IAP to the IAP availability list. If an entry already exists,
+     * only signal strength is updated if needed.
+     *
+     * @param iap_id IAP ID to add.
+     * @param iap_rcpi Signal strength of the IAP.
+     */
+    void update_iap_availability(
+        u32_t iap_id,
+        u8_t iap_rcpi );
+
 private: // data
 
     /**
@@ -223,14 +251,19 @@ private: // data
     bool_t is_limiting_algorithm_used_m;    
 
     /**
-     * Original list of IAPs.
+     * Number of IAPs.
+     */
+    u32_t iap_data_count_m;
+
+    /**
+     * List of IAPs.
      */
     core_type_list_c<core_iap_data_s>& iap_data_list_m;
 
     /**
-     * List for storing IDs of available IAPs.
+     * List of available IAPs.
      */
-    core_type_list_c<u32_t>& iap_id_list_m;
+    core_type_list_c<core_iap_availability_data_s>& iap_availability_list_m;
 
     /**
      * List of possible secondary SSIDs. Not owned by this pointer.
@@ -273,9 +306,14 @@ private: // data
     u8_t bss_count_m;
 
     /**
-     * SSID being direct scanned.
+     * List of SSIDs to direct scan.
      */
-    core_ssid_s direct_scanned_ssid_m;
+    core_type_list_c<core_ssid_s> direct_scan_list_m;
+    
+    /**
+     * Iterator for direct scan list. 
+     */
+    core_type_list_iterator_c<core_ssid_s> direct_scan_iter_m;
 
     /**
      * Region information that is selected based on the APs country information.

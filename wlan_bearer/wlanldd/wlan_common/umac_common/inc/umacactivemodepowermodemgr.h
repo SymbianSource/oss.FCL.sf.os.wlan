@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 9 %
+* %version: 10 %
 */
 
 #ifndef WLAN_ACTIVE_MODE_POWER_MODE_MGR
@@ -26,13 +26,22 @@
 
 class WlanContextImpl;
 
+
 /**
 * Class implementing infrastructure mode dynamic power mode management 
 * algorithm for Active mode (CAM)
 */
 class WlanActiveModePowerModeMgr : public WlanPowerModeMgrBase
-    {    
-
+    {
+    
+public:
+    /** 
+    * Default Rx/Tx frame count threshold for considering change to Light 
+    * PS mode.
+    * This value is used if another value hasn't been provided
+    */
+    static const TUint KDefaultToLightPsFrameThreshold = 1;
+    
 public:
     
     /** Ctor */
@@ -62,6 +71,7 @@ public:
     * @param aCtxImpl global statemachine context
     * @param aQueueId Id of the queue/AC via which the frame will be transmitted
     * @param aEtherType Ethernet type of the frame
+    * @param aDot11FrameType 802.11 frame type
     * @param aIgnoreThisFrame shall this frame be ignored from dynamic power 
     *                         mode management perspective
     * @return To which power management mode to change; if any at all
@@ -70,6 +80,7 @@ public:
         WlanContextImpl& aCtxImpl, 
         WHA::TQueueId aQueueId,
         TUint16 aEtherType,
+        T802Dot11FrameControlTypeMask aDot11FrameType,
         TBool aIgnoreThisFrame );
 
     /** 

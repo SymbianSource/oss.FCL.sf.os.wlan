@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,17 +16,12 @@
 */
 
 /*
-* %version: 13 %
+* %version: 14 %
 */
 
 #include "config.h"
 #include "umacactivemodepowermodemgr.h"
 #include "UmacContextImpl.h"
-
-
-// Default Rx/Tx frame count threshold for considering change to Light PS mode.
-// This value is used if another value hasn't been provided
-const TUint KDefaultToLightPsFrameThreshold = 1;
 
 
 // ================= MEMBER FUNCTIONS =======================
@@ -57,6 +52,7 @@ TPowerMgmtModeChange WlanActiveModePowerModeMgr::OnFrameTx(
     WlanContextImpl& /*aCtxImpl*/, 
     WHA::TQueueId /*aQueueId*/,
     TUint16 aEtherType,
+    T802Dot11FrameControlTypeMask aDot11FrameType,
     TBool aIgnoreThisFrame )
     {
     if ( aEtherType == KEapolType ||
@@ -69,7 +65,7 @@ TPowerMgmtModeChange WlanActiveModePowerModeMgr::OnFrameTx(
         }
     else
         {
-        if ( aIgnoreThisFrame )
+        if ( aIgnoreThisFrame || aDot11FrameType == E802Dot11FrameTypeDataNull )
             { 
             // for these frames we don't increment the Tx counter
     

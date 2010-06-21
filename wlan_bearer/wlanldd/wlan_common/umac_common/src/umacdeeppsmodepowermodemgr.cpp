@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2008-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2008-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #include "config.h"
@@ -42,32 +42,53 @@ WlanDeepPsModePowerModeMgr::~WlanDeepPsModePowerModeMgr()
     {
     }
 
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+void WlanDeepPsModePowerModeMgr::SetParameters(
+    TUint16 aUapsdRxFrameLengthThreshold )
+    {
+    iUapsdRxFrameLengthThreshold = aUapsdRxFrameLengthThreshold;
+    }
+
 // ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------
 //
 TPowerMgmtModeChange WlanDeepPsModePowerModeMgr::OnFrameTx( 
-    WlanContextImpl& /*aCtxImpl*/, 
+    WlanContextImpl& aCtxImpl, 
     WHA::TQueueId /*aQueueId*/,
     TUint16 aEtherType,
-    TBool /*aIgnoreThisFrame*/ )
+    T802Dot11FrameControlTypeMask aDot11FrameType,
+    TBool aIgnoreThisFrame )
     {
     TPowerMgmtModeChange powerMgmtModeChange( ENoChange );
 
     if ( aEtherType == KEapolType ||
-         aEtherType == KWaiType )
+         aEtherType == KWaiType ||
+         aDot11FrameType == E802Dot11FrameTypeDataNull ||
+         ( aEtherType == KArpType && 
+           !(aCtxImpl.UapsdUsedForVoice() && aCtxImpl.InVoiceCallState()) ) ) 
         {
         powerMgmtModeChange = EToActive;
 
         OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameTx: EAPOL or WAI frame; change to Active") );            
+            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameTx: EAPOL, WAI or keep "
+             "alive frame or ARP in non- U-APSD WoWLAN call state; change to "
+			 "Active") );
         }
-    else
+    else if ( !aIgnoreThisFrame )
         {
         powerMgmtModeChange = EToLightPs; 
 
         OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameTx: change to Light PS") );            
+            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameTx: change to Light"
+             " PS") );            
+        }
+    else
+        {
+        // no action needed
         }
     
     return powerMgmtModeChange;    
@@ -78,11 +99,11 @@ TPowerMgmtModeChange WlanDeepPsModePowerModeMgr::OnFrameTx(
 // ---------------------------------------------------------------------------
 //
 TPowerMgmtModeChange WlanDeepPsModePowerModeMgr::OnFrameRx( 
-    WlanContextImpl& /*aCtxImpl*/,
-    WHA::TQueueId /*aAccessCategory*/,
+    WlanContextImpl& aCtxImpl,
+    WHA::TQueueId aAccessCategory,
     TUint16 aEtherType,
-    TBool /*aIgnoreThisFrame*/,
-    TUint /*aPayloadLength*/,
+    TBool aIgnoreThisFrame,
+    TUint aPayloadLength,
     TDaType aDaType ) 
     {
     TPowerMgmtModeChange powerMgmtModeChange( ENoChange );
@@ -93,22 +114,36 @@ TPowerMgmtModeChange WlanDeepPsModePowerModeMgr::OnFrameRx(
         powerMgmtModeChange = EToActive;
 
         OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameRx: EAPOL or WAI frame; change to Active") );            
-        }
-    else if ( aDaType == EBroadcastAddress ) 
-        {
-        // no action needed
-        
-        OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameRx: bcast frame; no state change") );            
+            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameRx: EAPOL or WAI frame;"
+             " change to Active") );            
         }
     else
         {
-        powerMgmtModeChange = EToLightPs;        
+        if ( CountThisFrame( 
+                aCtxImpl, 
+                aAccessCategory,
+                aEtherType,
+                aIgnoreThisFrame, 
+                aPayloadLength, 
+                iUapsdRxFrameLengthThreshold,
+                aDaType ) )
+            {
+            powerMgmtModeChange = EToLightPs;        
 
-        OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameRx: change to Light PS") );            
+            OsTracePrint( KPwrStateTransition, (TUint8*)
+                ("UMAC: WlanDeepPsModePowerModeMgr::OnFrameRx: change to Light"
+                 " PS") );            
+            }
         }
     
-    return powerMgmtModeChange;    
+    return powerMgmtModeChange;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TPowerMgmtModeChange WlanDeepPsModePowerModeMgr::OnPsModeErrorIndication()
+    {
+    return EToActive;
     }

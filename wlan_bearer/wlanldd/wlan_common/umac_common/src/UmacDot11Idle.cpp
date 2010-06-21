@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 42 %
+* %version: 43 %
 */
 
 #include "config.h"
@@ -315,13 +315,14 @@ TBool WlanDot11Idle::Connect(
     aCtxImpl.IeData( aIeData );
     aCtxImpl.IeDataLength( aIeDataLength );
 
+    TInt status(KErrNone);
 
     // check do we meet the requirements for the network
     // and construct necessary objects for establishing the connection
-    if ( InitNetworkConnect( 
+    if ( ( status = InitNetworkConnect( 
             aCtxImpl, 
             aScanResponseFrameBodyLength, 
-            aScanResponseFrameBody ) )
+            aScanResponseFrameBody ) ) == KErrNone )
         {
         // continue
 
@@ -350,7 +351,7 @@ TBool WlanDot11Idle::Connect(
         {
         // abort
         ret = EFalse;
-        OnOidComplete( aCtxImpl, KErrGeneral );
+        OnOidComplete( aCtxImpl, status );
         }
 
     return ret;    

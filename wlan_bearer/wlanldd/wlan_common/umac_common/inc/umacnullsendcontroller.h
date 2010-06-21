@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 15 %
 */
 
 #ifndef WLAN_NULL_SEND_CONTROLLER
@@ -172,6 +172,14 @@ public:
     * @since S60 3.2
     */
     void OnKeepAliveTimerTimeout();
+    
+    /** 
+    * Are we currently in Voice over WLAN Call state
+    * 
+    * @return ETrue if we are
+    *         EFalse if we are not
+    */
+    inline TBool InVoiceCallState() const;
 
 private:
     

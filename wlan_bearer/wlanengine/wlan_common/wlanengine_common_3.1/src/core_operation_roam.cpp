@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76.1.2 %
+* %version: 76.1.5 %
 */
 
 #include "core_operation_roam.h"
@@ -433,6 +433,12 @@ core_error_e core_operation_roam_c::next_state()
                         bssid.addr[0], bssid.addr[1], bssid.addr[2],
                         bssid.addr[3], bssid.addr[4], bssid.addr[5] );
 
+                    /**
+                     * is_eapol_disconnecting is not updated here because this disassociation
+                     * is for the previous AP and thus we don't really care when this
+                     * request gets completed.
+                     */
+
                     server_m->get_eapol_instance().disassociation( &network );
                     }
                 }
@@ -796,19 +802,19 @@ core_connect_status_e core_operation_roam_c::connect_status(
     core_management_status_e management_status )
     {
     DEBUG( "core_operation_roam_c::connect_status()" );
-    
-    core_iap_data_c& iap_data( server_m->get_connection_data()->iap_data() );
 
-    if ( management_status == core_management_status_assoc_denied_full_ap )
-        {
-        DEBUG( "core_operation_roam_c::connect_status() - AP full" );
-        return core_connect_ap_full;
-        }
+    core_iap_data_c& iap_data( server_m->get_connection_data()->iap_data() );
 
     if ( request_status == core_error_eapol_auth_start_timeout )
         {
         DEBUG( "core_operation_roam_c::connect_status() - EAPOL authentication timeout before authentication was started" );
         return core_connect_eapol_auth_start_timeout;
+        }
+
+    if ( request_status == core_error_unsupported_config )
+        {
+        DEBUG( "core_operation_roam_c::connect_status() - AP has an unsupported configuration" );
+        return core_connect_ap_unsupported_configuration;
         }
 
     switch( iap_data.security_mode() )
@@ -919,6 +925,20 @@ core_connect_status_e core_operation_roam_c::connect_status(
             }
         }
 
+    if ( management_status == core_management_status_assoc_denied_full_ap )
+        {
+        DEBUG( "core_operation_roam_c::connect_status() - AP full" );
+        return core_connect_ap_full;
+        }
+
+    if ( management_status == core_management_status_unsupported_capabilities ||
+         management_status == core_management_status_assoc_unsup_basic_rates ||
+         management_status == core_management_status_assoc_unsup_ht_features )
+        {
+        DEBUG( "core_operation_roam_c::connect_status() - AP has an unsupported configuration" );
+        return core_connect_ap_unsupported_configuration;
+        }
+
     return core_connect_undefined;
     }
 
@@ -942,6 +962,15 @@ core_ap_blacklist_reason_e core_operation_roam_c::is_fatal_failure(
         {
         DEBUG( "core_operation_roam_c::is_fatal_failure() - fatal, EAP failure" );
         return core_ap_blacklist_reason_eapol_failure;
+        }
+
+    /**
+     * Unsupported configuration is always fatal.
+     */
+    if( request_status == core_error_unsupported_config )
+        {
+        DEBUG( "core_operation_roam_c::is_fatal_failure() - fatal, unsupported configuration" );
+        return core_ap_blacklist_reason_association_status;
         }
 
     /**

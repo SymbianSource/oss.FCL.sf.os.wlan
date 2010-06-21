@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 18 %
+* %version: 18.1.1 %
 */
 
 #ifndef RWLAN_LOGICAL_CHANNEL_H_
@@ -199,11 +199,6 @@ private:
     inline TInt InitWlanSystem( TOpenParam& aOpenParam );
 
 private: // data
-
-    /**
-     * has the WLAN system been initialized
-     */
-    TBool iWlanSystemInitialized;
 
     /**
      * If a WLAN Management Command is executed asynchronously, this data

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 29 %
+* %version: 30 %
 */
 
 #ifndef UMACTYPES_H
@@ -56,7 +56,9 @@ typedef enum _TIndication
     EPsModeError
     } TIndication;
 
-
+/** Connect failed because of unsupported network configuration */
+const TInt KWlanErrUnsupportedNwConf = -333001;
+    
 /**
 * Maximum length of an SSID in BYTES
 */

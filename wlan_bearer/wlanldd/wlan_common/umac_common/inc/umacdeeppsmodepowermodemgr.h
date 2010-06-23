@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2008-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2008-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #ifndef WLAN_DEEP_PS_MODE_POWER_MODE_MGR
@@ -42,6 +42,14 @@ public:
     virtual ~WlanDeepPsModePowerModeMgr();
     
     /**
+    * Sets the dynamic power mode transition algorithm parameters
+    *
+    * @param aUapsdRxFrameLengthThreshold received frame 
+    *        payload length (in bytes) threshold in U-APSD network
+    */
+    void SetParameters( TUint16 aUapsdRxFrameLengthThreshold );
+    
+    /**
     * To be called when transmitting a frame
     *
     * @since S60 5.1
@@ -49,6 +57,7 @@ public:
     * @param aCtxImpl global statemachine context
     * @param aQueueId Id of the queue/AC via which the frame will be transmitted
     * @param aEtherType Ethernet type of the frame
+    * @param aDot11FrameType 802.11 frame type
     * @param aIgnoreThisFrame shall this frame be ignored from dynamic power 
     *                         mode management perspective
     * @return To which power management mode to change; if any at all
@@ -57,6 +66,7 @@ public:
         WlanContextImpl& aCtxImpl, 
         WHA::TQueueId aQueueId,
         TUint16 aEtherType,
+        T802Dot11FrameControlTypeMask aDot11FrameType,
         TBool aIgnoreThisFrame );
 
     /** 
@@ -79,6 +89,15 @@ public:
         TBool aIgnoreThisFrame,
         TUint aPayloadLength,
         TDaType aDaType );
+    
+    /**
+    * From WlanPowerModeMgrBase
+    * To be called upon receiving the PS Mode Error indication
+    * Determines the need to make a power mode transition
+    *
+    * @return To which power management mode to change; if any at all
+    */
+    virtual TPowerMgmtModeChange OnPsModeErrorIndication();
     
     /** 
     * From WlanPowerModeMgrBase

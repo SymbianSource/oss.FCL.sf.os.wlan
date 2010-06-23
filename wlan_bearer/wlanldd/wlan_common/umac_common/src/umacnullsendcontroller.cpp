@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2007-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2007-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 15 %
+* %version: 16 %
 */
 
 #include "config.h"
@@ -397,32 +397,17 @@ void WlanNullSendController::OnKeepAliveTimerTimeout()
     
     iFlags &= ~KKeepAliveTimerArmed;
 
-    TUint32 KTimeAfterLatestTx ( 
-        static_cast<TUint32>(os_systemTime() - iLatestTx) );
-    
-    if ( KTimeAfterLatestTx >= iKeepAliveTimeout )
+    // request a regular Null Data frame to be sent
+    // however, if there is a frame Tx (of any frame) already pending OR
+    // we use U-APSD for Voice and we are on a VoWLAN call
+    // we won't request a new frame to be sent. 
+    if ( !iWlanContextImpl.UnsentTxPackets() &&
+         !( iWlanContextImpl.UapsdUsedForVoice() && InVoiceCallState() ) )
         {
-        // request a regular Null Data frame to be sent
-    
-        // however, if there is a frame Tx (of any frame) already pending, 
-        // we won't request a new frame to be sent. 
-        if ( !iWlanContextImpl.UnsentTxPackets() )
+        if ( !iNullSender.TxNullDataFrame( iWlanContextImpl, EFalse ) )
             {
-            if ( !iNullSender.TxNullDataFrame( iWlanContextImpl, EFalse ) )
-                {
-                // frame was not sent because we didn't get a Tx buffer.
-                // In this case we'll skip the sending
-                // However, we need to re-arm the timer to trigger the next
-                // Null Data frame sending
-                RegisterKeepAliveTimeout( iKeepAliveTimeout );
-                }
-            }
-        else
-            {
-            // frame Tx already pending, so we don't ask a Null Data to be sent
-            OsTracePrint( KUmacDetails, (TUint8*)
-                ("UMAC: WlanNullSendController::OnKeepAliveTimerTimeout: frame Tx already pending. New Null Data Tx request skipped") );
-            
+            // frame was not sent because we didn't get a Tx buffer.
+            // In this case we'll skip the sending
             // However, we need to re-arm the timer to trigger the next
             // Null Data frame sending
             RegisterKeepAliveTimeout( iKeepAliveTimeout );
@@ -430,9 +415,15 @@ void WlanNullSendController::OnKeepAliveTimerTimeout()
         }
     else
         {
-        // No need to send keep alive; yet. Re-arm the timer with 
-        // a suitable timeout relative to the time of the latest frame Tx
-        RegisterKeepAliveTimeout( iKeepAliveTimeout - KTimeAfterLatestTx );        
+        // we don't ask a Null Data to be sent
+        OsTracePrint( KUmacDetails, (TUint8*)
+            ("UMAC: WlanNullSendController::OnKeepAliveTimerTimeout: frame Tx "
+             "already pending OR U-APSD used for Voice and we are in VoWLAN"
+             "call => Null Data Tx request skipped") );
+        
+        // However, we need to re-arm the timer to trigger the next
+        // Null Data frame sending
+        RegisterKeepAliveTimeout( iKeepAliveTimeout );
         }
     }
 

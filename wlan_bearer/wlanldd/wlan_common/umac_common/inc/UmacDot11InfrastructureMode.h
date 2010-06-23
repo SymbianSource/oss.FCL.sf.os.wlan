@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 34 %
+* %version: 35 %
 */
 
 #ifndef WLANDOT11INFRASTRUCTUREMODE_H
@@ -273,14 +273,6 @@ private:
         WlanContextImpl& aCtxImpl,
         WHA::TRcpi aRcpi );
 
-    /**
-    * Indicates that the WLAN device has detected problems in the power
-    * save mode operation of the AP
-    * 
-    * @param aCtxImpl global statemachine context
-    */
-    virtual void DoPsModeErrorIndication( WlanContextImpl& aCtxImpl );
-    
     /**
     * Voice Call Entry timer timeout function
     *

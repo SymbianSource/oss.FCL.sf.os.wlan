@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 78 %
+* %version: 79 %
 */
 
 #include "umacconnectcontext.h"
@@ -1610,9 +1610,13 @@ inline void WlanContextImpl::StopPowerModeManagement()
 //
 inline TPowerMgmtModeChange WlanContextImpl::OnFrameTx( 
     WHA::TQueueId aQueueId,
-    TUint16 aEtherType )
+    TUint16 aEtherType,
+    T802Dot11FrameControlTypeMask aDot11FrameType )
     {
-    return iDynamicPowerModeCntx.OnFrameTx( aQueueId, aEtherType );
+    return iDynamicPowerModeCntx.OnFrameTx( 
+        aQueueId, 
+        aEtherType, 
+        aDot11FrameType );
     }
 
 // ---------------------------------------------------------------------------
@@ -1630,6 +1634,15 @@ inline TPowerMgmtModeChange WlanContextImpl::OnFrameRx(
         aEtherType,
         aPayloadLength, 
         aDaType );
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline TPowerMgmtModeChange WlanContextImpl::OnPsModeErrorIndication()
+    {
+    return iDynamicPowerModeCntx.OnPsModeErrorIndication();
     }
 
 // ---------------------------------------------------------------------------
@@ -1689,6 +1702,15 @@ inline void WlanContextImpl::FreezePwrModeMgmtTrafficOverride()
     iDynamicPowerModeCntx.FreezeTrafficOverride();
     }
                     
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline void WlanContextImpl::RestorePwrModeMgmtParameters()
+    {
+    iDynamicPowerModeCntx.RestoreActiveModeParameters();
+    }
+
 // ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------
@@ -2059,6 +2081,15 @@ inline void WlanContextImpl::OnKeepAliveTimerTimeout()
 // 
 // ---------------------------------------------------------------------------
 //
+inline TBool WlanContextImpl::InVoiceCallState() const
+    {
+    return iNullSendController.InVoiceCallState();
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
 inline TBool WlanContextImpl::InsertNewRcpiIntoPredictor( 
     TInt64 aTimestamp, 
     WHA::TRcpi aRcpi )
@@ -2098,6 +2129,18 @@ inline void WlanContextImpl::ConfigureWlanSignalPredictor(
         aTimeToWarnLevel,
         aTimeToNextInd,
         aRcpiWarnLevel );
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+inline void WlanContextImpl::ClearBssMembershipFeatureList()
+    {
+    os_memset( 
+        &iOurBssMembershipFeatureArray, 
+        KUnallocated, 
+        sizeof( iOurBssMembershipFeatureArray ) );
     }
 
 // ---------------------------------------------------------------------------

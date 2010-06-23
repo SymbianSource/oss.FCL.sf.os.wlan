@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: 1 %
+* %version: 2 %
 */
 
 #include "wlanticktimer.h"
@@ -72,6 +72,7 @@ CWlanTickTimer* CWlanTickTimer::NewL(
 //
 CWlanTickTimer::~CWlanTickTimer()
     {
+    Cancel();
     iTimer.Close();
     }
 

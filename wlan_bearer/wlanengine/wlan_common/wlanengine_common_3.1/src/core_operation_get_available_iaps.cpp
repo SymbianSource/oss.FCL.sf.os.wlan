@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 41 %
+* %version: 42 %
 */
 
 #include "core_operation_get_available_iaps.h"
@@ -1017,7 +1017,7 @@ void core_operation_get_available_iaps_c::remove_matching_iaps(
         }
     
     u8_t treshold_val = 
-        static_cast<u8_t>(server_m->get_core_settings().rcp_improve_boundary());
+        static_cast<u8_t>( server_m->get_device_settings().rcpi_trigger );
         
     /**
      * Loop through the IAP list.
@@ -1039,22 +1039,30 @@ void core_operation_get_available_iaps_c::remove_matching_iaps(
                 iap->id );            
 
             u32_t* iap_id = new u32_t;
+            bool_t is_match_found( true_t );
             if( iap_id )
                 {
-                if ( server_m->get_core_settings().is_iap_id_in_weak_list( iap->id) ) 
+                if ( server_m->get_core_settings().is_iap_id_in_weak_list( iap->id ) ) 
                     {
                     DEBUG( "core_operation_get_available_iaps_c::remove_matching_iaps() - IAP ID is in weak list" );
                     
                     if ( ap_data.rcpi() > treshold_val )
                         {
-                        DEBUG( "core_operation_get_available_iaps_c::remove_matching_iaps() - RCPI improved enough, remove IAP ID from weak list" );
+                        DEBUG1( "core_operation_get_available_iaps_c::remove_matching_iaps() - RCPI improved enough (%u), remove IAP ID from weak list",
+                            ap_data.rcpi() );
                         *iap_id = iap->id;
                         iap_id_list_m.append( iap_id );
             		    iap_id = NULL;
                         
                         server_m->get_core_settings().remove_iap_id_from_weak_list( iap->id );
                         }
+                    else
+                        {
+                        DEBUG2( "core_operation_get_available_iaps_c::remove_matching_iaps() - RCPI not improved enough (%u vs %u)",
+                            ap_data.rcpi(), treshold_val );
 
+                        is_match_found = false_t;
+                        }
                     }
                 else
                     {
@@ -1066,19 +1074,22 @@ void core_operation_get_available_iaps_c::remove_matching_iaps(
 
             /** Using a temporary pointer to guarantee list iterator working. */
             core_iap_data_s* temp = iap;
-            
             iap = iap_data_list_m.next();
-            core_error_e ret = iap_data_list_m.remove( temp );
-            if( ret != core_error_ok )
+            if( is_match_found )
                 {
-                if( iap )
+                core_error_e ret = iap_data_list_m.remove( temp );
+                if( ret != core_error_ok )
                     {
-                    DEBUG1("core_operation_get_available_iaps_c::remove_matching_iaps() - error while removing IAP entry (%d)",
-                        iap->id );                   
+                    if( iap )
+                        {
+                        DEBUG1("core_operation_get_available_iaps_c::remove_matching_iaps() - error while removing IAP entry (%d)",
+                            iap->id );
+                        }
                     }
+
+                delete temp;
                 }
 
-            delete temp;
             temp = NULL;
             delete iap_id;
             iap_id = NULL;

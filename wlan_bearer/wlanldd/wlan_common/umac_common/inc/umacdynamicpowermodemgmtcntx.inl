@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,8 +16,20 @@
 */
 
 /*
-* %version: 5 %
+* %version: 6 %
 */
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline void WlanDynamicPowerModeMgmtCntx::RestoreActiveModeParameters()
+    {
+    iToLightPsTimeout = iActiveParamsBackup.iToLightPsTimeout;
+    iActiveModeCntx.SetParameters( 
+        iActiveParamsBackup.iToLightPsFrameThreshold, 
+        iActiveParamsBackup.iUapsdRxFrameLengthThreshold );
+    }
 
 // -----------------------------------------------------------------------------
 // 
@@ -108,4 +120,38 @@ inline TBool
 WlanDynamicPowerModeMgmtCntx::StayInPsDespiteLegacyBackgroundTraffic() const
     {    
     return ( iFlags & KStayInPsDespiteLegacyBackgroundTraffic );
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+inline void WlanDynamicPowerModeMgmtCntx::SetPsModeErrorActiveModeParameters()
+    {
+    const TUint32 KToLightPsTimeout( 1000000 ); // 1 second
+    const TUint16 KToLightPsFrameThreshold( 4 );
+    const TUint16 KUapsdRxFrameLengthThreshold(
+        WlanPowerModeMgrBase::KDefaultUapsdRxFrameLengthThreshold );
+    
+    iToLightPsTimeout = KToLightPsTimeout;
+    iActiveModeCntx.SetParameters( 
+        KToLightPsFrameThreshold, 
+        KUapsdRxFrameLengthThreshold );
+    }
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+inline void WlanDynamicPowerModeMgmtCntx::SetKeepAliveActiveModeParameters()
+    {
+    const TUint32 KToLightPsTimeout( 20000 ); // 20ms
+    const TUint16 KToLightPsFrameThreshold( 1 );
+    const TUint16 KUapsdRxFrameLengthThreshold(
+        WlanPowerModeMgrBase::KDefaultUapsdRxFrameLengthThreshold );
+    
+    iToLightPsTimeout = KToLightPsTimeout;
+    iActiveModeCntx.SetParameters( 
+        KToLightPsFrameThreshold, 
+        KUapsdRxFrameLengthThreshold );
     }

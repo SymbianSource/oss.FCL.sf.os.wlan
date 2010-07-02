@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 42 %
+* %version: 44 %
 */
 
 #include "core_operation_get_available_iaps.h"
@@ -27,10 +27,9 @@
 #include "core_frame_dot11_ie.h"
 #include "am_debug.h"
 
-/** Defining this enables IAP related traces. */
-//#define WLAN_CORE_DEEP_DEBUG 1
-
-/** The channel time used in the long passive scan. */
+/** 
+ * The channel time used in the long passive scan.
+ */
 const u32_t LONG_PASSIVE_SCAN_CHANNEL_TIME = 210;
 
 /**
@@ -51,24 +50,24 @@ core_operation_get_available_iaps_c::core_operation_get_available_iaps_c(
     abs_core_server_callback_c* adaptation,
     bool_t is_active_scan_allowed,
     core_type_list_c<core_iap_data_s>& iap_data_list,
-    core_type_list_c<u32_t>& iap_id_list,
+    core_type_list_c<core_iap_availability_data_s>& iap_availability_list,
     core_type_list_c<core_ssid_entry_s>* iap_ssid_list,
     ScanList& scan_data ) :
     core_operation_base_c( core_operation_get_available_iaps, request_id, server, drivers, adaptation,
         core_base_flag_drivers_needed ),    
     is_active_scan_allowed_m( is_active_scan_allowed ),
     is_limiting_algorithm_used_m( false_t ),
+    iap_data_count_m( iap_data_list.count() ),
     iap_data_list_m( iap_data_list ),
-    iap_id_list_m( iap_id_list ),
+    iap_availability_list_m( iap_availability_list ),
     iap_ssid_list_m( iap_ssid_list ),
     client_scan_data_m( scan_data ),
     active_channels_m( ),
     broadcast_channels_m( ),
     long_broadcast_count_m( 0 ),
-    non_found_iaps_list_m( ),
     is_split_scan_m( false_t ),
     bss_count_m( 0 ),
-    direct_scanned_ssid_m( ),
+    direct_scan_iter_m( direct_scan_list_m ), 
     region_from_ap_m( core_wlan_region_fcc )
     {
     DEBUG( "core_operation_get_available_iaps_c::core_operation_get_available_iaps_c()" );
@@ -83,7 +82,7 @@ core_operation_get_available_iaps_c::~core_operation_get_available_iaps_c()
 
     server_m->unregister_event_handler( this );
     server_m->unregister_frame_handler( this );
-    non_found_iaps_list_m.clear();
+    direct_scan_list_m.clear();
     iap_ssid_list_m = NULL;
     }
 
@@ -103,15 +102,13 @@ core_error_e core_operation_get_available_iaps_c::next_state()
 #ifdef WLAN_CORE_DEEP_DEBUG
             DEBUG( "core_operation_get_available_iaps_c::next_state() - IAP data list:" );
 
-            core_iap_data_s* iter_data = iap_data_list_m.first();            
-            while( iter_data )
+            core_type_list_iterator_c<core_iap_data_s> iap_data_iter( iap_data_list_m );
+            for( core_iap_data_s* entry = iap_data_iter.first(); entry; entry = iap_data_iter.next() )
                 {
                 DEBUG1( "core_operation_get_available_iaps_c::next_state() - ID: %u",
-                    iter_data->id );
+                    entry->id );
                 DEBUG1S( "core_operation_get_available_iaps_c::next_state() - SSID: ",
-                    iter_data->ssid.length, iter_data->ssid.ssid );
-
-                iter_data = iap_data_list_m.next();
+                    entry->ssid.length, entry->ssid.ssid );
                 }
 
             if ( iap_ssid_list_m )
@@ -257,7 +254,6 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             const core_scan_channels_s channels(
                 server_m->get_core_settings().valid_scan_channels( broadcast_channels_m.channels() ) );
 
-
             if ( !is_active_scan_allowed_m ||
                  is_limiting_algorithm_used_m )
                 {
@@ -322,7 +318,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             	 * handled already */
             	return goto_state( core_state_broadcast_scan_done_handle_result );
             	}
-            
+
             operation_state_m = core_state_broadcast_scan_start_unknown_region;
 
             broadcast_channels_m.set(
@@ -472,7 +468,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                 }
 
             /**
-             * Go through the broadcast scan results and remove matching IAPs.
+             * Go through the broadcast scan results.
              */
             process_scan_results(
                 core_scan_list_tag_scan );
@@ -487,13 +483,37 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                    is_limiting_algorithm_used_m &&
                    bss_count_m ) )
                 {
-                remove_non_hidden_iaps();
+                /**
+                 * Gather a list of SSID to direct scan. Only IAPs marked
+                 * as hidden will be scanned. 
+                 */
+                core_type_list_iterator_c<core_iap_data_s> iap_data_iter( iap_data_list_m );
+                for( core_iap_data_s* entry = iap_data_iter.first(); entry; entry = iap_data_iter.next() )
+                    {
+                    if( entry->is_hidden &&
+                        !is_ssid_in_list(
+                            entry->ssid,
+                            direct_scan_list_m ) )
+                        {
+                        core_ssid_s* ssid = new core_ssid_s;
+                        if( ssid )
+                            {
+                            *ssid = entry->ssid;
+                            core_error_e ret = direct_scan_list_m.append( ssid );
+                            if( ret != core_error_ok )
+                                {
+                                delete ssid;
+                                }
+                            ssid = NULL;
+                            }
+                        }
+                    }
 
                 /**
                  * If limiting algorithm is used, only the current active_channels_m
                  * will be used.
                  */               
-                if ( is_limiting_algorithm_used_m )
+                if( is_limiting_algorithm_used_m )
                     {
                     DEBUG( "core_operation_get_available_iaps_c::next_state() - limiting channels based on WLAN activity" );
                     }
@@ -503,27 +523,18 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                         server_m->get_core_settings().all_valid_scan_channels() );
                     }
 
-                /**
-                 * iap_data_list_m now contains only hidden ssid IAPs,
-                 * that will be direct scanned next.
-                 */
-                core_iap_data_s* iap = iap_data_list_m.first();
-                if( !iap )
+                core_ssid_s* ssid = direct_scan_iter_m.first();
+                if( !ssid )
                     {
                     DEBUG( "core_operation_get_available_iaps_c::next_state() - nothing to direct scan" );
 
-                    /** No hidden IAP entries in the request, move on.. */
                     return goto_state( core_state_secondary_ssid_check );
                     }
 
-                DEBUG1( "core_operation_get_available_iaps_c::next_state() - going to direct scan %u IAP(s)",
-                    iap_data_list_m.count() );
-
-                direct_scanned_ssid_m = iap->ssid;
-                DEBUG1( "core_operation_get_available_iaps_c::next_state() - direct scanning IAP ID %u",
-                    iap->id );
-                DEBUG1S( "core_operation_get_available_iaps_c::next_state() - SSID: ",
-                    direct_scanned_ssid_m.length, direct_scanned_ssid_m.ssid );
+                DEBUG1( "core_operation_get_available_iaps_c::next_state() - going to direct scan %u SSID(s)",
+                    direct_scan_list_m.count() );
+                DEBUG1S( "core_operation_get_available_iaps_c::next_state() - direct scanning SSID: ",
+                    ssid->length, &ssid->ssid[0] );
 
                 server_m->get_scan_list().set_tag(
                     core_scan_list_tag_direct_scan );
@@ -542,7 +553,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                 drivers_m->scan(
                     request_id_m,
                     core_scan_mode_active,
-                    direct_scanned_ssid_m,
+                    *ssid,
                     server_m->get_device_settings().scan_rate,
                     channels,
                     server_m->get_device_settings().active_scan_min_ch_time,
@@ -554,7 +565,6 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             else
                 {
                 DEBUG( "core_operation_get_available_iaps_c::next_state() - no reason to direct scan anything" );
-                remove_non_hidden_iaps();
 
                 return goto_state( core_state_scanning_done );
                 }
@@ -571,8 +581,6 @@ core_error_e core_operation_get_available_iaps_c::next_state()
 
             DEBUG1( "core_operation_get_available_iaps_c::next_state() - direct scan done, %u beacon(s)/probe(s) received",
                 bss_count_m );
-            DEBUG1( "core_operation_get_available_iaps_c::next_state() - max %u direct scans left",
-                iap_data_list_m.count() );           
 
             /**
              * Go through the direct scan results and remove the matching IAPs.
@@ -580,101 +588,70 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             process_scan_results(
                 core_scan_list_tag_direct_scan );
 
-            /**
-             * If the first entry is still the same the one that was scanned,
-             * it means the IAP was not found.
-             */
-            core_iap_data_s* iap = iap_data_list_m.first();
-            if ( iap && iap->ssid == direct_scanned_ssid_m )
-                {
-                DEBUG1( "core_operation_get_available_iaps_c::next_state() - IAP ID %u not found in direct scan",
-                    iap->id );
-
-                core_error_e ret = iap_data_list_m.remove( iap );
-                if( ret != core_error_ok )
-                    {
-                    DEBUG1( "core_operation_get_available_iaps_c::next_state() - error while removing IAP entry (%d)",
-                        ret );
-                    }
-
-                non_found_iaps_list_m.append( iap );
-                }
-
-            iap = iap_data_list_m.first();
-            if( iap )
-                {
-                direct_scanned_ssid_m = iap->ssid;
-                DEBUG1( "core_operation_get_available_iaps_c::next_state() - direct scanning IAP ID %u",
-                    iap->id );              
-                DEBUG1S( "core_operation_get_available_iaps_c::next_state() - SSID: ",
-                    direct_scanned_ssid_m.length, direct_scanned_ssid_m.ssid );
-
-                server_m->get_scan_list().set_tag(
-                    core_scan_list_tag_direct_scan );
-
-                const core_scan_channels_s& channels(
-                    active_channels_m.channels() );
-                DEBUG2( "core_operation_get_available_iaps_c::next_state() - requesting scan on channels 0x%02X%02X",
-                    channels.channels2dot4ghz[1],
-                    channels.channels2dot4ghz[0] );
-
-                bss_count_m = 0;
-
-                server_m->register_event_handler( this );
-                server_m->register_frame_handler( this );
-
-                drivers_m->scan(
-                    request_id_m,
-                    core_scan_mode_active,
-                    direct_scanned_ssid_m,
-                    server_m->get_device_settings().scan_rate,
-                    channels,
-                    server_m->get_device_settings().active_scan_min_ch_time,
-                    server_m->get_device_settings().active_scan_max_ch_time,
-                    is_split_scan_m );
-                }
-            else
+            core_ssid_s* ssid = direct_scan_iter_m.next();
+            if( !ssid )
                 {
                 DEBUG( "core_operation_get_available_iaps_c::next_state() - nothing to direct scan" );
 
                 return goto_state( core_state_secondary_ssid_check );
                 }
 
+            DEBUG1S( "core_operation_get_available_iaps_c::next_state() - direct scanning SSID: ",
+                ssid->length, &ssid->ssid[0] );
+
+            server_m->get_scan_list().set_tag(
+                core_scan_list_tag_direct_scan );
+
+            const core_scan_channels_s& channels(
+                active_channels_m.channels() );
+            DEBUG2( "core_operation_get_available_iaps_c::next_state() - requesting scan on channels 0x%02X%02X",
+                channels.channels2dot4ghz[1],
+                channels.channels2dot4ghz[0] );
+
+            bss_count_m = 0;
+
+            server_m->register_event_handler( this );
+            server_m->register_frame_handler( this );
+
+            drivers_m->scan(
+                request_id_m,
+                core_scan_mode_active,
+                *ssid,
+                server_m->get_device_settings().scan_rate,
+                channels,
+                server_m->get_device_settings().active_scan_min_ch_time,
+                server_m->get_device_settings().active_scan_max_ch_time,
+                is_split_scan_m );
+
             break;
             }
         case core_state_secondary_ssid_check:
             {
-            ASSERT( !iap_data_list_m.count() );
-            ASSERT( !iap_data_list_m.first() );
-
             /**
-             * All the IAPs that were not found are contained in non_found_iaps_list_m
-             * list. Those that have secondary SSIDs defined, will be moved back to
-             * iap_data_list_m for scanning.
+             * Remove all IAPs that have either been found or don't have
+             * secondary SSID defined.
              */
-
-            if ( iap_ssid_list_m )
+            if( iap_ssid_list_m )
                 {
-                core_iap_data_s* iap = non_found_iaps_list_m.first();
-                while( iap )
+                core_type_list_iterator_c<core_iap_data_s> iap_data_iter( iap_data_list_m );
+                for( core_iap_data_s* entry = iap_data_iter.first(); entry; entry = iap_data_iter.next() )
                     {
                     DEBUG1( "core_operation_get_available_iaps_c::next_state() - checking IAP ID %u for secondary SSIDs",
-                        iap->id );
+                        entry->id );
 
-                    if ( is_id_in_secondary_ssid_list( iap->id ) )
+                    if( !is_iap_in_availability_list(                        
+                            entry->id,
+                            iap_availability_list_m ) &&
+                        is_id_in_secondary_ssid_list(
+                            entry->id ) )
                         {
                         DEBUG( "core_operation_get_available_iaps_c::next_state() - IAP has secondary SSID(s) defined" );
-
-                        /** Using a temporary pointer to guarantee list iterator working. */
-                        core_iap_data_s* temp = iap;
-                        iap = non_found_iaps_list_m.next();
-
-                        non_found_iaps_list_m.remove( temp );
-                        iap_data_list_m.append( temp );
                         }
                     else
                         {
-                        iap = non_found_iaps_list_m.next();
+                        iap_data_iter.remove();
+                        delete entry;
+                        entry = NULL;
                         }
                     }
                 }
@@ -727,10 +704,8 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                             entry->ssid,
                             client_scan_data_m ) )
                         {                    
-                        direct_scanned_ssid_m = entry->used_ssid;
-
                         DEBUG1S( "core_operation_get_available_iaps_c::next_state() - matching SSID found, doing a direct scan for SSID ",
-                            direct_scanned_ssid_m.length, direct_scanned_ssid_m.ssid );
+                            entry->used_ssid.length, entry->used_ssid.ssid );
 
                         server_m->get_scan_list().set_tag(
                             core_scan_list_tag_direct_scan );
@@ -749,7 +724,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                         drivers_m->scan(
                             request_id_m,
                             core_scan_mode_active,
-                            direct_scanned_ssid_m,
+                            entry->used_ssid,
                             server_m->get_device_settings().scan_rate,
                             channels,
                             server_m->get_device_settings().active_scan_min_ch_time,
@@ -776,7 +751,8 @@ core_error_e core_operation_get_available_iaps_c::next_state()
 
             remove_secondary_ssid_entries_by_id( iap->id );            
             iap_data_list_m.remove( iap );
-            non_found_iaps_list_m.append( iap );
+            delete iap;
+            iap = NULL;
             (void)iap_ssid_list_m->first();
             (void)iap_data_list_m.first();
 
@@ -799,7 +775,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             core_scan_list_iterator_by_tag_and_ssid_c iter(
                 server_m->get_scan_list(),
                 core_scan_list_tag_direct_scan,
-                direct_scanned_ssid_m );
+                entry->used_ssid );
 
             for ( core_ap_data_c* ap_data = iter.first(); ap_data; ap_data = iter.next() )
                 {
@@ -815,14 +791,9 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                     DEBUG1( "core_operation_get_available_iaps_c::next_state() - secondary SSID match for IAP ID %u",
                         iap->id );
 
-                    u32_t* iap_id = new u32_t;
-                    if( iap_id )
-                        {
-                        *iap_id = iap->id;
-                        iap_id_list_m.append( iap_id );
-                        iap_id = NULL;
-                        }
-
+                    update_iap_availability(
+                        iap_data.id(),
+                        ap_data->rcpi() );
                     remove_secondary_ssid_entries_by_id( iap->id );
                     iap_data_list_m.remove( iap );
                     (void)iap_ssid_list_m->first();
@@ -836,7 +807,7 @@ core_error_e core_operation_get_available_iaps_c::next_state()
                 }
 
             DEBUG1S( "core_operation_get_available_iaps_c::next_state() - no matching SSID ",
-                direct_scanned_ssid_m.length, direct_scanned_ssid_m.ssid );
+                entry->used_ssid.length, entry->used_ssid.ssid );
 
             (void)iap_ssid_list_m->next();
 
@@ -854,9 +825,9 @@ core_error_e core_operation_get_available_iaps_c::next_state()
             DEBUG1( "core_operation_get_available_iaps_c::next_state() - scan list size is %u bytes",
                 client_scan_data_m.Size() );
             DEBUG1( "core_operation_get_available_iaps_c::next_state() - %u IAP(s) found",
-                iap_id_list_m.count() );
+                iap_availability_list_m.count() );
             DEBUG1( "core_operation_get_available_iaps_c::next_state() - %u IAP(s) not found",
-                non_found_iaps_list_m.count() );
+                iap_data_count_m - iap_availability_list_m.count() );
 
             /**
              * Detect channels that have APs with long beacon intervals.
@@ -950,41 +921,6 @@ void core_operation_get_available_iaps_c::user_cancel(
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 //
-void core_operation_get_available_iaps_c::remove_non_hidden_iaps()
-    {
-    DEBUG("core_operation_get_available_iaps_c::remove_non_hidden_iaps()");
-
-    core_iap_data_s* iap = iap_data_list_m.first();
-    while( iap )
-        {
-        if( !iap->is_hidden )
-            {
-            DEBUG1("core_operation_get_available_iaps_c::remove_non_hidden_iaps() - removing IAP ID %u",
-                iap->id );
-            
-            core_iap_data_s* temp = iap;
-            iap = iap_data_list_m.next();
-            core_error_e ret = iap_data_list_m.remove( temp );
-            if( ret != core_error_ok )
-                {
-                DEBUG1("core_operation_get_available_iaps_c::remove_non_hidden_iaps() - error while removing IAP entry (%d)",
-                    ret );
-                }
-            non_found_iaps_list_m.append( temp );
-            }
-        else
-            {
-            DEBUG1("core_operation_get_available_iaps_c::remove_non_hidden_iaps() - leaving IAP ID %u",
-                iap->id );
-
-            iap = iap_data_list_m.next();
-            }
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-//
 void core_operation_get_available_iaps_c::process_scan_results(
     u8_t tag )
     {
@@ -1007,26 +943,17 @@ void core_operation_get_available_iaps_c::remove_matching_iaps(
     core_ap_data_c& ap_data )
     {
     DEBUG( "core_operation_get_available_iaps_c::remove_matching_iaps()" );
-        
-    if ( ap_data.rcpi() < server_m->get_device_settings().iap_availability_rcpi_threshold )
-        {
-        DEBUG2( "core_operation_get_available_iaps_c::remove_matching_iaps() - AP not considered, signal too weak (%u vs %u)",
-            ap_data.rcpi(), server_m->get_device_settings().iap_availability_rcpi_threshold );
 
-        return;
-        }
-    
-    u8_t treshold_val = 
-        static_cast<u8_t>( server_m->get_device_settings().rcpi_trigger );
-        
+    core_mac_address_s bssid = ap_data.bssid();
+
     /**
-     * Loop through the IAP list.
+     * Loop through the list of IAPs.
      */
-    core_iap_data_s* iap = iap_data_list_m.first();
-    while( iap )
+    core_type_list_iterator_c<core_iap_data_s> iap_data_iter( iap_data_list_m );
+    for( core_iap_data_s* entry = iap_data_iter.first(); entry; entry = iap_data_iter.next() )
         {
-        core_iap_data_c iap_data( *iap );
-        if ( iap->ssid == ap_data.ssid() &&
+        core_iap_data_c iap_data( *entry );
+        if ( iap_data.ssid() == ap_data.ssid() &&
              core_tools_parser_c::is_ap_compatible_with_iap(
                 server_m->get_wpx_adaptation_instance(),
                 ap_data,
@@ -1035,68 +962,14 @@ void core_operation_get_available_iaps_c::remove_matching_iaps(
                 false_t,
                 false_t ) == core_connect_ok )
             {
-            DEBUG1("core_operation_get_available_iaps_c::remove_matching_iaps() - match found for IAP ID %u",
-                iap->id );            
+            DEBUG7("core_operation_get_available_iaps_c::remove_matching_iaps() - BSSID %02X:%02X:%02X:%02X:%02X:%02X matches IAP ID %u",
+                bssid.addr[0], bssid.addr[1], bssid.addr[2], 
+                bssid.addr[3], bssid.addr[4], bssid.addr[5], 
+                iap_data.id() );
 
-            u32_t* iap_id = new u32_t;
-            bool_t is_match_found( true_t );
-            if( iap_id )
-                {
-                if ( server_m->get_core_settings().is_iap_id_in_weak_list( iap->id ) ) 
-                    {
-                    DEBUG( "core_operation_get_available_iaps_c::remove_matching_iaps() - IAP ID is in weak list" );
-                    
-                    if ( ap_data.rcpi() > treshold_val )
-                        {
-                        DEBUG1( "core_operation_get_available_iaps_c::remove_matching_iaps() - RCPI improved enough (%u), remove IAP ID from weak list",
-                            ap_data.rcpi() );
-                        *iap_id = iap->id;
-                        iap_id_list_m.append( iap_id );
-            		    iap_id = NULL;
-                        
-                        server_m->get_core_settings().remove_iap_id_from_weak_list( iap->id );
-                        }
-                    else
-                        {
-                        DEBUG2( "core_operation_get_available_iaps_c::remove_matching_iaps() - RCPI not improved enough (%u vs %u)",
-                            ap_data.rcpi(), treshold_val );
-
-                        is_match_found = false_t;
-                        }
-                    }
-                else
-                    {
-                    *iap_id = iap->id;
-                    iap_id_list_m.append( iap_id );
-                    iap_id = NULL;
-                    }
-                }
-
-            /** Using a temporary pointer to guarantee list iterator working. */
-            core_iap_data_s* temp = iap;
-            iap = iap_data_list_m.next();
-            if( is_match_found )
-                {
-                core_error_e ret = iap_data_list_m.remove( temp );
-                if( ret != core_error_ok )
-                    {
-                    if( iap )
-                        {
-                        DEBUG1("core_operation_get_available_iaps_c::remove_matching_iaps() - error while removing IAP entry (%d)",
-                            iap->id );
-                        }
-                    }
-
-                delete temp;
-                }
-
-            temp = NULL;
-            delete iap_id;
-            iap_id = NULL;
-            }
-        else
-            {
-            iap = iap_data_list_m.next();
+            update_iap_availability(
+                iap_data.id(),
+                ap_data.rcpi() ); 
             }
         }
     }
@@ -1238,6 +1111,96 @@ bool_t core_operation_get_available_iaps_c::is_ssid_in_scanlist(
         }
 
     return false_t;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+bool_t core_operation_get_available_iaps_c::is_ssid_in_list(
+    const core_ssid_s& ssid,
+    core_type_list_c<core_ssid_s>& ssid_list ) const
+    {
+    core_type_list_iterator_c<core_ssid_s> ssid_iter( ssid_list );
+    for( core_ssid_s* entry = ssid_iter.first(); entry; entry = ssid_iter.next() )
+        {
+        if( *entry == ssid )
+            {
+            return true_t;
+            }
+        }
+
+    return false_t;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+bool_t core_operation_get_available_iaps_c::is_iap_in_availability_list(
+    u32_t iap_id,
+    core_type_list_c<core_iap_availability_data_s>& iap_list ) const
+    {
+    core_type_list_iterator_c<core_iap_availability_data_s> iap_iter( iap_list );
+    for( core_iap_availability_data_s* entry = iap_iter.first(); entry; entry = iap_iter.next() )
+        {
+        if( entry->id == iap_id )
+            {
+            return true_t;
+            }
+        }
+
+    return false_t;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
+void core_operation_get_available_iaps_c::update_iap_availability(
+    u32_t iap_id,
+    u8_t iap_rcpi )
+    {
+    core_type_list_iterator_c<core_iap_availability_data_s> iap_iter( iap_availability_list_m );
+    bool_t is_found( false_t );
+    core_iap_availability_data_s* entry = iap_iter.first();
+    while( entry && !is_found )
+        {
+        if( entry->id == iap_id )
+            {
+            is_found = true_t;
+            if( entry->rcpi < iap_rcpi )
+                {
+                DEBUG3("core_operation_get_available_iaps_c::update_iap_availability() - IAP %u already available, RCPI improved from %u to %u",
+                    iap_id, entry->rcpi, iap_rcpi );
+
+                entry->rcpi = iap_rcpi;
+                }
+            else
+                {
+                DEBUG3("core_operation_get_available_iaps_c::update_iap_availability() - IAP %u already available, RCPI not improved (%u vs %u)",
+                    iap_id, iap_rcpi, entry->rcpi );            
+                }
+            }
+
+        entry = iap_iter.next();
+        }
+
+    if( !is_found )
+        {
+        core_iap_availability_data_s* data = new core_iap_availability_data_s;
+        if( data )        
+            {
+            DEBUG2("core_operation_get_available_iaps_c::update_iap_availability() - IAP %u marked as available, RCPI is %u",
+                iap_id, iap_rcpi );
+
+            data->id = iap_id;
+            data->rcpi = iap_rcpi;
+            core_error_e ret = iap_availability_list_m.append( data );
+            if( ret != core_error_ok )
+                {
+                delete data;
+                }
+            data = NULL;
+            }
+        }
     }
 
 // ---------------------------------------------------------------------------

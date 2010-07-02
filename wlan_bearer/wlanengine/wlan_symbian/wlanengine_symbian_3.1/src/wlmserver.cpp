@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 109 %
+* %version: 111 %
 */
 
 #include <e32def.h>
@@ -207,11 +207,10 @@ void CWlmServer::ConstructL()
     TWlanConversionUtil::ConvertMacAddress( core_mac, mac );
 
     // Get Device Settings
-    CWlanDeviceSettings::SWlanDeviceSettings deviceSettings;
-    GetWlanSettingsL( deviceSettings );
-    SetCachedRegion(deviceSettings.region, deviceSettings.regionTimestamp);    
+    GetWlanSettingsL( iDeviceSettings );
+    SetCachedRegion(iDeviceSettings.region, iDeviceSettings.regionTimestamp);    
     core_device_settings_s coreSettings; // core needs the settings here
-    TWlanConversionUtil::ConvertDeviceSettings( coreSettings, deviceSettings );
+    TWlanConversionUtil::ConvertDeviceSettings( coreSettings, iDeviceSettings );
 
     // Create core server    
     User::LeaveIfNull( iCoreServer = core_server_factory_c::instance(
@@ -221,7 +220,7 @@ void CWlmServer::ConstructL()
         core_mac,
         TWlanConversionUtil::ConvertFeatureFlags(
             iSupportedFeatures,
-            deviceSettings.enabledFeatures ) ) );
+            iDeviceSettings.enabledFeatures ) ) );
     iCoreServer->disable_wlan( KWlanIntCmdDisableWlan );
 
     // Create scan timer
@@ -236,7 +235,7 @@ void CWlmServer::ConstructL()
 
     // Create scan cache
     iCache = CWlanScanResultCache::NewL();
-    iConfiguredCacheLifetime = deviceSettings.scanExpirationTimer;
+    iConfiguredCacheLifetime = iDeviceSettings.scanExpirationTimer;
 
     // Create a callback for asynchronous core requests
     TCallBack callback( HandleCoreAsynchCb, this );
@@ -295,6 +294,7 @@ CWlmServer::~CWlmServer()
     // Stop all plugins
     iGenericWlanPlugin.StopPlugins();
 
+    iIapWeakList.Close();
     delete iCoreServer;
     delete iDriverIf;
     iNotificationArray.Close();
@@ -660,7 +660,8 @@ void CWlmServer::Connect(
     TInt ret = GetCurrentIapId(
         static_cast<TUint>(lanServiceId), 
         *coreIapData );
-        
+    iConnectionIapId = coreIapData->iap_id;
+
     if (  ret != KErrNone )
         {
         secondarySsidList.Close();
@@ -1223,6 +1224,10 @@ void CWlmServer::GetAvailableIaps(
     // Read cacheLifetime and maxDelay arguments
     TPckgBuf<TInt> cacheLifetimePckg( KWlmDefaultScanCacheLifetime );
     TPckgBuf<TUint> maxDelayPckg( 0 );
+    TBool isFiltered(
+        aMessage.Int3() );
+    DEBUG1( "CWlmServer::GetAvailableIaps() - isFiltered: %u",
+        isFiltered );
     if( aMessage.Read( 1, cacheLifetimePckg ) != KErrNone )
         {
         DEBUG( "CWlmServer::GetAvailableIaps() - unable to read lifetime parameter" );
@@ -1254,28 +1259,47 @@ void CWlmServer::GetAvailableIaps(
      * See if cached IAP availability information is available.
      */
     RArray<TWlanLimitedIapData> iapList;
-    RArray<TUint>* list = iCache->AvailableIaps(
-                                            iapList,
-                                            ( cacheLifetimePckg() == 0 ? 1 : cacheLifetimePckg() ) );
-    
+    RArray<TWlmAvailabilityData>* list = iCache->AvailableIaps(
+        iapList,
+        ( cacheLifetimePckg() == 0 ? 1 : cacheLifetimePckg() ) );
     // Only complete with valid cache if maxDelay is zero
     if( list && maxDelayPckg() == 0 )
         {
+        TWlmAvailableIaps tmp = { 0 };
+        if( isFiltered )
+            {            
+            DEBUG1( "CWlmServer::GetAvailableIaps() - using filtered cached IAP list, list contains %d IAP(s)",
+                list->Count() );
 
-        TWlmAvailableIaps tmp;
-        const TInt listCount(
-            Min( list->Count(), KWlmMaxAvailableIaps ) );
-        
-        DEBUG1( "CWlmServer::GetAvailableIaps() - using cached IAP list, list contains %d IAP(s)", listCount );
-        
-        TInt listIdx( 0 );
-
-        while( listIdx < listCount )
-            {
-            tmp.iaps[ listIdx ] = (*list)[listIdx];
-            ++listIdx;
+            for( TInt idx( 0 ); idx < list->Count() && tmp.count < KWlmMaxAvailableIaps; ++idx )
+                {
+                if( (*list)[idx].rcpi >= iDeviceSettings.minRcpiForIapAvailability &&
+                    iIapWeakList.Find( (*list)[idx].iapId ) == KErrNotFound )
+                    {
+                    DEBUG2( "CWlmServer::GetAvailableIaps() - IAP %u is available, RCPI is %u",
+                        (*list)[idx].iapId, (*list)[idx].rcpi );
+                    tmp.iaps[tmp.count++] = (*list)[idx];
+                    }
+                else
+                    {
+                    DEBUG2( "CWlmServer::GetAvailableIaps() - IAP %u filtered, RCPI is %u",
+                        (*list)[idx].iapId, (*list)[idx].rcpi );
+                    }
+                }
             }
-        tmp.count = listCount;
+        else
+            {
+            DEBUG1( "CWlmServer::GetAvailableIaps() - using cached IAP list, list contains %d IAP(s)",
+                list->Count() );
+
+            for( TInt idx( 0 ); idx < list->Count() && tmp.count < KWlmMaxAvailableIaps; ++idx )
+                {
+                DEBUG2( "CWlmServer::GetAvailableIaps() - IAP %u is available, RCPI is %u",
+                    (*list)[idx].iapId, (*list)[idx].rcpi );
+                tmp.iaps[tmp.count++] = (*list)[idx];                
+                }
+            }
+
         TPckg<TWlmAvailableIaps> outPckg( tmp );
         aMessage.Write( 0, outPckg );
         aMessage.Complete( KErrNone );
@@ -1330,8 +1354,9 @@ void CWlmServer::GetAvailableIaps(
     iapList.Close();
 
     // Create output list
-    core_type_list_c<u32_t>* iapIdList = new core_type_list_c<u32_t>;
-    if( iapIdList == NULL )
+    core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList =
+        new core_type_list_c<core_iap_availability_data_s>;
+    if( iapAvailabilityList == NULL )
         {
         aMessage.Complete( KErrNoMemory );
         delete iapDataList;
@@ -1346,7 +1371,7 @@ void CWlmServer::GetAvailableIaps(
         aMessage.Complete( KErrNoMemory );        
         delete iapDataList;
         delete iapSsidList;
-        delete iapIdList;
+        delete iapAvailabilityList;
         return;
         }
 
@@ -1362,7 +1387,7 @@ void CWlmServer::GetAvailableIaps(
             aMessage.Complete( KErrNoMemory );
             delete iapDataList;
             delete iapSsidList;
-            delete iapIdList;
+            delete iapAvailabilityList;
             delete scanList;
     
             return;
@@ -1382,9 +1407,10 @@ void CWlmServer::GetAvailableIaps(
     mapEntry.iRequestId = iRequestIdCounter++;
     mapEntry.iSessionId = aSessionId;    
     mapEntry.iParam0 = iapDataList;
-    mapEntry.iParam1 = iapIdList;
+    mapEntry.iParam1 = iapAvailabilityList;
     mapEntry.iParam2 = scanList;
     mapEntry.iParam3 = iapSsidList;
+    mapEntry.iParam4 = reinterpret_cast<TAny*>( isFiltered );
     mapEntry.iTime = scanTime;
     iRequestMap.Append( mapEntry );
 
@@ -1510,7 +1536,8 @@ TInt CWlmServer::UpdateWlanSettings()
 
         return err;
         }
-        
+    iDeviceSettings = settings;
+
     // Only if startup is complete, inform current settings to BgScan
     if( iIsStartupComplete )
         {
@@ -1645,12 +1672,11 @@ TBool CWlmServer::FindNextTimedScanSchedulingRequest(
 //
 void CWlmServer::NotifyBackgroundScanDone(
     ScanList* aScanList, 
-    core_type_list_c<u32_t>* aIapIdList )
+    core_type_list_c<core_iap_availability_data_s>& aIapAvailabilityData )
     {
     DEBUG( "CWlmServer::NotifyBackgroundScanDone()" );
     ASSERT( aScanList != NULL );
-    ASSERT( aIapIdList != NULL );
-    
+
     // Unload the drivers immediately to conserve power.
     if( !iPlatform->IsWlanDisabled() &&
         iConnectionState == EWlanStateNotConnected )
@@ -1666,7 +1692,7 @@ void CWlmServer::NotifyBackgroundScanDone(
     TBool newIaps( EFalse );
     TBool lostIaps( EFalse );
     iCache->UpdateAvailableNetworksList(
-        *aIapIdList,
+        aIapAvailabilityData,
         networkList,
         newIaps,
         lostIaps );
@@ -1813,6 +1839,7 @@ void CWlmServer::notify(
                 case EWlanStateNotConnected:
                     DEBUG( "CWlmServer::notify() - STATE: EWlanStateNotConnected" );
                     iIsRoaming = EFalse;
+                    iConnectionIapId = 0;
 
                     // set icon to "not available"
                     SetIconState( EWlmIconStatusNotAvailable );
@@ -1896,6 +1923,29 @@ void CWlmServer::notify(
             break;
         case EWlmNotifyAcTrafficStatusChanged:
             DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyAcTrafficStatusChanged<ind>" );
+            break;
+        case EWlmNotifyRcpChanged:
+            DEBUG( "CWlmServer::notify() - STATE: EWlmNotifyRcpChanged<ind>" );
+            if( static_cast<core_rcp_class_e>( data[0] ) == core_rcp_normal )
+                {
+                TInt idx = iIapWeakList.Find( iConnectionIapId );
+                if( idx >= 0 )
+                    {
+                    DEBUG1( "CWlmServer::notify() - removing IAP %u from weak list",
+                        iConnectionIapId );
+                    iIapWeakList.Remove( idx );
+                    }
+                }
+            else
+                {
+                TInt idx = iIapWeakList.Find( iConnectionIapId );
+                if( idx == KErrNotFound )
+                    {
+                    DEBUG1( "CWlmServer::notify() - adding IAP %u to weak list",
+                        iConnectionIapId );
+                    iIapWeakList.Append( iConnectionIapId );                    
+                    }
+                }
             break;
         default:
             break;
@@ -2622,9 +2672,8 @@ void CWlmServer::CompleteInternalRequest(
             
             ScanList* scanList = 
                 reinterpret_cast<ScanList*>( aRequest.iParam2 );
-            core_type_list_c<u32_t>* idList = 
-                reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
-                
+            core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList = 
+                reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( aRequest.iParam1 );
             core_type_list_c<core_iap_data_s>* iapDataList =
                 reinterpret_cast<core_type_list_c<core_iap_data_s>*>( aRequest.iParam0 );
             delete iapDataList;
@@ -2640,7 +2689,7 @@ void CWlmServer::CompleteInternalRequest(
 
                 if( aStatus == core_error_ok )
                     {
-                    NotifyBackgroundScanDone( scanList, idList );
+                    NotifyBackgroundScanDone( scanList, *iapAvailabilityList );
                     // cache takes the ownership of the scanList
                     scanList = NULL;
                     }
@@ -2652,8 +2701,8 @@ void CWlmServer::CompleteInternalRequest(
             
             delete scanList;
             scanList = NULL;
-            delete idList;
-            idList = NULL;
+            delete iapAvailabilityList;
+            iapAvailabilityList = NULL;
                         
             break;
             }
@@ -2789,29 +2838,33 @@ void CWlmServer::CompleteExternalRequest(
             // Create pointers to parameters
             core_type_list_c<core_ssid_entry_s>* iapSsidList;
             ScanList* scanList;
-            core_type_list_c<u32_t>* coreIdList;
+            core_type_list_c<core_iap_availability_data_s>* coreAvailabilityList;
             core_type_list_c<core_iap_data_s>* iapDataList;
+            TBool isFiltered( reinterpret_cast<TBool>( aRequest.iParam4 ) );
+            DEBUG1( "CWlmServer::CompleteExternalRequest() - isFiltered: %u",
+                isFiltered );
 
             iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( aRequest.iParam3 );
             iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( aRequest.iParam0 );
             
             TUint* completedScanTime = reinterpret_cast<TUint*>( aRequest.iTime );
             ScanList* completedScanList = reinterpret_cast<ScanList*>( aRequest.iParam2);
-            core_type_list_c<u32_t>* completedIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
+            core_type_list_c<core_iap_availability_data_s>* completedAvailabilityList =
+                reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( aRequest.iParam1 );
             
             if( aTriggerRequest == NULL )
                 {
                 DEBUG( "CWlmServer::CompleteExternalRequest() - GetAvailableIaps request handled by core" );    
 
                 scanList = reinterpret_cast<ScanList*>( aRequest.iParam2);
-                coreIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aRequest.iParam1 );
+                coreAvailabilityList = reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( aRequest.iParam1 );
                 }
             else
                 {
                 DEBUG( "CWlmServer::CompleteExternalRequest() - GetAvailableIaps request not handled by core" );    
                 //Use the results of the triggering request to complete also this other request
                 scanList = reinterpret_cast<ScanList*>( aTriggerRequest->iParam2);
-                coreIdList = reinterpret_cast<core_type_list_c<u32_t>*>( aTriggerRequest->iParam1 );                
+                coreAvailabilityList = reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( aTriggerRequest->iParam1 );                
                 }
 
             delete iapSsidList;
@@ -2831,27 +2884,75 @@ void CWlmServer::CompleteExternalRequest(
                 if( aTriggerRequest == NULL )
                     {
                     iCache->UpdateAvailableNetworksList(
-                        *coreIdList,
+                        *coreAvailabilityList,
                         networkList,
                         newIaps,
                         lostIaps );
                     }
                 networkList.Close();                
 
-                TWlmAvailableIaps tmp;                
-                TUint32* pInt = coreIdList->first();
-                TInt idx = 0;
-                while( pInt )
+                TWlmAvailableIaps tmp = { 0 };
+                core_iap_availability_data_s* pInt = coreAvailabilityList->first();
+                if( isFiltered )
                     {
-                    DEBUG1( "CWlmServer::CompleteExternalRequest() - IAP %u is available",
-                        *pInt );
-                    tmp.iaps[ idx ] = *pInt;
-                    idx++;
-                    pInt = coreIdList->next();
+                    while( pInt && tmp.count < KWlmMaxAvailableIaps )
+                        {
+                        if( pInt->rcpi < iDeviceSettings.minRcpiForIapAvailability )
+                            {
+                            DEBUG3( "CWlmServer::CompleteExternalRequest() - IAP %u filtered, RCPI is too weak (%u vs %u)",
+                                pInt->id, pInt->rcpi, iDeviceSettings.minRcpiForIapAvailability );
+                            }
+                        else if( iIapWeakList.Find( pInt->id ) != KErrNotFound )
+                            {
+                            if( pInt->rcpi < iDeviceSettings.rcpiTrigger )
+                                {
+                                DEBUG3( "CWlmServer::CompleteExternalRequest() - IAP %u filtered, in weak list and RCPI is too weak (%u vs %u)",
+                                    pInt->id, pInt->rcpi, iDeviceSettings.rcpiTrigger );                            
+                                }
+                            else
+                                {
+                                DEBUG2( "CWlmServer::CompleteExternalRequest() - IAP %u is available, RCPI is %u, removed from weak list",
+                                    pInt->id, pInt->rcpi );
+                                tmp.iaps[tmp.count].iapId = pInt->id;
+                                tmp.iaps[tmp.count++].rcpi = pInt->rcpi;
+                                iIapWeakList.Remove(
+                                    iIapWeakList.Find( pInt->id ) );
+                                }
+                            }
+                        else
+                            {
+                            DEBUG2( "CWlmServer::CompleteExternalRequest() - IAP %u is available, RCPI is %u",
+                                pInt->id, pInt->rcpi );
+                            tmp.iaps[tmp.count].iapId = pInt->id;
+                            tmp.iaps[tmp.count++].rcpi = pInt->rcpi;
+                            }
+                        pInt = coreAvailabilityList->next();
+                        }
+                    }
+                else
+                    {
+                    while( pInt && tmp.count < KWlmMaxAvailableIaps )
+                        {
+                        if( pInt->rcpi >= iDeviceSettings.rcpiTrigger &&
+                            iIapWeakList.Find( pInt->id ) != KErrNotFound )
+                            {                            
+                            DEBUG2( "CWlmServer::CompleteExternalRequest() - IAP %u is available, RCPI is %u, removed from weak list",
+                                pInt->id, pInt->rcpi );
+                            iIapWeakList.Remove(
+                                iIapWeakList.Find( pInt->id ) );
+                            }
+                        else
+                            {
+                            DEBUG2( "CWlmServer::CompleteExternalRequest() - IAP %u is available, RCPI is %u",
+                                pInt->id, pInt->rcpi );
+                            }
+
+                        tmp.iaps[tmp.count].iapId = pInt->id;
+                        tmp.iaps[tmp.count++].rcpi = pInt->rcpi;
+                        pInt = coreAvailabilityList->next();                        
+                        }
                     }
 
-                tmp.count = idx;
-                
                 if( IsSessionActive( aRequest ) )
                     {
                     TPckg<TWlmAvailableIaps> outPckg( tmp );
@@ -2859,14 +2960,14 @@ void CWlmServer::CompleteExternalRequest(
                     }
                 if( aTriggerRequest == NULL )
                     {
-                    DEBUG("CWlmServer::CompleteExternalRequest() - delete iapIdList" );
-                    delete coreIdList;	
+                    DEBUG("CWlmServer::CompleteExternalRequest() - delete coreAvailabilityList" );
+                    delete coreAvailabilityList;	
                     }
                 else
                     {
                     // If this completed request was not the triggering request then there is no need
                     // to cache anything. The triggering request results will be cached.
-                    delete completedIdList;
+                    delete completedAvailabilityList;
                     delete completedScanList;
                     }
 
@@ -2887,14 +2988,14 @@ void CWlmServer::CompleteExternalRequest(
                 // scan failed due to some reason: not caching anything
                 if( aTriggerRequest == NULL )
                     {
-                    delete coreIdList;
+                    delete coreAvailabilityList;
                     delete scanList;
                     }
                 else
                     {
                     // Delete only the lists of the completed request. Triggering request lists are
                     // deleted later on when that request is actually handled.
-                    delete completedIdList;
+                    delete completedAvailabilityList;
                     delete completedScanList; 
                     }
                 }
@@ -3026,6 +3127,7 @@ TInt CWlmServer::GetNetworkList(
             TWlanAvailableNetwork network;
             network.ssid.Copy( ieData, ieLength );
             network.securityMode = info.SecurityMode();
+            network.rcpi = info.RXLevel();
             if( info.OperatingMode() == WlanOperatingModeInfra )
                 {
                 network.networkType = Infrastructure;                
@@ -3035,11 +3137,17 @@ TInt CWlmServer::GetNetworkList(
                 network.networkType = Adhoc;
                 }
 
-            if ( aNetworkList.Find( network, isEqual ) == KErrNotFound )
+            TInt idx = aNetworkList.Find( network, isEqual ); 
+            if ( idx == KErrNotFound )
                 {
                 DEBUG1S( "CWlmServer::GetNetworkList() - appending SSID ",
                     ieLength, ieData );
                 aNetworkList.Append( network );
+                }
+            else if( idx >= 0 &&
+                     aNetworkList[idx].rcpi < network.rcpi )
+                {
+                aNetworkList[idx].rcpi = network.rcpi;            
                 }
             }
         }
@@ -3433,8 +3541,9 @@ TInt CWlmServer::BackgroundScanRequest(
     iapList.Close();
 
     // Create output list
-    core_type_list_c<u32_t>* iapIdList = new core_type_list_c<u32_t>;
-    if( iapIdList == NULL )
+    core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList =
+        new core_type_list_c<core_iap_availability_data_s>;
+    if( iapAvailabilityList == NULL )
         {
         DEBUG( "ERROR: Out of memory" );
         delete iapDataList;
@@ -3449,7 +3558,7 @@ TInt CWlmServer::BackgroundScanRequest(
         DEBUG( "CWlmServer::BackgroundScanRequest() - Out of memory when instantiating ScanList" );
         delete iapDataList;
         delete iapSsidList;
-        delete iapIdList;
+        delete iapAvailabilityList;
         return KErrNoMemory;
         }
 
@@ -3461,7 +3570,7 @@ TInt CWlmServer::BackgroundScanRequest(
 
         delete iapDataList;
         delete iapSsidList;
-        delete iapIdList;
+        delete iapAvailabilityList;
         delete scanList;
         return KErrNoMemory;
         }
@@ -3472,12 +3581,13 @@ TInt CWlmServer::BackgroundScanRequest(
     mapEntry.iRequestId = KWlanIntCmdBackgroundScan;
     mapEntry.iSessionId = 0;
     mapEntry.iParam0 = iapDataList;
-    mapEntry.iParam1 = iapIdList;
+    mapEntry.iParam1 = iapAvailabilityList;
     mapEntry.iParam2 = scanList;
     mapEntry.iParam3 = iapSsidList;
+    mapEntry.iParam4 = reinterpret_cast<TAny*>( EFalse );
     mapEntry.iTime = scanTime;
     iRequestMap.Append( mapEntry );
-    
+
     if( IsOnlyTimedScanRequestInRequestMap( mapEntry ) || *scanTime < iScanSchedulingTimerExpiration )
         {
         // Scan scheduling timer needs to be set again because this request needs the results earlier
@@ -3547,7 +3657,15 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         if( self->IsSessionActive( self->iRequestMap[index] ) )
             {
             self->iRequestMap[index].iMessage.Write( 2, pckgDynamicScanList );
-            self->iRequestMap[index].iMessage.Complete( KErrNone );
+
+            if( self->iPlatform->GetWlanOnOffState() != EWlanOn )
+                {
+                self->iRequestMap[index].iMessage.Complete( self->iPlatform->GetWlanOnOffState() );
+                }
+            else
+                {
+                self->iRequestMap[index].iMessage.Complete( KErrServerBusy );
+                }
             }
 
         delete completedScanList;
@@ -3576,7 +3694,8 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         DEBUG( "CWlmServer::ScanSchedulingTimerExpired() - GetAvailableIaps" );
             
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
-        core_type_list_c<u32_t>* iapIdList =  reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
+        core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList =
+            reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( self->iRequestMap[index].iParam1 );
         ScanList* scanList =  reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam2 );
         core_type_list_c<core_ssid_entry_s>* iapSsidList =  reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
         TUint* scanTime =  reinterpret_cast<TUint*>( self->iRequestMap[index].iTime );        
@@ -3600,13 +3719,25 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
                 TWlmAvailableIaps tmp = { 0 };
                 TPckg<TWlmAvailableIaps> outPckg( tmp );
                 self->iRequestMap[index].iMessage.Write( 0, outPckg );
-                self->iRequestMap[index].iMessage.Complete( KErrNone );
+
+                if( self->iPlatform->GetWlanOnOffState() != EWlanOn )
+                    {
+                    self->iRequestMap[index].iMessage.Complete( self->iPlatform->GetWlanOnOffState() );
+                    }
+                else if( iapDataList->count() == 0 )
+                    {
+                    self->iRequestMap[index].iMessage.Complete( KErrNone );
+                    }
+                else
+                    {
+                    self->iRequestMap[index].iMessage.Complete( KErrServerBusy );
+                    }
                 }
 
             delete iapDataList;
             iapDataList = NULL;
-            delete iapIdList;
-            iapIdList = NULL;
+            delete iapAvailabilityList;
+            iapAvailabilityList = NULL;
             delete scanList;
             scanList = NULL;
             delete iapSsidList;
@@ -3655,14 +3786,15 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         // pass request to core
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
         core_type_list_c<core_ssid_entry_s>* iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
-        core_type_list_c<u32_t>* iapIdList = reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
+        core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList =
+            reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( self->iRequestMap[index].iParam1 );
         ScanList* scanList = reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam2 );
         
         self->iCoreServer->get_available_iaps(
             self->iRequestMap[index].iRequestId,
             isActiveScanAllowed,
             *iapDataList,
-            *iapIdList,
+            *iapAvailabilityList,
             iapSsidList,
             *scanList );
         
@@ -3694,14 +3826,15 @@ TInt CWlmServer::ScanSchedulingTimerExpired( TAny* aThisPtr )
         // pass request to core
         core_type_list_c<core_iap_data_s>* iapDataList = reinterpret_cast<core_type_list_c<core_iap_data_s>*>( self->iRequestMap[index].iParam0 );
         core_type_list_c<core_ssid_entry_s>* iapSsidList = reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( self->iRequestMap[index].iParam3 );
-        core_type_list_c<u32_t>* iapIdList = reinterpret_cast<core_type_list_c<u32_t>*>( self->iRequestMap[index].iParam1 );
+        core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList =
+            reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( self->iRequestMap[index].iParam1 );
         ScanList* scanList = reinterpret_cast<ScanList*>( self->iRequestMap[index].iParam2 );
         
         self->iCoreServer->get_available_iaps(
             self->iRequestMap[index].iRequestId,
             isActiveScanAllowed,
             *iapDataList,
-            *iapIdList,
+            *iapAvailabilityList,
             iapSsidList,
             *scanList );
         
@@ -4103,7 +4236,7 @@ void CWlmServer::CancelScan()
             DEBUG( "CWlmServer::CancelScan() - remove entry from request map" );
             SRequestMapEntry entry = iRequestMap[index];
             delete reinterpret_cast<core_type_list_c<core_iap_data_s>*>( entry.iParam0 );
-            delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
+            delete reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( entry.iParam1 );
             delete reinterpret_cast<ScanList*>( entry.iParam2);
             delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
             delete reinterpret_cast<TUint*>( entry.iTime );
@@ -4140,7 +4273,7 @@ void CWlmServer::CancelScan()
                 DEBUG( "CWlmServer::CancelScan() - remove entry from request map" );
                 SRequestMapEntry entry = iRequestMap[index];
                 delete reinterpret_cast<core_type_list_c<core_iap_data_s>*>( entry.iParam0 );
-                delete reinterpret_cast<core_type_list_c<u32_t>*>( entry.iParam1 );
+                delete reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( entry.iParam1 );
                 delete reinterpret_cast<ScanList*>( entry.iParam2);
                 delete reinterpret_cast<core_type_list_c<core_ssid_entry_s>*>( entry.iParam3 );
                 delete reinterpret_cast<TUint*>( entry.iTime );                
@@ -5067,8 +5200,8 @@ void CWlmServer::HandleSsidListAvailabilityL(
 
     ScanList* scanList =
         reinterpret_cast<ScanList*>( aMapEntry.iParam2 );
-    core_type_list_c<u32_t>* iapIdList = 
-        reinterpret_cast<core_type_list_c<u32_t>*>( aMapEntry.iParam1 );
+    core_type_list_c<core_iap_availability_data_s>* iapAvailabilityList = 
+        reinterpret_cast<core_type_list_c<core_iap_availability_data_s>*>( aMapEntry.iParam1 );
 
     /**
      * Go through the IAP list and find IAPs that haven't been found
@@ -5077,14 +5210,14 @@ void CWlmServer::HandleSsidListAvailabilityL(
     RArray<TWlanLimitedIapData> attachedIapList;
     CleanupClosePushL( attachedIapList );
     const RArray<TWlanLimitedIapData>& cachedIapList(
-        iCache->CachedIapDataList() );    
-    core_type_list_iterator_c<u32_t> iter( *iapIdList );
+        iCache->CachedIapDataList() );
+    core_type_list_iterator_c<core_iap_availability_data_s> iter( *iapAvailabilityList );    
     for( TInt idx( 0 ); idx < cachedIapList.Count(); ++idx )
         {
         TBool isFound( EFalse );
-        for( u32_t* item = iter.first(); !isFound && item; item = iter.next() )
+        for( core_iap_availability_data_s* item = iter.first(); !isFound && item; item = iter.next() )
             {
-            if( *item == cachedIapList[idx].iapId )
+            if( item->id == cachedIapList[idx].iapId )
                 {                
                 isFound = ETrue;
                 }
@@ -5131,11 +5264,13 @@ void CWlmServer::HandleSsidListAvailabilityL(
             attachedIapList[idx].iapId,
             *ssidList );
         TBool isMatch( EFalse );
+        TUint rcpi( 0 );
         for( TInt iidx( 0 ); !isMatch && iidx < networkList.Count(); ++iidx )
             {
             if( attachedIapList[idx].networkType == networkList[iidx].networkType &&
                 ssidList->IsInList( networkList[iidx].ssid ) )
                 {
+                rcpi = networkList[iidx].rcpi;
                 isMatch = ETrue;
                 }
             }
@@ -5147,10 +5282,16 @@ void CWlmServer::HandleSsidListAvailabilityL(
             /**
              * A match has been found, mark the IAP as available.
              */
-            u32_t* iapId = new (ELeave) u32_t(
-                attachedIapList[idx].iapId );
-            iapIdList->append(
-                iapId );
+            core_iap_availability_data_s* data = new (ELeave) core_iap_availability_data_s;
+            data->id = attachedIapList[idx].iapId;
+            data->rcpi = rcpi;
+            core_error_e ret = iapAvailabilityList->append(
+                data );
+            if( ret != core_error_ok )
+                {
+                delete data;
+                }
+            data = NULL;
             }
         else
             {

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 58 %
+* %version: 59 %
 */
 
 #ifndef WLANDOT11STATE_H
@@ -314,14 +314,18 @@ protected:
 
 
     /**
-    * 
+    * Determines if it is possible to try to connect to the target nw
     *
     * @since S60 3.2
     * @param aCtxImpl statemachine context
-    * @param 
-    * @return ETrue if ...
+    * @param aScanResponseFrameBodyLength Length of the WLAN Mgmt Client 
+    *        provided scan response frame body received from the target nw
+    * @param aScanResponseFrameBody The WLAN Mgmt Client provided scan 
+    *        response frame body received from the target nw
+    * @return KErrNone if it is possible to try to connect to the target nw
+    *         An error code otherwise
     */
-    TBool InitNetworkConnect( 
+    TInt InitNetworkConnect( 
         WlanContextImpl& aCtxImpl,
         TUint16 aScanResponseFrameBodyLength,
         const TUint8* aScanResponseFrameBody ) const;
@@ -697,8 +701,11 @@ private:
 
     static TBool NetworkCapabilityInformationMet( 
         WlanContextImpl& aCtxImpl );
-    static TBool AreSupportedRatesMet( WlanContextImpl& aCtxImpl,
-                                       TBool aCheckAlsoExtendedRates );
+    
+    static TBool AreSupportedRatesMet( 
+        WlanContextImpl& aCtxImpl,
+        TBool aCheckAlsoExtendedRates );
+    
     static TBool ProcessSingleSupportedRateElement(
         WlanContextImpl& aCtxImpl,
         const TUint8 aApRate,

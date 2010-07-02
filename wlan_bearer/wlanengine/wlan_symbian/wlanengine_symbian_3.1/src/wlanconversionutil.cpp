@@ -16,12 +16,12 @@
 */
 
 /*
-* %version: 87 %
+* %version: 89 %
 */
 
 #include <in_sock.h>
 #include <e32math.h>
-
+#include <in_iface.h>
 #include "wlanconversionutil.h"
 #include "wlmserver.h"
 #include "wlmtsparams.h"
@@ -443,6 +443,8 @@ TInt TWlanConversionUtil::ConvertConnectStatus(
             return KErrWlanInternalError;
         case core_connect_wapi_certificate_failure:
             return KErrWlanInternalError;
+        case core_connect_ap_unsupported_configuration:
+            return KErrIfAuthenticationFailure;
         default:
             return KErrUnknown;
         }
@@ -783,7 +785,14 @@ void TWlanConversionUtil::ConvertIapSettings(
             aCoreSettings.security_mode = core_security_mode_wep;
             break;
         case Wlan8021x:
-            aCoreSettings.security_mode = core_security_mode_802dot1x;
+            if( aAmSettings.WPAKeyLength == 1 )
+                {
+                aCoreSettings.security_mode = core_security_mode_802dot1x_unencrypted;
+                }
+            else
+                {
+                aCoreSettings.security_mode = core_security_mode_802dot1x;
+                }
             break;
         case Wpa:
             aCoreSettings.security_mode = core_security_mode_wpa;
@@ -1015,6 +1024,7 @@ TInt TWlanConversionUtil::ConvertErrorCode( const core_error_e aError )
         case core_error_challenge_failure:
         case core_error_not_connected:
         case core_error_general:
+        case core_error_unsupported_config:
         default:
             return KErrGeneral;
         }
@@ -1046,6 +1056,8 @@ core_error_e TWlanConversionUtil::ConvertErrorCode( const TInt aError )
             return core_error_cancel;
         case KErrAlreadyExists:
             return core_error_already_exists;
+        case KWlanErrUnsupportedNwConf:
+            return core_error_unsupported_config;
         default:
             return core_error_general;    
         }

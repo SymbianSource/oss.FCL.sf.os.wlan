@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 11 %
+* %version: 12 %
 */
 
 #ifndef WLANMGMTCOMMON_H
@@ -281,6 +281,22 @@ struct TWlanProtectedSetupCredentialAttribute
     TWlanDefaultWepKey iWepDefaultKey;
     /** WPA preshared key. */
     TWlanWpaPresharedKey iWpaPreSharedKey;
+    };
+
+/**
+ * Data structure for storing IAP availability data.
+ */
+struct TWlanIapAvailabilityData
+    {
+    /**
+     * ID of the IAP.
+     */
+    TUint iIapId;
+    /** 
+     * Received Signal Strength Indicator (RSSI) of the strongest
+     * AP in the network.
+     */
+    TUint iRssi;
     };
 
 // CLASS DECLARATION

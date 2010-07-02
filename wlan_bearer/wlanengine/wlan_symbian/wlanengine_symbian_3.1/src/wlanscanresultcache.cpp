@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 13 %
+*/
 
 #include "wlanscanresultcache.h"
 #include "am_debug.h"
@@ -119,7 +122,7 @@ ScanList* CWlanScanResultCache::GetScanList(
 // -----------------------------------------------------------------------------
 //
 void CWlanScanResultCache::UpdateAvailableNetworksList(
-    core_type_list_c<u32_t>& aIapIdList,
+    core_type_list_c<core_iap_availability_data_s>& aIapAvailabilityList,
     RArray<TWlanAvailableNetwork>& aNetworkList,
     TBool& aNewIapsAvailable,
     TBool& aOldIapsLost )
@@ -127,7 +130,7 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
     DEBUG( "CWlanScanResultCache::UpdateAvailableNetworksList()" ); 
 
     DEBUG1( "CWlanScanResultCache::UpdateAvailableNetworksList() - %u IAP(s) available",
-        aIapIdList.count() );
+        aIapAvailabilityList.count() );
     DEBUG1( "CWlanScanResultCache::UpdateAvailableNetworksList() - %u IAP(s) previously available",
         iAvailableIapList.Count() ); 
     DEBUG1( "CWlanScanResultCache::UpdateAvailableNetworksList() - %u networks(s) available",
@@ -140,26 +143,27 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
     const TInt oldNetworkCount( iAvailableNetworkList.Count() );
     aNewIapsAvailable = EFalse;
     aOldIapsLost = EFalse;
-    TIdentityRelation<TWlanAvailableNetwork> isEqual( CWlanScanResultCache::IsNetworkEqual );
+    TIdentityRelation<TWlanAvailableNetwork> isNetworkEqual( CWlanScanResultCache::IsNetworkEqual );
+    TIdentityRelation<TWlmAvailabilityData> isIapEqual( CWlanScanResultCache::IsIapEqual );
 
     // Iterate through previously available IAPs to find lost IAPs.    
     TInt idx( 0 );
     //while( idx < oldIapCount && !aOldIapsLost )
     while( idx < oldIapCount )
         {
-        const TUint32* newId = aIapIdList.first();
+        const core_iap_availability_data_s* newIap = aIapAvailabilityList.first();
 
-        while( newId )
+        while( newIap )
             {
-            if( *newId == iAvailableIapList[idx] )
+            if( newIap->id == iAvailableIapList[idx].iapId )
                 {
                 break;
                 }
 
-            newId = aIapIdList.next();
+            newIap = aIapAvailabilityList.next();
             }
 
-        if( !newId )
+        if( !newIap )
             {
             DEBUG1( "CWlanScanResultCache::UpdateAvailableNetworksList() - old IAP %u has been lost",
                 iAvailableIapList[idx] );
@@ -170,18 +174,21 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
         }
 
     // Iterate through available IAPs to find new IAPs.    
-    const TUint32* newId = aIapIdList.first();
+    const core_iap_availability_data_s* newIap = aIapAvailabilityList.first();
     //while( newId && !aNewIapsAvailable )
-    while( newId )
+    while( newIap )
         {
-        if ( iAvailableIapList.Find( *newId ) == KErrNotFound )
+        TWlmAvailabilityData tmp;
+        tmp.iapId = newIap->id;
+        tmp.rcpi = newIap->rcpi;
+        if ( iAvailableIapList.Find( tmp, isIapEqual ) == KErrNotFound )
             {
             DEBUG1( "CWlanScanResultCache::UpdateAvailableNetworksList() - new IAP %u has been detected",
-                *newId );
+                newIap->id );
             aNewIapsAvailable = ETrue;
             }
-
-        newId = aIapIdList.next();
+        
+        newIap = aIapAvailabilityList.next();
         }
 
     // Iterate through previously available networks to find lost networks.
@@ -189,7 +196,7 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
     //while ( idx < oldNetworkCount && !aOldIapsLost )
     while ( idx < oldNetworkCount )
         {
-        if ( aNetworkList.Find( iAvailableNetworkList[idx], isEqual ) == KErrNotFound )
+        if ( aNetworkList.Find( iAvailableNetworkList[idx], isNetworkEqual ) == KErrNotFound )
             {
             DEBUG1S( "CWlanScanResultCache::UpdateAvailableNetworksList() - old network has been lost, SSID ",
                 iAvailableNetworkList[idx].ssid.Length(), iAvailableNetworkList[idx].ssid.Ptr() );
@@ -203,7 +210,7 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
     //while( idx < newNetworkCount && !aNewIapsAvailable )
     while( idx < newNetworkCount )
         {
-        if ( iAvailableNetworkList.Find( aNetworkList[idx], isEqual ) == KErrNotFound )
+        if ( iAvailableNetworkList.Find( aNetworkList[idx], isNetworkEqual ) == KErrNotFound )
             {
             DEBUG1S( "CWlanScanResultCache::UpdateAvailableNetworksList() - new network has been detected, SSID ",
                 aNetworkList[idx].ssid.Length(), aNetworkList[idx].ssid.Ptr() );            
@@ -217,11 +224,14 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
     iAvailableNetworkList.Reset();
     iIapListTimeStamp.HomeTime();
         
-    newId = aIapIdList.first();
-    while( newId )
+    newIap = aIapAvailabilityList.first();
+    while( newIap )
         {
-        iAvailableIapList.Append( *newId );
-        newId = aIapIdList.next();
+        TWlmAvailabilityData tmp;
+        tmp.iapId = newIap->id;
+        tmp.rcpi = newIap->rcpi;
+        iAvailableIapList.Append( tmp );
+        newIap = aIapAvailabilityList.next();
         }
         
     idx = 0;
@@ -236,7 +246,7 @@ void CWlanScanResultCache::UpdateAvailableNetworksList(
 // CWlanScanResultCache::AvailableIaps
 // -----------------------------------------------------------------------------
 //
-RArray<TUint>* CWlanScanResultCache::AvailableIaps(
+RArray<TWlmAvailabilityData>* CWlanScanResultCache::AvailableIaps(
     RArray<TWlanLimitedIapData>& aIapList,
     TUint aCacheLifetime )
     {
@@ -384,6 +394,22 @@ TBool CWlanScanResultCache::IsNetworkEqual(
     if ( aFirst.ssid != aSecond.ssid ||
          aFirst.networkType != aSecond.networkType ||
          aFirst.securityMode != aSecond.securityMode )
+        {
+        return EFalse;
+        }
+
+    return ETrue;
+    }
+
+// -----------------------------------------------------------------------------
+// CWlanScanResultCache::IsIapEqual
+// -----------------------------------------------------------------------------
+//
+TBool CWlanScanResultCache::IsIapEqual(
+    const TWlmAvailabilityData& aFirst,
+    const TWlmAvailabilityData& aSecond )
+    {
+    if ( aFirst.iapId != aSecond.iapId )
         {
         return EFalse;
         }

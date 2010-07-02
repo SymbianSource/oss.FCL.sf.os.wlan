@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 22 %
+* %version: 23 %
 */
 
 #include "core_operation_check_rcpi.h"
@@ -365,13 +365,7 @@ core_error_e core_operation_check_rcpi_c::next_state()
                 u8_t buf[5];
                 buf[0] = static_cast<u8_t>( core_rcp_weak );
                 buf[1] = static_cast<u8_t>( current_rcpi_m );
-                  
-                /**
-                 * Get current IAP Id value and add it to the weak list. 
-                 */
-                server_m->get_core_settings().add_iap_id_to_weak_iap_list(
-                     server_m->get_connection_data()->iap_data().iap_id());
-                 
+
                 adaptation_m->notify(
                     core_notification_rcp_changed,
                     sizeof( buf ),

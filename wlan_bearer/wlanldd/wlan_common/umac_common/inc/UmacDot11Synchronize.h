@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 20 %
 */
 
 #ifndef WLANDOT11SYNCHRONIZE_H
@@ -105,8 +105,7 @@ protected:
         WlanContextImpl& aCtxImpl, 
         TState aNewState );
 
-    TBool InitActions( 
-        WlanContextImpl& aCtxImpl );
+    TInt InitActions( WlanContextImpl& aCtxImpl ) const;
     
     void SetDot11SlotTime( 
         WlanContextImpl& aCtxImpl );
@@ -209,8 +208,8 @@ protected:    // Data
     
     TState              iState;
 
-    // true, if the Join operation failed
-    TBool iJoinFailed;
+    /** status of the Join operation */
+    TInt iJoinStatus;
 
 #ifndef NDEBUG
     // max length of state name for tracing

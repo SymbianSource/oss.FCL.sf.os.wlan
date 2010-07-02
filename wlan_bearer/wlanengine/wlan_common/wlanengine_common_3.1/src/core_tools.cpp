@@ -484,8 +484,8 @@ wlan_eapol_if_eapol_key_authentication_type_e core_tools_c::eap_authentication_t
         DEBUG( "core_tools_c::eap_authentication_type() - wlan_eapol_if_eapol_key_authentication_type_802_1x" );
         return wlan_eapol_if_eapol_key_authentication_type_802_1x;
         }
-    else if( mode == core_security_mode_802dot1x &&
-             ap_data.key_management_suites() & core_key_management_wpx_fast_roam )
+    else if( (mode == core_security_mode_802dot1x || core_security_mode_802dot1x_unencrypted) &&
+            (ap_data.key_management_suites() & core_key_management_wpx_fast_roam) )
         {
         DEBUG( "core_tools_c::eap_authentication_type() - wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam" );
         return wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam;
@@ -494,6 +494,21 @@ wlan_eapol_if_eapol_key_authentication_type_e core_tools_c::eap_authentication_t
         {
         DEBUG( "core_tools_c::eap_authentication_type() - wlan_eapol_if_eapol_key_authentication_type_wfa_sc" );
         return wlan_eapol_if_eapol_key_authentication_type_wfa_sc;
+        }
+    if( mode == core_security_mode_802dot1x_unencrypted &&
+         !ap_data.is_rsn_ie_present() &&
+         !ap_data.is_wpa_ie_present() )
+        {
+        if( !ap_data.is_privacy_enabled() )
+            {
+            DEBUG( "core_tools_c::eap_authentication_type() - wlan_eapol_if_eapol_key_authentication_type_802_1x_unencrypted" );
+            return wlan_eapol_if_eapol_key_authentication_type_802_1x_unencrypted;
+            }
+        else
+            {
+            DEBUG( "core_tools_c::eap_authentication_type() - wlan_eapol_if_eapol_key_authentication_type_802_1x" );
+            return wlan_eapol_if_eapol_key_authentication_type_802_1x;                
+            }
         }
     else if( iap_data.is_eap_used() )
         {

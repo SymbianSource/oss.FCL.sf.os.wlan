@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 108 %
+* %version: 109 %
 */
 
 #include <e32def.h>
@@ -2396,7 +2396,7 @@ void CWlmServer::request_complete(
         if( IsSessionActive( completedMapEntry ) )
             {
             TPckg<TWlmProtectedSetupCredentials> outPckg( tmp );
-            completedMapEntry.iMessage.Write( 1, outPckg );
+            completedMapEntry.iMessage.Write( 2, outPckg );
             }
 
         if( status == core_error_ok && IsSessionActive( completedMapEntry ) )
@@ -4394,40 +4394,47 @@ void CWlmServer::RunProtectedSetup(
 		aMessage.Complete( wlanState );
 		return;
 		}
-    
-    // Get WlanSettings and secondarySSID list
-    // (lanServiceId specifies the table row in wlansettings)
-    SWLANSettings iapData;
-    RArray<TWlanSecondarySsid> secondarySsidList;
-    TInt lanServiceId = aMessage.Int0();
-    TRAPD( err, GetIapSettingsL( lanServiceId, iapData, secondarySsidList ) ) ;
-    if( err != KErrNone )
+        
+    TPckgBuf<TWlanSsid> ssidPckg;
+    TInt ret( aMessage.Read( 0, ssidPckg ) );
+    if( ret != KErrNone )
         {
-        DEBUG1( "CWlmServer::RunProtectedSetup() - GetIapSettingsL leaved with %d",
-            err );
-        secondarySsidList.Close();
-        aMessage.Complete( err );
+        aMessage.Complete( ret );
         return;
         }
-    secondarySsidList.Close();
-
-    // Type conversion
+    
+    TPckgBuf<TWlanWpsPin> wpsPinPckg;
+    ret = aMessage.Read( 1, wpsPinPckg );
+    if( ret != KErrNone )
+        {
+        aMessage.Complete( ret );
+        return;
+        }
+    
     core_iap_data_s* coreIapData = new core_iap_data_s;
     if( !coreIapData )
         {
         aMessage.Complete( KErrNoMemory );
         return;
         }
-
-    TWLMOverrideSettings override = { 0 };
-    TWlanConversionUtil::ConvertIapSettings(
-        *coreIapData, 
-        iapData, 
-        ETrue, // dhcp usage is not important here
-        override );
-
-
-    // Create a list for the results.
+    
+    coreIapData->id = 0;
+    coreIapData->op_mode = core_operating_mode_infrastructure;
+    coreIapData->security_mode = core_security_mode_protected_setup;
+    coreIapData->wpa_preshared_key_in_use = ETrue; 
+    coreIapData->is_wpa_overriden = ETrue;
+    
+    // Type conversion
+    TWlanConversionUtil::ConvertSSID(
+         coreIapData->ssid,
+         ssidPckg() );
+    
+    // Type conversion
+    TWlanConversionUtil::ConvertWpaPreSharedKey(
+         coreIapData->wpa_preshared_key,
+         wpsPinPckg() );
+    
+    // Create a list for the results.  
     core_type_list_c<core_iap_data_s>* iapDataList = new core_type_list_c<core_iap_data_s>;
     if( iapDataList == NULL )
         {

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 31 %
+* %version: 32 %
 */
 
 // INCLUDE FILES
@@ -530,7 +530,8 @@ TInt CWlanMgmtImpl::UpdateRssNotificationBoundary(
 //
 void CWlanMgmtImpl::RunProtectedSetup(
     TRequestStatus& aStatus,
-    TUint32 aId,
+    const TWlanSsid& aSsid,
+    const TWlanWpsPin& aWpsPin,
     CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& aCredentials )
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::RunProtectedSetup()" ) ) );
@@ -540,7 +541,7 @@ void CWlanMgmtImpl::RunProtectedSetup(
     aStatus = KRequestPending;
     iPendingProtectedSetupStatus = &aStatus;
 
-    iProtectedSetupRequest = new CProtectedSetupRequest( *this, iServer, aId, aCredentials );
+    iProtectedSetupRequest = new CProtectedSetupRequest( *this, iServer, aSsid, aWpsPin, aCredentials );
     if ( !iProtectedSetupRequest )
         {
         User::RequestComplete( iPendingProtectedSetupStatus, KErrNoMemory );
@@ -1140,12 +1141,14 @@ void CWlanAvailableIapsRequest::DoCancel()
 CProtectedSetupRequest::CProtectedSetupRequest( 
     CWlanMgmtImpl& aCallback, 
     RWLMServer& aServer, 
-    TUint32 aId,
+    const TWlanSsid& aSsid,
+    const TWlanWpsPin& aWpsPin, 
     CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& aCredentials ) :
     CActive( CActive::EPriorityStandard ),
     iCallback( aCallback ),
     iServer( aServer ),
-    iServiceId( aId ),
+    iSsid( aSsid ),
+    iWpsPin( aWpsPin ),
     iCredentials ( aCredentials ),
     iCredentialsBuf( iCredentialsStorage )
     {
@@ -1168,7 +1171,7 @@ CProtectedSetupRequest::~CProtectedSetupRequest()
 void CProtectedSetupRequest::IssueRequest()
     {
     TraceDump( INFO_LEVEL, ( _L( "CProtectedSetupRequest::IssueRequest()" ) ) );
-    iServer.RunProtectedSetup( iStatus, iServiceId, iCredentialsBuf );
+    iServer.RunProtectedSetup( iStatus, iSsid, iWpsPin, iCredentialsBuf );
     SetActive();
     }
 

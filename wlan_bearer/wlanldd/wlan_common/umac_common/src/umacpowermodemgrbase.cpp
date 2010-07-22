@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,15 +16,12 @@
 */
 
 /*
-* %version: 8 %
+* %version: 9 %
 */
 
 #include "config.h"
 #include "umacpowermodemgrbase.h"
 #include "UmacContextImpl.h"
-
-// Default frame payload length threshold value (in bytes) for U-APSD
-const TUint32 KUapsdRxFrameLengthThreshold = 400;
 
 
 // ================= MEMBER FUNCTIONS =======================
@@ -34,7 +31,7 @@ const TUint32 KUapsdRxFrameLengthThreshold = 400;
 // ---------------------------------------------------------------------------
 //
 WlanPowerModeMgrBase::WlanPowerModeMgrBase() : 
-    iUapsdRxFrameLengthThreshold( KUapsdRxFrameLengthThreshold )
+    iUapsdRxFrameLengthThreshold( KDefaultUapsdRxFrameLengthThreshold )
     {
     }
 
@@ -46,6 +43,15 @@ WlanPowerModeMgrBase::~WlanPowerModeMgrBase()
     {
     }
 
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TPowerMgmtModeChange WlanPowerModeMgrBase::OnPsModeErrorIndication()
+    {
+    return ENoChange;
+    }
+        
 // ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------

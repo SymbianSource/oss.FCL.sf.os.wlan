@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 96 %
+* %version: 99 %
 */
 
 #include "config.h"
@@ -658,8 +658,8 @@ void WlanDot11Associated::OnDataFrameRx(
     TUint nbrOfpacketsForMgmtClient ( 0 );
     const TUint KMaxNbrOfPacketsForUsr ( 30 );
     const TUint KMaxNbrOfPacketsForMgmtClient ( 10 );
-    const TDataBuffer* packetsForUsr[KMaxNbrOfPacketsForUsr];
-    const TDataBuffer* packetsForMgmtClient[KMaxNbrOfPacketsForMgmtClient];
+    TDataBuffer* packetsForUsr[KMaxNbrOfPacketsForUsr];
+    TDataBuffer* packetsForMgmtClient[KMaxNbrOfPacketsForMgmtClient];
     // one byte past the last actual payload byte (so excluding the potentially
     // present security trailer) of the MPDU
     const TUint8* const KMpduPayloadEnd ( 
@@ -1006,8 +1006,7 @@ void WlanDot11Associated::OnManagementActionFrameRx(
             - aBuffer );                              // buffer beginning
         
         // complete
-        const TDataBuffer* KMetaHdr ( metaHdr );
-        aCtxImpl.iUmac.MgmtDataReceiveComplete( KMetaHdr, 1 );
+        aCtxImpl.iUmac.MgmtDataReceiveComplete( metaHdr, 1 );
         }
     else
         {
@@ -1369,7 +1368,7 @@ TUint WlanDot11Associated::EncryptTrailerLength(
     if ( // our client has instructed us not the encrypt this frame under
          // any circumstances OR
          ( aDataBuffer.KeFlags() & TDataBuffer::KTxFrameMustNotBeEncrypted ) ||
-         // no space is reserved for security header on this sw layer. It is
+         // no space is reserved for security trailer on this sw layer. It is
          // done on lower layers; when necessary.
          ( aCtxImpl.WHASettings().iCapability & 
            WHA::SSettings::KNoSecHdrAndTrailer ) )
@@ -1996,7 +1995,7 @@ TBool WlanDot11Associated::TxData(
         const TPowerMgmtModeChange KPowerMgmtModeChange ( 
             aCtxImpl.OnFrameTx( queue_id, etherType ) );
         
-        // if any change change is needed regarding our power mgmt mode,
+        // if any change is needed regarding our power mgmt mode,
         // proceed with it
         stateChange = PowerMgmtModeChange( aCtxImpl, KPowerMgmtModeChange );        
         }
@@ -2157,177 +2156,6 @@ void WlanDot11Associated::DoRegainedBSSIndication(
 // 
 // ---------------------------------------------------------------------------
 //
-TBool WlanDot11Associated::AddMulticastAddr(
-    WlanContextImpl& aCtxImpl,
-    const TMacAddress& aMacAddr )
-    {
-    TBool stateTransitionOccurred( EFalse );
-    
-    OsTracePrint( 
-        KWlmCmdDetails, 
-        (TUint8*)
-        ("UMAC: WlanDot11Associated::AddMulticastAddr(): addr to be added:"),
-        aMacAddr);
-
-    if ( aCtxImpl.MulticastFilteringDisAllowed() )
-        {
-        OsTracePrint( 
-            KWlmCmdDetails, 
-            (TUint8*)
-            ("UMAC: WlanDot11Associated::AddMulticastAddr(): Multicast filtering disallowed"));
-            
-        OnOidComplete( aCtxImpl, KErrGeneral );        
-        }
-    else
-        {        
-        if ( aCtxImpl.WHASettings().iNumOfGroupTableEntrys > 
-             aCtxImpl.MulticastAddressCount() )
-            {
-            // wha layer is able to take in an address
-            
-            // 1st try to add the address to our own internal bookkeeping
-            WlanContextImpl::TGroupAddStatus addStatus = 
-                aCtxImpl.AddMulticastAddress( aMacAddr );
-
-            switch ( addStatus )
-                {
-                case WlanContextImpl::EOk:
-                    OsTracePrint( 
-                        KWlmCmdDetails, 
-                        (TUint8*)
-                        ("UMAC: WlanDot11Associated::AddMulticastAddr(): Address will be added to the MIB"));
-                    // the address needed to be added and adding went ok.
-                    // Now update the group addresses MIB
-                    stateTransitionOccurred = SetGroupAddressesTableMib( aCtxImpl ); 
-                    break;
-                case WlanContextImpl::EAlreadyExists: 
-                    OsTracePrint( 
-                        KWlmCmdDetails, 
-                        (TUint8*)
-                        ("UMAC: WlanDot11Associated::AddMulticastAddr(): Address already exists"));
-                    // the specified address already exists so there's no need
-                    // to update the group addresses MIB
-                    // just complete the request with OK status
-                    OnOidComplete( aCtxImpl );
-                    stateTransitionOccurred = EFalse;           
-                    break;
-                case WlanContextImpl::EFull:
-                    OsTracePrint( 
-                        KWlmCmdDetails, 
-                        (TUint8*)
-                        ("UMAC: WlanDot11Associated::AddMulticastAddr(): Internal address table full; disallow multicast filtering"));
-                    // we are not able to take in any more addresses.
-                    // We will totally disable the multicast filtering
-                    // and we won't allow it to be enabled any more during 
-                    // the current nw connection
-                    //
-                    aCtxImpl.ResetMulticastAddresses();               
-                    aCtxImpl.MulticastFilteringDisAllowed( ETrue );
-                    stateTransitionOccurred = 
-                        SetGroupAddressesTableMib( aCtxImpl );
-                    break;
-                default:
-                    // programming error
-                    OsTracePrint( KErrorLevel, (TUint8*)
-                        ("UMAC: addStatus: %d"), addStatus );
-                    OsAssert( (TUint8*)("UMAC: panic"), 
-                        (TUint8*)(WLAN_FILE), __LINE__ );
-                }
-            }
-        else
-            {
-            OsTracePrint( 
-                KWlmCmdDetails, 
-                (TUint8*)
-                ("UMAC: WlanDot11Associated::AddMulticastAddr(): WHA not able to accept address; disallow multicast filtering"));
-            // wha layer is not able to take in an address. Either this is one 
-            // address too many, or it doesn't support even a single address.
-            // In either case we will totally disable the multicast filtering
-            // and we won't allow it to be enabled any more during the current 
-            // nw connection
-            aCtxImpl.ResetMulticastAddresses();               
-            aCtxImpl.MulticastFilteringDisAllowed( ETrue );
-            stateTransitionOccurred = SetGroupAddressesTableMib( aCtxImpl );
-            }
-        }
-
-    // signal caller whether a state transition occurred or not
-    return stateTransitionOccurred;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-TBool WlanDot11Associated::RemoveMulticastAddr(
-    WlanContextImpl& aCtxImpl,
-    TBool aRemoveAll,
-    const TMacAddress& aMacAddr )
-    {
-    TBool stateTransitionOccurred( EFalse );
-    
-    OsTracePrint( 
-        KWlmCmdDetails, 
-        (TUint8*)
-        ("UMAC: WlanDot11Associated::RemoveMulticastAddr(): addr to be removed:"),
-        aMacAddr);
-
-    if ( aCtxImpl.MulticastFilteringDisAllowed() )
-        {
-        OsTracePrint( 
-            KWlmCmdDetails, 
-            (TUint8*)
-            ("UMAC: WlanDot11Associated::RemoveMulticastAddr(): Multicast filtering disallowed"));
-        // filtering is not allowed currently so there can't be any addresses
-        // to remove. Just complete the request with OK status            
-        OnOidComplete( aCtxImpl );        
-        }
-    else
-        {
-        if ( aRemoveAll )        
-            {
-            OsTracePrint( 
-                KWlmCmdDetails, 
-                (TUint8*)
-                ("UMAC: WlanDot11Associated::RemoveMulticastAddr(): remove all"));
-            // remove all addresses; naturally will also disable filtering
-            aCtxImpl.ResetMulticastAddresses();
-            stateTransitionOccurred = SetGroupAddressesTableMib( aCtxImpl );            
-            }
-        else
-            {            
-            // 1st remove the specified address from our own internal 
-            // bookkeeping, if it exists
-            if ( aCtxImpl.RemoveMulticastAddress( aMacAddr ) )
-                {
-                OsTracePrint( 
-                    KWlmCmdDetails, 
-                    (TUint8*)
-                    ("UMAC: WlanDot11Associated::RemoveMulticastAddr(): removing the specified address"));
-                // it existed, so update the group addresses MIB, too
-                stateTransitionOccurred = SetGroupAddressesTableMib( aCtxImpl );                 
-                }
-            else
-                {
-                OsTracePrint( 
-                    KWlmCmdDetails, 
-                    (TUint8*)
-                    ("UMAC: WlanDot11Associated::RemoveMulticastAddr(): specified address doesn't exist, nothing to do"));
-                // it did't exist, so there's nothing to remove
-                // Just complete the request with OK status            
-                OnOidComplete( aCtxImpl );                    
-                }
-            }
-        }
-
-    // signal caller whether a state transition occurred or not
-    return stateTransitionOccurred;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
 TBool WlanDot11Associated::AddBroadcastWepKey(
     WlanContextImpl& aCtxImpl,
     TUint32 aKeyIndex,             
@@ -2395,89 +2223,6 @@ TBool WlanDot11Associated::ConfigureTxQueueIfNecessary(
 // 
 // ---------------------------------------------------------------------------
 //
-TBool WlanDot11Associated::SetGroupAddressesTableMib(
-    WlanContextImpl& aCtxImpl )
-    {
-    const TMacAddress* multicastAddresses( NULL );
-    const TUint32 nbrOfAddrs( 
-        aCtxImpl.GetMulticastAddresses( multicastAddresses ) );
-
-    TUint32 mibLength(  
-        // mib header length
-        WHA::Sdot11GroupAddressesTable::KHeaderSize
-        // + mib data length
-        + ( sizeof( TMacAddress ) * nbrOfAddrs ) );
-
-    // align length of MIB to 4-byte boundary
-    mibLength = Align4( mibLength );
-    
-    OsTracePrint( 
-        KWlmCmdDetails, 
-        (TUint8*)
-        ("UMAC: WlanDot11Associated::SetGroupAddressesTableMib(): mibLength: %d"), 
-        mibLength );        
-
-    // allocate memory for the mib to write
-    WHA::Sdot11GroupAddressesTable* mib 
-        = static_cast<WHA::Sdot11GroupAddressesTable*>
-        (os_alloc( mibLength )); 
-
-    if ( !mib )
-        {
-        // allocation failed
-        // simulate macnotresponding error
-        OsTracePrint( KWarningLevel, (TUint8*)
-            ("UMAC: WlanDot11Associated::SetGroupAddressesTableMib(): memory allocating failed") );
-        return DoErrorIndication( aCtxImpl, WHA::KErrorMacNotResponding );
-        }
-    
-    if ( nbrOfAddrs )
-        {
-        // at least one address exists, so enable multicast address filtering
-        mib->iEnable = ETrue;
-        }
-    else
-        {
-        // no addresses, so disable filtering
-        mib->iEnable = EFalse;
-        OsTracePrint( KWlmCmdDetails, (TUint8*)
-            ("UMAC: WlanDot11Associated::SetGroupAddressesTableMib(): no addresses; disable filtering") );
-        }
-
-    mib->iNumOfAddrs = nbrOfAddrs;
-    
-    // copy the multicast addresses after the mib header
-    os_memcpy( mib->iAddrData,
-               reinterpret_cast<TUint8*>(const_cast<TMacAddress*>(
-                    multicastAddresses)),
-               ( sizeof( TMacAddress ) * nbrOfAddrs ) );
-        
-    WlanWsaWriteMib& wha_cmd = aCtxImpl.WsaWriteMib();
-        
-    wha_cmd.Set( 
-        aCtxImpl, 
-        WHA::KMibDot11GroupAddressesTable, 
-        mibLength, 
-        mib );
-        
-    // change global state: entry procedure triggers action
-    ChangeState( aCtxImpl, 
-        *this,              // prev state
-        wha_cmd,            // next state
-        // the ACT
-        KCompleteManagementRequest
-        );   
-
-    os_free( mib ); // release the allocated memory
-
-    // signal caller that a state transition occurred
-    return ETrue;
-    }         
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
 TBool WlanDot11Associated::PowerMgmtModeChange(
     WlanContextImpl& aCtxImpl,
     TPowerMgmtModeChange aPowerMgmtModeChange )
@@ -2490,7 +2235,7 @@ TBool WlanDot11Associated::PowerMgmtModeChange(
         
         if ( aPowerMgmtModeChange == EToActive )
             {
-            aCtxImpl.DesiredDot11PwrMgmtMode( WHA::KPsDisable );                
+            aCtxImpl.DesiredDot11PwrMgmtMode( WHA::KPsDisable );
             }
         else if ( aPowerMgmtModeChange == EToLightPs )
             {

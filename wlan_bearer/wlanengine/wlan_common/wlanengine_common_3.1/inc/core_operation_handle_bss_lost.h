@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 11 %
+* %version: 12 %
 */
 
 #ifndef CORE_OPERATION_HANDLE_BSS_LOST_H
@@ -41,6 +41,7 @@ public:
     enum core_state_e
         {
         core_state_init = core_base_state_next,
+        core_state_eapol_disassociated,
         core_state_set_tx_level,
         core_state_set_tx_level_success,
         core_state_scan_start,

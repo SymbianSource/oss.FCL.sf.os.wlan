@@ -90,6 +90,7 @@ enum wlan_eapol_if_message_type_function_e
     wlan_eapol_if_message_type_function_update_wlan_database_reference_values       = 21,
     wlan_eapol_if_message_type_function_complete_start_wpx_fast_roam_reassociation  = 22,
     wlan_eapol_if_message_type_function_new_protected_setup_credentials             = 23,
+    wlan_eapol_if_message_type_function_complete_disassociation                     = 37
     };
 
 
@@ -752,6 +753,8 @@ public:
     core_error_e parse_new_protected_setup_credentials(
         core_type_list_c< protected_setup_credential_c > & credential_list );
 
+    core_error_e parse_complete_disassociation(
+        network_id_c * receive_network_id );
 
     void debug_print();
     

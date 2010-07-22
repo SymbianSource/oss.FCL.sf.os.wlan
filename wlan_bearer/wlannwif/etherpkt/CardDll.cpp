@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #include <nifmbuf.h>
@@ -82,7 +82,7 @@ void CPcCardPktDrv::ConstructL( CLANLinkCommon* aParent )
 
     User::LeaveIfError( iCard.Open() );
 
-    User::LeaveIfError( iCard.InitialiseBuffers( iFrameXferBlock ) );
+    User::LeaveIfError( iCard.InitialiseBuffers() );
   }
 
 

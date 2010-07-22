@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 63 %
+* %version: 64 %
 */
 
 #include "config.h"
@@ -788,19 +788,6 @@ void WlanDot11InfrastructureMode::DoRcpiIndication(
 // 
 // ---------------------------------------------------------------------------
 //
-void WlanDot11InfrastructureMode::DoPsModeErrorIndication( 
-    WlanContextImpl& aCtxImpl )
-    {
-    OsTracePrint( KWlmIndication, (TUint8*)
-        ("UMAC: WlanDot11InfrastructureMode::DoPsModeErrorIndication") ); 
-    
-    OnInDicationEvent( aCtxImpl, EPsModeError );    
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
 TBool WlanDot11InfrastructureMode::OnVoiceCallEntryTimerTimeout( 
     WlanContextImpl& aCtxImpl )
     {
@@ -925,6 +912,7 @@ TBool WlanDot11InfrastructureMode::TxNullDataFrame(
     
     TUint32 lengthOfFrame( 0 );
     T802Dot11FrameControlTypeMask frameType( E802Dot11FrameTypeDataNull );
+    WHA::TQueueId queue_id( WHA::ELegacy );
 
     // copy Null Data frame to tx-buffer to correct offset
     // client doesn't need to take care of the tx buffer header space
@@ -972,7 +960,7 @@ TBool WlanDot11InfrastructureMode::TxNullDataFrame(
             }
 
         // determine Tx queue
-        const WHA::TQueueId queue_id( QueueId( aCtxImpl, start_of_frame ) );
+        queue_id = QueueId( aCtxImpl, start_of_frame );
         
         // send the Null Data frame by pushing it to packet scheduler
         aCtxImpl.PushPacketToPacketScheduler( 
@@ -982,13 +970,24 @@ TBool WlanDot11InfrastructureMode::TxNullDataFrame(
                 frameType,
                 NULL,
                 EFalse,
-                EFalse );
+                EFalse,
+                ETrue );
         }                
     else
         {
         // we didn't get a Tx buffer so we can't submit a frame send request.
         status = EFalse;
         }
-        
+
+    TUint16 KetherType( 0 ); // N/A in this case
+    // check if we need to change power mgmt mode; no matter whether we 
+    // actually managed to send a frame or not
+    const TPowerMgmtModeChange KPowerMgmtModeChange ( 
+        aCtxImpl.OnFrameTx( queue_id, KetherType, frameType ) );
+    
+    // if any change is needed regarding our power mgmt mode,
+    // proceed with it
+    PowerMgmtModeChange( aCtxImpl, KPowerMgmtModeChange );
+    
     return status;                
     }

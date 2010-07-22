@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 105 %
+* %version: 107 %
 */
 
 #ifndef WLANCONTEXTIMPL_H
@@ -945,7 +945,7 @@ public:
     * @since S60 3.2
     * @return length of the frame body
     */
-    inline const TUint16 ScanResponseFrameBodyLength() const;
+    inline TUint16 ScanResponseFrameBodyLength() const;
 
     /**
     * Stores the IE(s) to be included into the (re-)association request.
@@ -1310,11 +1310,13 @@ public:
     * @param aQueueId Id of the queue/AC via which the frame will be 
     *                 transmitted
     * @param aEtherType Ethernet type of the frame
+    * @param aDot11FrameType 802.11 frame type
     * @return To which power management mode to change; if any at all
     */
     inline TPowerMgmtModeChange OnFrameTx( 
         WHA::TQueueId aQueueId,
-        TUint16 aEtherType );
+        TUint16 aEtherType,
+        T802Dot11FrameControlTypeMask aDot11FrameType = E802Dot11FrameTypeData );
 
     /** 
     * To be called when accepting an Rx frame
@@ -1332,6 +1334,16 @@ public:
         TUint aPayloadLength,
         TDaType aDaType );
                         
+    /**
+    * To be called when receiving the PS Mode Error indication
+    * 
+    * Informs Dynamic Power Mode Manager about the indication.
+    * Determines the need to make a power mode transition.
+    *
+    * @return To which power management mode to change; if any at all
+    */
+    inline TPowerMgmtModeChange OnPsModeErrorIndication();
+    
     /**
     * Sets the dynamic power mode transition algorithm parameters
     *
@@ -1413,6 +1425,12 @@ public:
     * @since S60 3.2
     */
     inline void FreezePwrModeMgmtTrafficOverride();
+
+    /**
+    * Restores the Active mode parameters of dynamic power mode management 
+    * back to their WLAN Mgmt Client provided values
+    */
+    inline void RestorePwrModeMgmtParameters();
 
     /**
     * To be called upon Active to Light PS timer timeout
@@ -1760,7 +1778,15 @@ public:
     *
     * @since S60 3.2
     */
-    void OnKeepAliveTimerTimeout();    
+    inline void OnKeepAliveTimerTimeout();
+    
+    /** 
+    * Are we currently in Voice over WLAN Call state
+    * 
+    * @return ETrue if we are
+    *         EFalse if we are not
+    */
+    inline TBool InVoiceCallState() const;
     
     /**
      * Insert new RCPI value into the Signal Predictor.
@@ -1804,13 +1830,27 @@ public:
         WHA::TRcpi aRcpiWarnLevel );
 
     /**
-     * Adds a WLAN feature supported by us to the list of those supported
-     * features which are indicated in BSS membership selector
+     * Adds the specified WLAN feature supported by us to the list of those 
+     * supported features which are indicated in BSS membership selector
      *
      * @param aFeature Feature to add
      */
     void AddBssMembershipFeature( T802Dot11BssMembershipSelector aFeature );
-
+    
+    /**
+     * Removes the specified WLAN feature from our list of those supported
+     * features which are indicated in BSS membership selector
+     *
+     * @param aFeature Feature to remove
+     */
+    void RemoveBssMembershipFeature( TUint8 aItem );
+    
+    /**
+     * Clears (i.e. makes empty) our list of features which are indicated 
+     * in BSS membership selector
+     */
+    inline void ClearBssMembershipFeatureList();
+    
     /**
      * Checks if the specified item is a WLAN feature indicated in BSS 
      * membership selector and if it is supported by us

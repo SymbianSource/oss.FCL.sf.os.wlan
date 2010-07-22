@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 29 %
 */
 
 #include "config.h"
@@ -137,6 +137,7 @@ void WlanDot11SoftReset::InitActions( WlanContextImpl& aCtxImpl )
     // we are breaking an existing join so we have to reset some
     // state variables and settings
     aCtxImpl.CurrentDot11PwrMgmtMode( WHA::KPsDisable );
+    aCtxImpl.RestorePwrModeMgmtParameters();
     aCtxImpl.Reassociate( EFalse );
     aCtxImpl.QosEnabled( EFalse );
     aCtxImpl.UapsdEnabled( EFalse );

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #ifndef WLAN_POWER_MODE_MGR_BASE_H
@@ -32,12 +32,17 @@
 
 class WlanContextImpl;
 
+
 /**
 * Common base class for classes implementing dynamic power mode transition 
 * algorithm between PS and active mode in infrastructure mode 
 */
 class WlanPowerModeMgrBase
     {
+public:
+    // Default frame payload length threshold value (in bytes) for U-APSD
+    static const TUint32 KDefaultUapsdRxFrameLengthThreshold = 400;
+
 public:
 
     /** Dtor */
@@ -51,6 +56,7 @@ public:
     * @param aCtxImpl global statemachine context
     * @param aQueueId Id of the queue/AC via which the frame will be transmitted
     * @param aEtherType Ethernet type of the frame
+    * @param aDot11FrameType 802.11 frame type
     * @param aIgnoreThisFrame shall this frame be ignored from dynamic power 
     *                         mode management perspective
     * @return To which power management mode to change; if any at all
@@ -59,6 +65,7 @@ public:
         WlanContextImpl& aCtxImpl, 
         WHA::TQueueId aQueueId,
         TUint16 aEtherType,
+        T802Dot11FrameControlTypeMask aDot11FrameType,
         TBool aIgnoreThisFrame ) = 0;
 
     /** 
@@ -82,6 +89,14 @@ public:
         TUint aPayloadLength,
         TDaType aDaType ) = 0;
 
+    /**
+    * To be called upon receiving the PS Mode Error indication
+    * Determines the need to make a power mode transition
+    *
+    * @return To which power management mode to change; if any at all
+    */
+    virtual TPowerMgmtModeChange OnPsModeErrorIndication();
+    
     /**
     * To be called upon Active to Light PS timer timeout
     *

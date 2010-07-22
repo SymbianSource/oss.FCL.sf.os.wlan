@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 23 %
+* %version: 24 %
 */
 
 #include "config.h"
@@ -171,14 +171,7 @@ void WlanWsaConfigure::Entry( WlanContextImpl& aCtxImpl )
             ("UMAC: WlanWsaConfigure::Entry: iMcsFeedback: %d"), 
             aCtxImpl.WHASettings().iHtCapabilities.iMcsFeedback );
         }
-#endif
-    
-    if ( aCtxImpl.WHASettings().iCapability & WHA::SSettings::KHtOperation )
-        {
-        // wlanpdd indicates HT support. Record that in our BSS Membership
-        // features
-        aCtxImpl.AddBssMembershipFeature( E802Dot11HtPhy );        
-        }
+#endif    
     }
 
 // -----------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 11 %
 */
 
 TARGETTYPE      dll
@@ -144,6 +144,7 @@ SOURCE          wlanbgscancommand.cpp
 SOURCE          wlanbgscanstates.cpp
 SOURCE          wlantimerservices.cpp
 SOURCE          wlantimer.cpp
+SOURCE          wlanticktimer.cpp
 
 USERINCLUDE     ../inc
 USERINCLUDE     ../../../../inc
@@ -163,5 +164,6 @@ LIBRARY         wlanhwinit.lib
 LIBRARY         wlandbif.lib
 LIBRARY         featmgr.lib
 LIBRARY         commsdat.lib
+LIBRARY         hal.lib
 
 STATICLIBRARY   wlanscanlist.lib

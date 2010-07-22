@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 18 %
+* %version: 19 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -120,23 +120,23 @@ TInt DataFrameMemMngr::DoOpenHandle(
                 TraceDump(MEMORY, (("WLANLDD: new WlanChunk: 0x%08x"), 
                     reinterpret_cast<TUint32>(iTxFrameMemoryPool)));
 
-                iFrameXferBlock = reinterpret_cast<RFrameXferBlock*>(
-                    start_of_mem  
-                    + KRxDataChunkSize 
-                    + sizeof( TDataBuffer ) 
-                    + KMgmtSideTxBufferLength
-                    + KProtocolStackSideTxDataChunkSize
-                    + sizeof( RFrameXferBlock ) );
-                
                 iFrameXferBlockProtoStack = 
-                    static_cast<RFrameXferBlockProtocolStack*>(iFrameXferBlock);
+                    reinterpret_cast<RFrameXferBlockProtocolStack*>(
+                        start_of_mem  
+                        + KRxDataChunkSize 
+                        + sizeof( TDataBuffer ) 
+                        + KMgmtSideTxBufferLength
+                        + KProtocolStackSideTxDataChunkSize
+                        + sizeof( RFrameXferBlock ) );
+
+                iFrameXferBlockBase = iFrameXferBlockProtoStack;
                 
                 TraceDump( INIT_LEVEL, 
                     (("WLANLDD: DataFrameMemMngr::DoOpenHandle: Nif RFrameXferBlock addr: 0x%08x"),
                     reinterpret_cast<TUint32>(iFrameXferBlockProtoStack) ) );
     
                 // initiliase xfer block
-                iFrameXferBlockProtoStack->Initialise();
+                iFrameXferBlockProtoStack->Initialize();
                 
                 iRxBufAlignmentPadding = iParent.RxBufAlignmentPadding();
                 
@@ -175,197 +175,103 @@ TInt DataFrameMemMngr::DoOpenHandle(
 // 
 // ---------------------------------------------------------------------------
 //
-void DataFrameMemMngr::DoFreeRxBuffers()
-    {
-    for ( TUint i = 0; i < iCountCompleted; ++i )
-        {
-        TDataBuffer* metaHdr ( reinterpret_cast<TDataBuffer*>(
-            iRxDataChunk + iCompletedBuffers[i]) );  
-        
-        // first free the actual Rx frame buffer if relevant
-        if ( metaHdr->KeFlags() & TDataBuffer::KDontReleaseBuffer )
-            {
-            // this buffer shall not be freed yet, so no action here
-            
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DataFrameMemMngr::DoFreeRxBuffers: don't free yet Rx buf at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(metaHdr->KeGetBufferStart()) ) );            
-            }
-        else
-            {
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DataFrameMemMngr::DoFreeRxBuffers: free Rx buf at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(metaHdr->KeGetBufferStart()) ) );
-    
-            iRxFrameMemoryPool->Free( 
-                metaHdr->KeGetBufferStart()
-                // take into account the alignment padding 
-                - iRxBufAlignmentPadding );
-            }
-        
-        // free the Rx frame meta header
-
-        TraceDump( RX_FRAME, 
-            (("WLANLDD: DataFrameMemMngr::DoFreeRxBuffers: free Rx meta header at addr: 0x%08x"),
-            reinterpret_cast<TUint32>(metaHdr)) );
-
-        iRxFrameMemoryPool->Free( metaHdr );        
-        }
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
 TBool DataFrameMemMngr::DoEthernetFrameRxComplete( 
-    const TDataBuffer*& aBufferStart, 
+    TDataBuffer*& aBufferStart, 
     TUint32 aNumOfBuffers )
     {
     TraceDump( RX_FRAME, 
-        (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: aNumOfBuffers: %d"), 
+        (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: "
+          "aNumOfBuffers: %d"), 
         aNumOfBuffers) );
 
-    if ( aNumOfBuffers + iCountTobeCompleted > KMaxToBeCompletedRxBufs )
-        {
-        // too little space reserved for Rx buffer handles
-        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-        }
-
     TBool ret( EFalse );
+    TDataBuffer** metaHdrPtrArray(&aBufferStart);
 
-    if ( iReadStatus == EPending )
+    if ( iFrameXferBlockProtoStack )
         {
-        // read pending
-        if ( !iCountTobeCompleted )
+        for ( TUint i = 0; i < aNumOfBuffers; ++i )
             {
-            // no existing Rx buffers to complete in queue
-            // we may complete these ones on the fly
-            
-            // note the completed Rx buffers first so that we can change
-            // their addresses to offsets
-            assign( 
-                reinterpret_cast<TUint32*>(&aBufferStart), 
-                iCompletedBuffers, 
-                aNumOfBuffers );
-
-            // update the new Rx buffer start addresses added above to be 
-            // offsets from the Rx memory pool beginning
-            for( TUint i = 0; i < aNumOfBuffers; ++i )
+            if ( metaHdrPtrArray[i] )
                 {
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                    iCompletedBuffers[i]) );        
-                
-                iCompletedBuffers[i] 
-                    -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                    iCompletedBuffers[i]) );        
+                iFrameXferBlockProtoStack->AddRxFrame( metaHdrPtrArray[i] );
                 }
-
-            iCountCompleted = aNumOfBuffers;
-
-            iFrameXferBlock->KeRxComplete( iCompletedBuffers, iCountCompleted);
-            }
-        else
-            {
-            // existing rx buffers to complete in queue.
-            // We must append these at the rear and after that 
-            // complete the existing read request
-            assign( 
-                reinterpret_cast<TUint32*>(&aBufferStart),
-                iTobeCompletedBuffers + iCountTobeCompleted, 
-                aNumOfBuffers );
-
-            // update the new Rx buffer start addresses added above to be 
-            // offsets from the Rx memory pool beginning
-            for( TUint i = 0; i < aNumOfBuffers; ++i )
-                {
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                    iTobeCompletedBuffers[iCountTobeCompleted + i]) );
-
-                iTobeCompletedBuffers[iCountTobeCompleted + i] 
-                    -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                    iTobeCompletedBuffers[iCountTobeCompleted + i]) );
-                }
-
-            iCountCompleted = iCountTobeCompleted + aNumOfBuffers;
-
-            iFrameXferBlock->KeRxComplete( 
-                iTobeCompletedBuffers, 
-                iCountCompleted );  
-
-            // note the completed Rx buffers
-            assign( iTobeCompletedBuffers, iCompletedBuffers, iCountCompleted );
-            iCountTobeCompleted = 0;
-            }
-
-        ret = ETrue;
-        }
-    else
-        {
-        // no read pending
-        // append at the rear
-        assign( 
-            reinterpret_cast<TUint32*>(&aBufferStart),
-            iTobeCompletedBuffers + iCountTobeCompleted, 
-            aNumOfBuffers );
-
-        // update the new Rx buffer start addresses added above to be 
-        // offsets from the Rx memory pool beginning
-        for( TUint i = 0; i < aNumOfBuffers; ++i )
-            {
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                iTobeCompletedBuffers[iCountTobeCompleted + i]) );        
-                
-            iTobeCompletedBuffers[iCountTobeCompleted + i] 
-                -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                iTobeCompletedBuffers[iCountTobeCompleted + i]) );        
             }
         
-        iCountTobeCompleted += aNumOfBuffers;
+        if ( iReadStatus == EPending )
+            {
+            ret = ETrue;
+            }
         }
-    
-    TraceDump( RX_FRAME, 
-        (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: end: iCountCompleted: %d"), 
-        iCountCompleted) );
-
-    TraceDump( RX_FRAME, 
-        (("WLANLDD: DataFrameMemMngr::DoEthernetFrameRxComplete: end: iCountTobeCompleted: %d"), 
-        iCountTobeCompleted) );
 
     return ret;
     }
 
 // ---------------------------------------------------------------------------
-// 
+//   
 // ---------------------------------------------------------------------------
 //
-TUint32* DataFrameMemMngr::DoGetTobeCompletedBuffersStart()
+TBool DataFrameMemMngr::OnReadRequest()
     {
-    return iTobeCompletedBuffers;
+    TBool ret( EFalse );
+
+    if ( IsMemInUse() && iFrameXferBlockProtoStack )
+        {
+        if ( iFrameXferBlockProtoStack->RxFrameAvailable() )
+            {
+            // there are Rx frames ready for the user mode client retrieval
+            ret = ETrue;
+            
+            // the frame Rx request won't be left pending as the callee will 
+            // complete it
+            iReadStatus = ENotPending;
+            }
+        else
+            {
+            // there are no Rx frames ready for the user mode client retrieval 
+            // the Rx request is left pending
+            iReadStatus = EPending;
+            }
+        }
+#ifndef NDEBUG
+    else
+        {
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        }
+#endif        
+
+    TraceDump( RX_FRAME, 
+        (("WLANLDD: DataFrameMemMngr::OnReadRequest: ret (bool): %d"), 
+        ret) );
+
+    return ret;
     }
 
 // ---------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // ---------------------------------------------------------------------------
 //
-TUint32* DataFrameMemMngr::DoGetCompletedBuffersStart()
+TDataBuffer* DataFrameMemMngr::GetRxFrame( 
+    TDataBuffer* aFrameToFreeInUserSpace )
     {
-    return iCompletedBuffers;
+    TDataBuffer* rxFrame( NULL );
+    
+    if ( IsMemInUse() && iFrameXferBlockProtoStack )
+        {
+        if ( aFrameToFreeInUserSpace )
+            {            
+            FreeRxPacket( aFrameToFreeInUserSpace );
+            }
+        
+        rxFrame = iFrameXferBlockProtoStack->GetRxFrame();
+        }
+        
+    return rxFrame;
     }
 
 // ---------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // ---------------------------------------------------------------------------
 //
 TDataBuffer* DataFrameMemMngr::AllocTxBuffer( TUint aLength )
@@ -376,7 +282,10 @@ TDataBuffer* DataFrameMemMngr::AllocTxBuffer( TUint aLength )
     
     TDataBuffer* metaHdr ( NULL );
 
-    if ( ( !IsMemInUse() ) || ( aLength > KMaxEthernetFrameLength ) )
+    if ( ( !IsMemInUse() ) ||
+         ( !iTxFrameMemoryPool ) ||
+         ( !iFrameXferBlockProtoStack ) ||
+         ( aLength > KMaxEthernetFrameLength ) )
         {
 #ifndef NDEBUG
         TraceDump( NWSA_TX_DETAILS, 
@@ -423,18 +332,100 @@ TDataBuffer* DataFrameMemMngr::AllocTxBuffer( TUint aLength )
     }
 
 // ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// ---------------------------------------------------------------------------
+//
+TBool DataFrameMemMngr::AddTxFrame( 
+    TDataBuffer* aPacketInUserSpace, 
+    TDataBuffer*& aPacketInKernSpace,
+    TBool aUserDataTxEnabled )
+    {
+    if ( IsMemInUse() && iFrameXferBlockProtoStack )
+        {
+        return iFrameXferBlockProtoStack->AddTxFrame( 
+                    aPacketInUserSpace, 
+                    aPacketInKernSpace,
+                    aUserDataTxEnabled );
+        }
+    else
+        {
+        return EFalse;
+        }
+    }
+
+// ---------------------------------------------------------------------------
 // 
+// ---------------------------------------------------------------------------
+//
+TDataBuffer* DataFrameMemMngr::GetTxFrame( 
+    const TWhaTxQueueState& aTxQueueState,
+    TBool& aMore )
+    {
+    if ( IsMemInUse() && iFrameXferBlockProtoStack )
+        {
+        return iFrameXferBlockProtoStack->GetTxFrame( aTxQueueState, aMore );
+        }
+    else
+        {
+        return NULL;
+        }
+    }
+
+// ---------------------------------------------------------------------------
+// Note! This method is executed also in the context of the user mode client 
+// thread, but in supervisor mode
 // ---------------------------------------------------------------------------
 //
 void DataFrameMemMngr::FreeTxPacket( TDataBuffer*& aPacket )
     {
-    if ( IsMemInUse() )
+    if ( aPacket )
         {
-        // free the actual Tx buffer
-        iTxFrameMemoryPool->Free( aPacket->KeGetBufferStart() );
-        // free the meta header
-        iFrameXferBlockProtoStack->FreeTxPacket( aPacket );
+        if ( iTxFrameMemoryPool )
+            {
+            // free the actual Tx buffer
+            iTxFrameMemoryPool->Free( aPacket->KeGetBufferStart() );
+            }
+        
+        if ( iFrameXferBlockProtoStack )
+            {
+            // free the meta header
+            iFrameXferBlockProtoStack->FreeTxPacket( aPacket );
+            }
         }
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TBool DataFrameMemMngr::ResumeClientTx( TBool aUserDataTxEnabled ) const 
+    {
+    TBool ret( EFalse );
+
+    if ( iFrameXferBlockProtoStack )
+        {
+        ret = iFrameXferBlockProtoStack->ResumeClientTx( aUserDataTxEnabled );
+        }
+    
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// ---------------------------------------------------------------------------
+//
+TBool DataFrameMemMngr::AllTxQueuesEmpty() const
+    {
+    TBool ret( EFalse );
+
+    if ( iFrameXferBlockProtoStack )
+        {
+        ret = iFrameXferBlockProtoStack->AllTxQueuesEmpty();
+        }
+    
+    return ret;
     }
 
 // ---------------------------------------------------------------------------

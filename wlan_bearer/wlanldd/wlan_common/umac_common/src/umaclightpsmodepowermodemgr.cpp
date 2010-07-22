@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2008-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2008-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 4 %
 */
 
 #include "config.h"
@@ -59,49 +59,54 @@ WlanLightPsModePowerModeMgr::~WlanLightPsModePowerModeMgr()
 // ---------------------------------------------------------------------------
 //
 TPowerMgmtModeChange WlanLightPsModePowerModeMgr::OnFrameTx( 
-    WlanContextImpl& /*aCtxImpl*/, 
+    WlanContextImpl& aCtxImpl, 
     WHA::TQueueId /*aQueueId*/,
     TUint16 aEtherType,
+    T802Dot11FrameControlTypeMask aDot11FrameType,
     TBool aIgnoreThisFrame )
     {
     TPowerMgmtModeChange powerMgmtModeChange( ENoChange );
 
     if ( aEtherType == KEapolType ||
-         aEtherType == KWaiType )
+         aEtherType == KWaiType ||
+         aDot11FrameType == E802Dot11FrameTypeDataNull ||
+         ( aEtherType == KArpType && 
+           !(aCtxImpl.UapsdUsedForVoice() && aCtxImpl.InVoiceCallState())) )
         {
         powerMgmtModeChange = EToActive;
 
         OsTracePrint( KPwrStateTransition, (TUint8*)
-            ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: EAPOL or WAI frame; change to Active") );            
+            ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: EAPOL, WAI or keep "
+             "alive frame or ARP in non- U-APSD WoWLAN call state; change to "
+			 "Active") );
+        }
+    else if ( !aIgnoreThisFrame )
+        {
+        OsTracePrint( KPwrStateTransition, (TUint8*)
+            ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: count this frame") );
+
+        ++iToActiveFrameCount;
+        ++iToDeepPsFrameCount;
+        
+        if ( iToActiveFrameCount >= iToActiveFrameThreshold )
+            {
+            powerMgmtModeChange = EToActive;
+
+            OsTracePrint( KPwrStateTransition, (TUint8*)
+                ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: threshold "
+                 "exceeded; change to Active") );            
+            }
         }
     else
         {
-        if ( !aIgnoreThisFrame )
-            {
-            OsTracePrint( KPwrStateTransition, (TUint8*)
-                ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: count this frame") );
-
-            ++iToActiveFrameCount;
-            ++iToDeepPsFrameCount;
-            
-            if ( iToActiveFrameCount >= iToActiveFrameThreshold )
-                {
-                powerMgmtModeChange = EToActive;
-
-                OsTracePrint( KPwrStateTransition, (TUint8*)
-                    ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: threshold exceeded; change to Active") );            
-                }
-            }
-        else
-            {
-            OsTracePrint( KPwrStateTransition, (TUint8*)
-                ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: do no count this frame") );
-            
-            // no further action needed
-            }
+        OsTracePrint( KPwrStateTransition, (TUint8*)
+            ("UMAC: WlanLightPsModePowerModeMgr::OnFrameTx: do not count "
+             "this frame") );
+        
+        // no action needed
         }
     
-    return powerMgmtModeChange;    
+    return powerMgmtModeChange;
     }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +158,15 @@ TPowerMgmtModeChange WlanLightPsModePowerModeMgr::OnFrameRx(
     return powerMgmtModeChange;    
     }
 
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TPowerMgmtModeChange WlanLightPsModePowerModeMgr::OnPsModeErrorIndication()
+    {
+    return EToActive;
+    }
+        
 // ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------

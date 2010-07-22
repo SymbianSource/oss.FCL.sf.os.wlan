@@ -21,7 +21,7 @@
 
 #include "core_operation_base.h"
 
-const u32_t DELAY_FOR_AGENT = 100000; // 0,1 seconds
+const u32_t DELAY_FOR_AGENT = 500000; // 0,5 seconds
 
 class core_server_c;
 

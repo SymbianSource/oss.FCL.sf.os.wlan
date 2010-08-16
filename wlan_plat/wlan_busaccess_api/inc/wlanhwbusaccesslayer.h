@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2008 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of "Eclipse Public License v1.0"
@@ -11,12 +11,14 @@
 *
 * Contributors:
 *
-* Description:  file holds SPIA specific type definitions
+* Description:  The file contains a structure definition for accessing
+*               HW bus adaptation modules (SPIA or SDIOA) in WLAN
+*               adaptation code.
 *
 */
 
 /*
-* %version: 4 %
+* %version: 5 %
 */
 
 #ifndef WLANHWBUSACCESSLAYER_H
@@ -25,6 +27,7 @@
 #include <wlanosaplatform.h>
 
 class WlanSpia;
+class WlanSdioa;
 
 /**
  *  
@@ -36,8 +39,9 @@ class WlanSpia;
 struct SHwBusAccessLayer
     {
     WlanSpia* iSpia;
+    WlanSdioa* iSdioa;
 
-    SHwBusAccessLayer() : iSpia( NULL ) {};
+    SHwBusAccessLayer() : iSpia( NULL ), iSdioa( NULL ) {};
     
 private:
 

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 30 %
+* %version: 31 %
 */
 
 #include "config.h"
@@ -65,7 +65,7 @@ const TUint8 WlanDot11Synchronize::iEventName
 // -----------------------------------------------------------------------------
 //
 WlanDot11Synchronize::WlanDot11Synchronize() : 
-    iState( EINIT ), iJoinFailed ( EFalse ) 
+    iState( EINIT ), iJoinStatus ( KErrNone ) 
     {
     }
 
@@ -188,7 +188,7 @@ void WlanDot11Synchronize::OnStateEntryEvent(
     switch ( iState )
         {
         case EINIT:            
-            if ( InitActions( aCtxImpl ) )
+            if ( ( iJoinStatus = InitActions( aCtxImpl ) ) == KErrNone )
                 {                
                 // we meet the requirements of the network so we can continue
                 
@@ -214,13 +214,12 @@ void WlanDot11Synchronize::OnStateEntryEvent(
             else
                 {
                 // network requirements not met. Take the same action as 
-                // as in the join failed case
+                // in the join failed case
                 
                 OsTracePrint( 
                     KWarningLevel, (TUint8*)
                     ("UMAC: WlanDot11Synchronize::OnStateEntryEvent(): network requirements not met - abort"));            
                 
-                iJoinFailed = ETrue;
                 ChangeInternalState( aCtxImpl, ECONTINUEDOT11TRAVERSE );
                 }
             break;
@@ -408,11 +407,11 @@ void WlanDot11Synchronize::ContinueDot11StateTraversal(
         KUmacDetails, 
         (TUint8*)("UMAC: WlanDot11Synchronize::ContinueDot11StateTraversal()"));
 
-    if ( iJoinFailed )    
+    if ( iJoinStatus != KErrNone )
         {
         // set the completion code value to be returned to user mode
         // as the dot11idle state does the OID completion in this case
-        aCtxImpl.iStates.iIdleState.Set( KErrGeneral );
+        aCtxImpl.iStates.iIdleState.Set( iJoinStatus );
         // ... and proceed to dot11idle state                      
         ChangeState( aCtxImpl, 
             *this,                          // prev state
@@ -468,7 +467,7 @@ void WlanDot11Synchronize::ChangeInternalState(
 // 
 // -----------------------------------------------------------------------------
 //
-TBool WlanDot11Synchronize::InitActions( WlanContextImpl& aCtxImpl )
+TInt WlanDot11Synchronize::InitActions( WlanContextImpl& aCtxImpl ) const
     {
     OsTracePrint( 
         KUmacDetails, 
@@ -477,7 +476,6 @@ TBool WlanDot11Synchronize::InitActions( WlanContextImpl& aCtxImpl )
     // as we are about to join a new AP, reset BSS Loss indicators
     aCtxImpl.ResetBssLossIndications();
 
-    iJoinFailed = EFalse;
     // reset counter for this new AP connection
     aCtxImpl.ResetFailedTxPacketCount();            
         
@@ -507,7 +505,7 @@ TBool WlanDot11Synchronize::InitActions( WlanContextImpl& aCtxImpl )
     return InitNetworkConnect( 
         aCtxImpl,
         aCtxImpl.ScanResponseFrameBodyLength(),
-        aCtxImpl.ScanResponseFrameBody() );        
+        aCtxImpl.ScanResponseFrameBody() );
     }
 
 // -----------------------------------------------------------------------------
@@ -987,7 +985,7 @@ void WlanDot11Synchronize::OnWhaCommandResponse(
             // make a note of the failure and act 
             // accordingly when we
             // soon again enter this state
-            iJoinFailed = ETrue;
+            iJoinStatus = KErrGeneral;
             }
         else
             {

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14.1.1 %
+* %version: 16 %
 */
 
 #include "core_iap_data.h"
@@ -193,7 +193,8 @@ bool_t core_iap_data_c::is_eap_used() const
     if ( iap_data_m.security_mode == core_security_mode_802dot1x ||
         iap_data_m.security_mode == core_security_mode_wpa ||
         iap_data_m.security_mode == core_security_mode_wpa2only ||
-        iap_data_m.security_mode == core_security_mode_protected_setup )
+        iap_data_m.security_mode == core_security_mode_protected_setup ||
+        iap_data_m.security_mode == core_security_mode_802dot1x_unencrypted )
         {
         return true_t;
         }

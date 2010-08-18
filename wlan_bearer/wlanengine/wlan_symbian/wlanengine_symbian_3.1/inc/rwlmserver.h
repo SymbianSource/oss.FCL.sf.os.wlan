@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 27 %
+* %version: 28 %
 */
 
 #ifndef RWLMSERVER_H
@@ -232,18 +232,21 @@ NONSHARABLE_CLASS( RWLMServer ) : public RSessionBase, public MWLMNotify
         * @param aAvailableIaps Array of IAP IDs available.
         * @param aCacheLifetime how old cached results (in seconds) the client is willing to accept.
         * @param aMaxDelay maximum time (in seconds) the client is willing to wait for the scan results.
+        * @param aFilteredResults Whether availability is filtered based on signal strength.
         * @return General Symbian error code.
         */
         IMPORT_C TInt GetAvailableIaps(
             TWlmAvailableIaps& aAvailableIaps,
             TInt& aCacheLifetime,
-            TUint& aMaxDelay );
+            TUint& aMaxDelay,
+            TBool aFilteredResults );
 
         /**
          * Get available WLAN IAPs.
          * @param aAvailableIaps Array of IAP IDs available.
          * @param aCacheLifetime how old cached results (in seconds) the client is willing to accept.
          * @param aMaxDelay maximum time (in seconds) the client is willing to wait for the scan results.
+         * @param aFilteredResults Whether availability is filtered based on signal strength.
          * @param aStatus Status of the calling active object.
          *
          * In order to call this method, an instance of TWlmAvailableIaps must
@@ -258,6 +261,7 @@ NONSHARABLE_CLASS( RWLMServer ) : public RSessionBase, public MWLMNotify
              TDes8& aAvailableIaps,
              TDes8& aCacheLifetime,
              TDes8& aMaxDelay,
+             TBool aFilteredResults,
              TRequestStatus& aStatus );
         
         /**

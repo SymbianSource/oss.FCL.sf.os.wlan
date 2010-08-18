@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 32 %
+* %version: 34 %
 */
 
 // INCLUDE FILES
@@ -401,14 +401,14 @@ TInt CWlanMgmtImpl::GetAvailableIaps(
     iCacheLifetime = KWlanMgmtDefaultCacheLifetime;
     iMaxDelay = KWlanMgmtDefaultMaxDelay;
 
-	TInt ret = iServer.GetAvailableIaps( iaps, iCacheLifetime, iMaxDelay );
+	TInt ret = iServer.GetAvailableIaps( iaps, iCacheLifetime, iMaxDelay, ETrue );
 	if ( ret != KErrNone )
 		{
 		return ret;
 		}   
     for ( TUint idx( 0 ); idx < iaps.count; ++idx )
         {
-        aAvailableIaps.Append( iaps.iaps[idx] );
+        aAvailableIaps.Append( iaps.iaps[idx].iapId );
         }
 
     return KErrNone;
@@ -684,7 +684,7 @@ TInt CWlanMgmtImpl::GetExtendedConnectionSecurityMode(
 //
 void CWlanMgmtImpl::ActivateExtendedNotificationsL(
     MWlanMgmtNotifications& aCallback,
-    TUint aCallbackInterfaceVersion = KWlanCallbackInterfaceVersion )
+    TUint aCallbackInterfaceVersion )
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::ActivateExtendedNotificationsL()" ) ) );
     iClientNotification = &aCallback;
@@ -796,6 +796,33 @@ TInt CWlanMgmtImpl::StartAggressiveBgScan(
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::StartAggressiveBgScan()" ) ) );
     return iServer.StartAggressiveBgScan( aInterval );
+    }
+
+// ---------------------------------------------------------
+// CWlanMgmtImpl::GetAvailableIaps
+// ---------------------------------------------------------
+//
+void CWlanMgmtImpl::GetAvailableIaps(
+    TInt& aCacheLifetime,
+    TUint& aMaxDelay,
+    TBool aFilteredResults,
+    TRequestStatus& aStatus,
+    RArray<TWlanIapAvailabilityData>& aAvailableIaps )
+    {
+    TraceDump( INFO_LEVEL, ( _L( "CWlanMgmtImpl::GetAvailableIaps() (async)" ) ) );
+    
+    aAvailableIaps.Reset();
+    
+    aStatus = KRequestPending;
+    iPendingAvailableIapsStatus = &aStatus;    
+    iAvailableIapsRequest = new CWlanAvailableIapsRequest( *this, iServer, aAvailableIaps, aCacheLifetime, aMaxDelay, aFilteredResults );
+    if ( !iAvailableIapsRequest )
+        {
+        User::RequestComplete( iPendingAvailableIapsStatus, KErrNoMemory );
+        iPendingAvailableIapsStatus = NULL;
+        return;
+        }
+    iAvailableIapsRequest->IssueRequest();
     }
 
 // ---------------------------------------------------------
@@ -1069,10 +1096,36 @@ CWlanAvailableIapsRequest::CWlanAvailableIapsRequest(
     CActive( CActive::EPriorityStandard ),
     iCallback( aCallback ),
     iServer( aServer ),
-    iPendingAvailableIaps( aAvailableIaps ),
+    iPendingAvailableIapIds( &aAvailableIaps ),
+    iPendingAvailableIaps( NULL ),
     iAvailableIapsBuf( iAvailableIaps ),
     iCacheLifetimeBuf( aCacheLifetime ),
-    iMaxDelayBuf( aMaxDelay )
+    iMaxDelayBuf( aMaxDelay ),
+    iFilteredResults( ETrue )
+    {
+    TraceDump( INFO_LEVEL, ( _L( "CWlanAvailableIapsRequest::CWlanAvailableIapsRequest()" ) ) );
+    CActiveScheduler::Add( this );
+    }
+
+// C++ default constructor can NOT contain any code, that
+// might leave.
+//
+CWlanAvailableIapsRequest::CWlanAvailableIapsRequest(
+    CWlanMgmtImpl& aCallback, 
+    RWLMServer& aServer,
+    RArray<TWlanIapAvailabilityData>& aAvailableIaps,
+    TInt& aCacheLifetime,
+    TUint& aMaxDelay,
+    TBool aFilteredResults ) :
+    CActive( CActive::EPriorityStandard ),
+    iCallback( aCallback ),
+    iServer( aServer ),
+    iPendingAvailableIapIds( NULL ),
+    iPendingAvailableIaps( &aAvailableIaps ),
+    iAvailableIapsBuf( iAvailableIaps ),
+    iCacheLifetimeBuf( aCacheLifetime ),
+    iMaxDelayBuf( aMaxDelay ),
+    iFilteredResults( aFilteredResults )
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanAvailableIapsRequest::CWlanAvailableIapsRequest()" ) ) );
     CActiveScheduler::Add( this );
@@ -1083,6 +1136,8 @@ CWlanAvailableIapsRequest::~CWlanAvailableIapsRequest()
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanAvailableIapsRequest::CWlanAvailableIapsRequest()" ) ) );
     Cancel();
+    iPendingAvailableIapIds = NULL;
+    iPendingAvailableIaps = NULL;
     }
 
 // ---------------------------------------------------------
@@ -1092,7 +1147,7 @@ CWlanAvailableIapsRequest::~CWlanAvailableIapsRequest()
 void CWlanAvailableIapsRequest::IssueRequest()
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanAvailableIapsRequest::IssueRequest()" ) ) );
-    iServer.GetAvailableIaps( iAvailableIapsBuf, iCacheLifetimeBuf, iMaxDelayBuf, iStatus );
+    iServer.GetAvailableIaps( iAvailableIapsBuf, iCacheLifetimeBuf, iMaxDelayBuf, iFilteredResults, iStatus );
     SetActive();
     }
 
@@ -1103,9 +1158,24 @@ void CWlanAvailableIapsRequest::IssueRequest()
 void CWlanAvailableIapsRequest::RunL()
     {
     TraceDump( INFO_LEVEL, ( _L( "CWlanAvailableIapsRequest::RunL()" ) ) );
-    for ( TUint idx( 0 ); idx < iAvailableIaps.count; ++idx )
+    if( iPendingAvailableIapIds )
         {
-        iPendingAvailableIaps.Append( iAvailableIaps.iaps[idx] );
+        for ( TUint idx( 0 ); idx < iAvailableIaps.count; ++idx )
+            {
+            iPendingAvailableIapIds->Append( iAvailableIaps.iaps[idx].iapId );
+            }
+        }
+    else if( iPendingAvailableIaps )
+        {
+        for ( TUint idx( 0 ); idx < iAvailableIaps.count; ++idx )
+            {
+            TWlanIapAvailabilityData tmp;
+            tmp.iIapId = iAvailableIaps.iaps[idx].iapId;
+            // RCPI -> RSSI CONVERSION
+            // Note: conversion may round the result by 0.5 units
+            tmp.iRssi = ( 110 - ( iAvailableIaps.iaps[idx].rcpi / 2 ) ); 
+            iPendingAvailableIaps->Append( tmp );
+            }        
         }
     iCallback.AvailableIapsComplete( iStatus.Int() );
     }

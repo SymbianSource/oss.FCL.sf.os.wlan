@@ -15,6 +15,9 @@
 *
 */
 
+/*
+* %version: 21 %
+*/
 
 #ifndef CORE_SETTINGS_H
 #define CORE_SETTINGS_H
@@ -444,31 +447,6 @@ public:
      */
     void set_block_ack_usage(
         const core_block_ack_usage_s& usage );    
-    
-    /**
-     * Add a IAP ID to the weaklist.
-     *
-     * @since S60 v5.2
-     * @param iap_id IAP ID to be added.
-     */   
-    void add_iap_id_to_weak_iap_list(u32_t iap_id); 
-    
-    /**
-     * Check whether the given IAP ID is weaklisted.
-     *
-     * @since S60 v5.2
-     * @param iap_id IAP ID to be checked.
-     * @return Whether the given IAP ID is weaklisted.
-     */   
-    bool_t is_iap_id_in_weak_list( u32_t iap_id );
-    
-    /**
-     * Remove a IAP ID from the weaklist.
-     *
-     * @since S60 v5.2
-     * @param iap_id IAP ID to be removed.
-     */   
-    void remove_iap_id_from_weak_list( u32_t iap_id );
 
     /**
      * Set the currently enabled feature set.
@@ -553,9 +531,6 @@ private: // data
 
     /** Block ACK usage per traffic stream. */
     core_block_ack_usage_s block_ack_usage_m;
-
-    /** List of IAP Ids whose rcpi values are weak  */
-    core_type_list_c<u32_t> weak_iap_list_m;
 
     /** Bitmask of enabled features. */
     u32_t features_m;

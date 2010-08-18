@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 97 %
+* %version: 100 %
 */
 
 #ifndef CORE_TYPES_H
@@ -189,7 +189,9 @@ typedef enum _core_security_mode_e
     /** Use Wi-Fi Protected Setup, keys are negotiated by EAPOL. */
     core_security_mode_protected_setup,
     /** Use WAPI, keys are negotiated by EAPOL. */
-    core_security_mode_wapi
+    core_security_mode_wapi,
+    /** Use EAP authentication without encryption. */
+    core_security_mode_802dot1x_unencrypted
     } core_security_mode_e;
 
 /**
@@ -468,6 +470,7 @@ typedef enum _core_error_e
     core_error_wlan_disabled,
     core_error_already_exists,
     core_error_eapol_auth_start_timeout,
+    core_error_unsupported_config
     } core_error_e;
 
 /**
@@ -597,6 +600,7 @@ typedef enum _core_connect_status_e
     core_connect_ap_signal_too_weak,
     core_connect_ap_has_no_admission_control,
     core_connect_ap_has_no_free_admission_capability,
+    core_connect_ap_unsupported_configuration,
     core_connect_iap_open_but_ap_requires_encryption,
     core_connect_iap_wep_but_ap_has_no_privacy,
     core_connect_iap_wep_but_ap_has_wpa_ie,
@@ -796,7 +800,6 @@ typedef enum _core_management_status_e
     {
     core_management_status_success                     = 0,
     core_management_status_unspecified_failure         = 1,
-    // 2 - 9 are reserved.
     core_management_status_unsupported_capabilities    = 10,
     core_management_status_reassociation_denied_other  = 11,
     core_management_status_association_denied_other    = 12,
@@ -809,10 +812,10 @@ typedef enum _core_management_status_e
     core_management_status_assoc_unsup_short_preamble  = 19,
     core_management_status_assoc_unsup_pbcc            = 20,
     core_management_status_assoc_unsup_channel_agility = 21,
-    // 22 - 24 reserved.
     core_management_status_assoc_unsup_short_slot_time = 25,
-    core_management_status_assoc_unsup_dsss_ofdm       = 26
-    // 27 - 65,535 reserved
+    core_management_status_assoc_unsup_dsss_ofdm       = 26,
+    core_management_status_assoc_unsup_ht_features     = 27,
+    core_management_status_assoc_unsup_pco             = 29
     } core_management_status_e;
 
 /**
@@ -1558,6 +1561,17 @@ struct core_iap_data_s
     };
 
 /**
+ * Structure for storing IAP availability data.
+ */
+struct core_iap_availability_data_s
+    {
+    /** ID of the IAP. */
+    u32_t id;
+    /** Signal strength of the strongest AP in the network. */
+    u8_t rcpi;
+    };
+
+/**
  * Struct containing SSIDs related to secondary SSID feature.
  */
 struct core_ssid_entry_s
@@ -2012,7 +2026,8 @@ typedef enum _wlan_eapol_if_eapol_key_authentication_type_e
     wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam,
     wlan_eapol_if_eapol_key_authentication_type_wfa_sc,
     wlan_eapol_if_eapol_key_authentication_type_wapi_psk,
-    wlan_eapol_if_eapol_key_authentication_type_wapi
+    wlan_eapol_if_eapol_key_authentication_type_wapi,
+    wlan_eapol_if_eapol_key_authentication_type_802_1x_unencrypted
     } wlan_eapol_if_eapol_key_authentication_type_e;
 
 typedef enum _wlan_eapol_if_eapol_key_type_e

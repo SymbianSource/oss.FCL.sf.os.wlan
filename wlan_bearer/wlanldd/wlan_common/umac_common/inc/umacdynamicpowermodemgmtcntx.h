@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 14 %
 */
 
 #ifndef WLAN_DYNAMIC_POWER_MODE_MGMT_CNTX
@@ -205,7 +205,7 @@ public:
     void FreezeTrafficOverride();
 
     /**
-    * Restores the Ative mode parameters back to their WLAN Mgmt Client 
+    * Restores the Active mode parameters back to their WLAN Mgmt Client 
     * provided values
     */
     inline void RestoreActiveModeParameters();

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2005-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 15 %
 */
 
 #include "config.h"
@@ -110,13 +110,14 @@ TBool WlanDot11IbssNormalMode::Connect(
     aCtxImpl.IeData( aIeData );
     aCtxImpl.IeDataLength( aIeDataLength );
 
+    TInt status(KErrNone);
 
     // check do we meet the requirements for the network
     // and construct necessary objects for establishing the connection
-    if ( InitNetworkConnect( 
+    if ( ( status = InitNetworkConnect( 
             aCtxImpl,
             aScanResponseFrameBodyLength, 
-            aScanResponseFrameBody ) )
+            aScanResponseFrameBody ) ) == KErrNone )
         {
         // continue
 
@@ -134,7 +135,7 @@ TBool WlanDot11IbssNormalMode::Connect(
         {
         // abort
         ret = EFalse;
-        OnOidComplete( aCtxImpl, KErrGeneral );
+        OnOidComplete( aCtxImpl, status );
         }
 
     return ret;

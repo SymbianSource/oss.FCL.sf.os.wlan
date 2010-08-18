@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 42 %
+* %version: 43 %
 */
 
 #ifndef WLMCLIENTSERVER_H
@@ -398,15 +398,24 @@ struct TMacPckg
     };
 
 /**
+ * Data structure for storing IAP availability data.
+ */
+struct TWlmAvailabilityData
+    {
+    TUint iapId;
+    TUint rcpi;
+    };
+
+/**
 * Data structure for storing available IAP IDs.
 */  
 struct TWlmAvailableIaps
     {
     /** The number of IAPs available. */
     TUint32 count;
-    
+
     /** The available IAP IDs. */
-    TFixedArray<TUint,KWlmMaxAvailableIaps> iaps;
+    TFixedArray<TWlmAvailabilityData,KWlmMaxAvailableIaps> iaps;
     };
 
 /**

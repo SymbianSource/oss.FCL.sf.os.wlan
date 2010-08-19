@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 86.1.1 %
+* %version: 86.1.2 %
 */
 
 #include <in_sock.h>
@@ -770,7 +770,14 @@ void TWlanConversionUtil::ConvertIapSettings(
             aCoreSettings.security_mode = core_security_mode_wep;
             break;
         case Wlan8021x:
-            aCoreSettings.security_mode = core_security_mode_802dot1x;
+            if( aAmSettings.WPAKeyLength == 1 )
+                {
+                aCoreSettings.security_mode = core_security_mode_802dot1x_unencrypted;
+                }
+            else
+                {
+                aCoreSettings.security_mode = core_security_mode_802dot1x;
+                }
             break;
         case Wpa:
             aCoreSettings.security_mode = core_security_mode_wpa;

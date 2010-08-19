@@ -28,11 +28,15 @@ const u8_t IE_OFFSET_ELEMENT_ID = 0;
 const u8_t IE_OFFSET_LENGTH = 1;
 /** The number of mandatory IEs. */
 const u8_t MANDATORY_IE_LIST_SIZE = 3;
-/** Array element IDs of mandatory IEs. */
-const u8_t MANDATORY_IE_LIST[] =
-    { 0,     // SSID
-      1,     // Supported Rates
-      3 };   // DS
+/** Array of mandatory IEs and their minimum and maximum lengths. */
+const u8_t MANDATORY_IE_LIST[][3] =
+    { { 0, 0, 32 },     // SSID
+      { 1, 1, 255 },    // Supported Rates
+      { 3, 1, 255 } };  // DS
+/** Indexes for the IE array. */
+const u8_t MANDATORY_IE_ID = 0;
+const u8_t MANDATORY_IE_MIN_LENGTH = 1;
+const u8_t MANDATORY_IE_MAX_LENGTH = 2;
 
 /** Defining this enables memory allocation related traces. */
 //#define SCANLIST_DEEP_DEBUG 1
@@ -246,13 +250,18 @@ bool_t ScanList::CheckData(
             {
             if ( current_ie < data + size )
                 { /** Still searching... */
-                if ( current_ie[IE_OFFSET_ELEMENT_ID] == MANDATORY_IE_LIST[i] )
+                if ( current_ie[IE_OFFSET_ELEMENT_ID] == MANDATORY_IE_LIST[i][MANDATORY_IE_ID] &&
+                    current_ie[IE_OFFSET_LENGTH] >= MANDATORY_IE_LIST[i][MANDATORY_IE_MIN_LENGTH] &&
+                    current_ie[IE_OFFSET_LENGTH] <= MANDATORY_IE_LIST[i][MANDATORY_IE_MAX_LENGTH] )
                     { /** We have a match! Lets find out the next one. */
                     is_found = true_t;
                     }
                 }
             else
                 { /** The IE was not found. */
+                DEBUG1( "ScanList::CheckData() - Element ID %u not found, ignoring frame",
+                    MANDATORY_IE_LIST[i][MANDATORY_IE_ID] );
+
                 return false_t;
                 }
             }

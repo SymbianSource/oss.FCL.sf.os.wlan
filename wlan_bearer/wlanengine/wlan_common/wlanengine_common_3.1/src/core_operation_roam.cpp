@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 76.1.5 %
+* %version: 78 %
 */
 
 #include "core_operation_roam.h"
@@ -855,7 +855,9 @@ core_connect_status_e core_operation_roam_c::connect_status(
         case core_security_mode_allow_unsecure:
             {
             break;
-            }            
+            }   
+        case core_security_mode_802dot1x_unencrypted:
+            /** Falls through on purpose. */
         case core_security_mode_802dot1x:
             {
             if ( request_status == core_error_eapol_total_failure ||
@@ -1020,7 +1022,8 @@ core_connect_status_e core_operation_roam_c::eap_connect_status(
         eap_error );
  
     core_connect_status_e status( core_connect_wpa_eap_failure );
-    if ( security_mode == core_security_mode_802dot1x )
+    if ( security_mode == core_security_mode_802dot1x ||
+         security_mode == core_security_mode_802dot1x_unencrypted )
         {
         status = core_connect_802_1x_failure;
         }

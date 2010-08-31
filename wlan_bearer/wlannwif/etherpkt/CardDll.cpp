@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 14 %
 */
 
 #include <nifmbuf.h>
@@ -81,8 +81,12 @@ void CPcCardPktDrv::ConstructL( CLANLinkCommon* aParent )
     iReceiver = CReceiver::NewL( this );
 
     User::LeaveIfError( iCard.Open() );
+    
+    CleanupClosePushL( iCard );
 
-    User::LeaveIfError( iCard.InitialiseBuffers( iFrameXferBlock ) );
+    User::LeaveIfError( iCard.InitialiseBuffers() );
+    
+    CleanupStack::Pop( &iCard );
   }
 
 

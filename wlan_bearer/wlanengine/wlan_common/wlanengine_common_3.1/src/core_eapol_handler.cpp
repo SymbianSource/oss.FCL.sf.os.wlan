@@ -110,6 +110,17 @@ core_error_e core_eapol_handler_c::packet_send(
             send_unencrypted );
         }
 
+    if ( !server_m->get_connection_data()->current_ap_data() )
+        {
+        /**
+         * EAPOL might try to send packets after a failed connection attempt,
+         * filter them out. This check is only valid when no handler is registered.
+         */
+        DEBUG( "core_eapol_handler_c::packet_send() - not connected or attempting connection, ignoring" );
+
+        return core_error_ok;
+        }
+
     server_m->send_data_frame(
         *server_m->get_connection_data()->current_ap_data(),
         core_frame_type_ethernet,
@@ -582,6 +593,20 @@ u32_t core_eapol_handler_c::send_data(
                 }
             break;
             }
+        case wlan_eapol_if_message_type_function_complete_disassociation:
+            {
+            network_id_c network_id( NULL, 0, NULL, 0, 0 );
+            
+            error = function.parse_complete_disassociation(
+                &network_id );
+            if ( error == core_error_ok )
+                {
+                error = complete_disassociation(
+                    &network_id );
+                }
+            break;
+
+            }
         case wlan_eapol_if_message_type_function_none:
         default:
             DEBUG1( "core_eapol_handler_c::send_data() - Error: unknown function %i", func );
@@ -853,6 +878,69 @@ core_error_e core_eapol_handler_c::new_protected_setup_credentials(
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 //
+core_error_e core_eapol_handler_c::complete_disassociation(
+    network_id_c * receive_network_id )
+    {
+    DEBUG( "core_eapol_handler_c::complete_disassociation()" );
+
+    if( !server_m->get_connection_data() ||
+        !server_m->get_connection_data()->is_eapol_disconnecting() )
+        {
+        DEBUG( "core_eapol_handler_c::handle_wlan_authentication_state() - complete_disassociation received while not disconnecting, ignoring" );
+
+        return core_error_general;
+        }
+
+    const core_mac_address_s cur_bssid(
+        server_m->get_connection_data()->eapol_auth_bssid() );
+    const core_mac_address_s bssid(
+        receive_network_id->source() );
+    DEBUG6( "core_eapol_handler_c::complete_disassociation() - function BSSID is %02X:%02X:%02X:%02X:%02X:%02X",
+        bssid.addr[0], bssid.addr[1], bssid.addr[2], 
+        bssid.addr[3], bssid.addr[4], bssid.addr[5] );
+    DEBUG6( "core_eapol_handler_c::complete_disassociation() - current BSSID is %02X:%02X:%02X:%02X:%02X:%02X",
+        cur_bssid.addr[0], cur_bssid.addr[1], cur_bssid.addr[2], 
+        cur_bssid.addr[3], cur_bssid.addr[4], cur_bssid.addr[5] );
+    DEBUG1( "core_eapol_handler_c::complete_disassociation() - EAPOL authentication failure status is %u",
+        server_m->get_connection_data()->eapol_auth_failure() );
+
+    bool_t is_eapol_authentication_started(
+        server_m->get_connection_data()->is_eapol_authentication_started() );
+    DEBUG( "core_eapol_handler_c::complete_disassociation() - marking is_eapol_authenticating as false" );
+    server_m->get_connection_data()->set_eapol_authenticating(
+        false_t );
+    DEBUG( "core_eapol_handler_c::complete_disassociation() - marking is_eapol_authentication_started as false" );
+    server_m->get_connection_data()->set_eapol_authentication_started(
+        false_t );
+    DEBUG( "core_eapol_handler_c::complete_disassociation() - marking is_eapol_disconnecting as false" );
+    server_m->get_connection_data()->set_eapol_disconnecting(
+        false_t );
+
+    /**
+     * We only care about the pending status notification in case the authentication
+     * has been started by us, otherwise we'll just ignore it. 
+     */
+    if ( is_eapol_authentication_started )
+        {
+        DEBUG( "core_eapol_handler_c::complete_disassociation() - completing request" );
+        server_m->request_complete(
+            REQUEST_ID_CORE_INTERNAL,
+            server_m->get_connection_data()->eapol_auth_failure() );
+        }
+    else
+        {
+        DEBUG( "core_eapol_handler_c::complete_disassociation() - completing request (authentication not started)" );
+        server_m->request_complete(
+            REQUEST_ID_CORE_INTERNAL,
+            core_error_ok );
+        }
+
+    return core_error_ok;
+    }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//
 void core_eapol_handler_c::handle_error(
     wlan_eapol_if_error_e errorcode,
     wlan_eapol_if_message_type_function_e function )
@@ -974,8 +1062,18 @@ void core_eapol_handler_c::handle_wlan_authentication_state(
         return;
         }
 
+    server_m->get_connection_data()->set_eapol_auth_failure(
+        eapol_wlan_authentication_state_to_error( state )  );
+
+    if ( server_m->get_connection_data()->is_eapol_disconnecting() )
+        {
+        DEBUG( "core_ap_data_c::instance() - disassociation pending, request cannot be completed yet" );
+
+        return;
+        }
+
     bool_t is_authentication_started( server_m->get_connection_data()->is_eapol_authenticating() );
-    
+
     DEBUG( "core_eapol_handler_c::handle_wlan_authentication_state() - marking is_eapol_authenticating as false" );
     server_m->get_connection_data()->set_eapol_authenticating(
         false_t );

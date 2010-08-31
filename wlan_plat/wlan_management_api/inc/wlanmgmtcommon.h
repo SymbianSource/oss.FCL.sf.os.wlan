@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10.1.1 %
+* %version: 12 %
 */
 
 #ifndef WLANMGMTCOMMON_H
@@ -28,6 +28,9 @@
 // LOCAL CONSTANTS
 /** The maximum SSID length. */
 const TUint KWlanMaxSsidLength = 32;
+
+/** The maximum WPS PIN length. */
+const TUint KWlanMaxWpsPinLength = 8;
 
 /** The maximum BSSID length. */
 const TUint KWlanMaxBssidLength = 6;
@@ -47,6 +50,9 @@ const TUint KWlanCallbackInterfaceVersion = 2;
 // DATA TYPES
 /** Data structure for storing the SSID of a WLAN network. */
 typedef TBuf8<KWlanMaxSsidLength> TWlanSsid;
+
+/** Data structure for storing the WPS Pin. */
+typedef TBuf8<KWlanMaxWpsPinLength> TWlanWpsPin;
 
 /** Data structure for storing the BSSID of a BSS. */
 typedef TBuf8<KWlanMaxBssidLength> TWlanBssid;

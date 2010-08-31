@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 59.1.1 %
+* %version: 61 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -41,7 +41,8 @@ extern void os_free( const TAny* );
 const TUint32 KDmaTxMemSize = 4096; // equals to 1 MMU page on most systems
 
 // ---------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // ---------------------------------------------------------------------------
 //
 #ifndef RD_WLAN_DDK
@@ -271,6 +272,9 @@ TBool DWlanLogicalChannel::InitIndicationListEntries()
     }
 
 // ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+//
 // If an error occurs in this method, we set iPdd to NULL to prevent 
 // PDD object destruction in base class (DLogicalChannelBase) destructor.
 // DLogicalChannelBase destructor gets called as this logical channel instance
@@ -606,10 +610,11 @@ void DWlanLogicalChannel::HandleMsg(TMessageBase* aMsg)
     
 
 // ---------------------------------------------------------------------------
-// 
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
 // ---------------------------------------------------------------------------
 //
-TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
+TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* aParam )
     {
     TAny* ret( NULL );
     TBool triggerTx ( EFalse );    
@@ -620,9 +625,6 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
     TraceDump(WLM_CMD_DETAILS, (("WLANLDD: channel creator thread: 0x%08x"), 
         iClient));
     TraceDump(WLM_CMD_DETAILS, (("WLANLDD: function: 0x%x"), aFunction));
-    
-    // Note! We are executing in the context of the client's thread, but
-    // in supervisor mode
     
     // acquire mutex
     // Enter critical section before requesting the mutex as
@@ -637,70 +639,24 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
     TraceDump(MUTEX, 
         (("WLANLDD: DWlanLogicalChannel::DoControlFast: mutex acquired")));
     
-    switch ( aFunction )
+    if ( iUnit == KUnitWlan )
         {
-        case RPcmNetCardIf::EControlFastAllocTxBuffer:
-            ret = iEthernetFrameMemMngr->AllocTxBuffer(
-                reinterpret_cast<TUint>(param) );
-            
-            if ( !ret && iAddTxFrameAllowed )
-                {
-                iAddTxFrameAllowed = EFalse;
-                
-                TraceDump( NWSA_TX, 
-                    ("WLANLDD: DWlanLogicalChannel::DoControlFast: stop flow from protocol stack") );        
-                }
-            break;
-            
-        case RPcmNetCardIf::EControlFastAddTxFrame:
-            {
-#ifndef NDEBUG
-            if ( !iAddTxFrameAllowed )
-                {
-                TraceDump(ERROR_LEVEL, 
-                    ("WLANLDD: DWlanLogicalChannel::DoControlFast: WARNING: AddTxFrame req. when flow ctrl is on"));
-                }
+        ret = OnMgmtSideControlFast( aFunction, aParam );
+        }
+    else if ( iUnit == KUnitEthernet )
+        {
+        ret = OnEthernetSideControlFast( aFunction, aParam, triggerTx );
+        }
+    else
+        {
+        // unknown unit
+#ifndef NDEBUG            
+        TraceDump(ERROR_LEVEL, 
+            ("WLANLDD: DWlanLogicalChannel::DoControlFast: unknown unit"));
+        TraceDump(ERROR_LEVEL, (("WLANLDD: aFunction: %d"), aFunction));
+        TraceDump(ERROR_LEVEL, (("WLANLDD: unit: %d"), iUnit));
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
 #endif
-            if ( iEthernetFrameMemMngr->AllTxQueuesEmpty() )
-                {
-                triggerTx = ETrue;
-                }
-            
-            TDataBuffer* discardFrame ( NULL );
-            
-            ret = reinterpret_cast<TAny*>(iEthernetFrameMemMngr->AddTxFrame( 
-                reinterpret_cast<TDataBuffer*>(param),
-                discardFrame,
-                iUmac.UserDataTxEnabled() ));
-            
-            if ( discardFrame )
-                {
-                TraceDump( NWSA_TX_DETAILS, 
-                    (("WLANLDD: DWlanLogicalChannel::DoControlFast: have to drop tx frame of UP: %d"),
-                    reinterpret_cast<TDataBuffer*>(param)->UserPriority()) );
-                
-                iEthernetFrameMemMngr->FreeTxPacket( discardFrame );
-                }
-                
-            if ( !ret )
-                {
-                iAddTxFrameAllowed = EFalse;
-
-                TraceDump( NWSA_TX, 
-                    ("WLANLDD: DWlanLogicalChannel::DoControlFast: stop flow from protocol stack") );        
-                }
-            break;
-            }
-        default:
-#ifndef NDEBUG
-            TraceDump(ERROR_LEVEL, (("WLANLDD: unknown request: %d"), 
-                aFunction));
-            os_assert( 
-                (TUint8*)("WLANLDD: panic"), 
-                (TUint8*)(WLAN_FILE), 
-                __LINE__ );            
-#endif
-            break;
         }
     
     // release mutex
@@ -725,7 +681,7 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
         // the lower priority thread will get paused and the higher priority 
         // thread will get scheduled (to execute the DFC), we don't want the 
         // higher priority thread to need to wait for the mutex. So we 
-        // released the mutex first in this code block and after that enque 
+        // released the mutex first in this code block and after that enqueue 
         // the DFC request.
         if ( !( iFlags & KTxTriggerArmed ) )
             {
@@ -738,6 +694,162 @@ TAny* DWlanLogicalChannel::DoControlFast( TInt aFunction, TAny* param )
     }
 
 // ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// ---------------------------------------------------------------------------
+//
+TAny* DWlanLogicalChannel::OnMgmtSideControlFast( 
+    TInt aFunction, 
+    TAny* aParam )
+    {
+    TAny* ret( NULL );
+    
+    switch ( aFunction )
+        {
+        // ==========================================================
+        // Get Rx frame
+        // ==========================================================        
+        case RWlanLogicalChannel::EWlanControlFastGetRxFrame:
+            if ( iEthernetFrameMemMngr )
+                {
+                ret = iEthernetFrameMemMngr->GetRxFrame( 
+                        reinterpret_cast<TDataBuffer*>(aParam) );
+                }
+            break;
+        // ==========================================================
+        // Unknown request
+        // ==========================================================        
+        default:
+#ifndef NDEBUG
+            TraceDump(ERROR_LEVEL, (("WLANLDD: unknown request: %d"), 
+                aFunction));
+            os_assert( 
+                (TUint8*)("WLANLDD: panic"), 
+                (TUint8*)(WLAN_FILE), 
+                __LINE__ );
+#endif
+            break;
+        }
+    
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// ---------------------------------------------------------------------------
+//
+TAny* DWlanLogicalChannel::OnEthernetSideControlFast( 
+    TInt aFunction, 
+    TAny* aParam,
+    TBool& aTriggerTx )
+    {
+    TAny* ret( NULL );    
+    aTriggerTx = EFalse;
+    
+    switch ( aFunction )
+        {
+        // ==========================================================
+        // Alloc Tx buffer
+        // ==========================================================        
+        case RPcmNetCardIf::EControlFastAllocTxBuffer:
+            if ( iEthernetFrameMemMngr )
+                {
+                ret = iEthernetFrameMemMngr->AllocTxBuffer(
+                    reinterpret_cast<TUint>(aParam) );
+                }
+            
+            if ( !ret && iAddTxFrameAllowed )
+                {
+                iAddTxFrameAllowed = EFalse;
+                
+                TraceDump( NWSA_TX, 
+                    ("WLANLDD: DWlanLogicalChannel::OnEthernetSideControlFast: "
+                     "stop flow from protocol stack") );        
+                }
+            break;            
+        // ==========================================================
+        // Add Tx frame
+        // ==========================================================        
+        case RPcmNetCardIf::EControlFastAddTxFrame:
+            {
+#ifndef NDEBUG
+            if ( !iAddTxFrameAllowed )
+                {
+                TraceDump(ERROR_LEVEL, 
+                    ("WLANLDD: DWlanLogicalChannel::OnEthernetSideControlFast: "
+                     "WARNING: AddTxFrame req. when flow ctrl is on"));
+                }
+#endif
+            if ( iEthernetFrameMemMngr && aParam )
+                {
+                if ( iEthernetFrameMemMngr->AllTxQueuesEmpty() )
+                    {
+                    aTriggerTx = ETrue;
+                    }
+                
+                TDataBuffer* discardFrame ( NULL );
+                
+                ret = reinterpret_cast<TAny*>(
+                          iEthernetFrameMemMngr->AddTxFrame( 
+                              reinterpret_cast<TDataBuffer*>(aParam),
+                              discardFrame,
+                              iUmac.UserDataTxEnabled() ));
+                
+                if ( discardFrame )
+                    {
+                    TraceDump( NWSA_TX_DETAILS, 
+                        (("WLANLDD: DWlanLogicalChannel::OnEthernetSideControlFast: "
+                          "have to drop tx frame of UP: %d"),
+                        reinterpret_cast<TDataBuffer*>(
+                            aParam)->UserPriority()) );
+                    
+                    iEthernetFrameMemMngr->FreeTxPacket( discardFrame );
+                    aTriggerTx = EFalse;
+                    }
+                }
+                
+            if ( !ret )
+                {
+                iAddTxFrameAllowed = EFalse;
+
+                TraceDump( NWSA_TX, 
+                    ("WLANLDD: DWlanLogicalChannel::OnEthernetSideControlFast: "
+                     "stop flow from protocol stack") );
+                }
+            break;
+            }            
+        // ==========================================================
+        // Get Rx frame
+        // ==========================================================        
+        case RPcmNetCardIf::EControlFastGetRxFrame:
+            {
+            if ( iEthernetFrameMemMngr )
+                {
+                ret = iEthernetFrameMemMngr->GetRxFrame( 
+                        reinterpret_cast<TDataBuffer*>(aParam) );
+                }
+            }
+            break;
+        // ==========================================================
+        // Unknown request
+        // ==========================================================        
+        default:
+#ifndef NDEBUG
+            TraceDump(ERROR_LEVEL, (("WLANLDD: unknown request: %d"), 
+                aFunction));
+            os_assert( 
+                (TUint8*)("WLANLDD: panic"), 
+                (TUint8*)(WLAN_FILE), 
+                __LINE__ );            
+#endif
+            break;
+        } // switch
+    
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------
 //
@@ -745,7 +857,7 @@ void DWlanLogicalChannel::DoCancel( TInt aMask )
     {
     if ( iUnit == KUnitWlan )
         {
-        if ( aMask & ( 1 << EWlanRequestNotify ) )
+        if ( aMask & ( 1 << RWlanLogicalChannel::EWlanRequestNotify ) )
             {
             TraceDump(INFO_LEVEL, 
                 ("WLANLDD: DWlanLogicalChannel::DoCancel: mgmt side notify cancel"));
@@ -755,7 +867,7 @@ void DWlanLogicalChannel::DoCancel( TInt aMask )
                 iClient, iWlanRequestNotifyStatus, KErrServerTerminated );
             iWlanRequestNotifyStatus = NULL;
             }        
-        else if ( aMask & ( 1 << EWlanRequestFrame ) )
+        else if ( aMask & ( 1 << RWlanLogicalChannel::EWlanRequestFrame ) )
             {
             TraceDump(INFO_LEVEL, 
                 ("WLANLDD: DWlanLogicalChannel::DoCancel: mgmt side frame read cancel"));
@@ -767,7 +879,8 @@ void DWlanLogicalChannel::DoCancel( TInt aMask )
         else
             {
             TraceDump(ERROR_LEVEL, 
-                (("WLANLDD: DWlanLogicalChannel::DoCancel: mgmt side unhandled mask panic: 0x%08x"), 
+                (("WLANLDD: DWlanLogicalChannel::DoCancel: mgmt side "
+                  "unhandled mask panic: 0x%08x"), 
                 aMask));
             os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
             }        
@@ -795,7 +908,8 @@ void DWlanLogicalChannel::DoCancel( TInt aMask )
         else
             {
             TraceDump(ERROR_LEVEL, 
-                (("WLANLDD: DWlanLogicalChannel::DoCancel: user side unhandled mask panic: 0x%08x"), 
+                (("WLANLDD: DWlanLogicalChannel::DoCancel: user side "
+                  "unhandled mask panic: 0x%08x"), 
                 aMask));
             os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
             }        
@@ -813,11 +927,13 @@ void DWlanLogicalChannel::DoCancel( TInt aMask )
 // ---------------------------------------------------------------------------
 //
 TBool DWlanLogicalChannel::ProtocolStackDataReceiveComplete( 
-    const TDataBuffer*& aBufferStart,
+    TDataBuffer*& aBufferStart,
     TUint32 aNumOfBuffers )
     {
-    if ( iEthernetFrameMemMngr->OnEthernetFrameRxComplete( aBufferStart, 
-        aNumOfBuffers ) )
+    if ( iEthernetFrameMemMngr && 
+         iEthernetFrameMemMngr->OnEthernetFrameRxComplete( 
+             aBufferStart, 
+             aNumOfBuffers ) )
         {
         Kern::RequestComplete( iClient, iEthernetReceiveFrameStatus, KErrNone );
         iEthernetReceiveFrameStatus = NULL;
@@ -900,13 +1016,17 @@ void DWlanLogicalChannel::OnTxProtocolStackDataComplete(
     TraceDump(UMAC_PROTO_CALLBACK, 
         (("WLANLDD: aCompletionCode: %d"), aCompletionCode));
 
-    iEthernetFrameMemMngr->FreeTxPacket( aMetaHeader );
+    if ( iEthernetFrameMemMngr )
+        {
+        iEthernetFrameMemMngr->FreeTxPacket( aMetaHeader );
+        }
 
     TxProtocolStackData();
     
     if ( !iAddTxFrameAllowed )
         {
-        if ( iResumeTxStatus && 
+        if ( iResumeTxStatus &&
+             iEthernetFrameMemMngr &&
              iEthernetFrameMemMngr->ResumeClientTx( 
                  iUmac.UserDataTxEnabled() ) )
             {
@@ -977,18 +1097,24 @@ void DWlanLogicalChannel::OnTxDataSent()
 //
 void DWlanLogicalChannel::TxManagementData()
     {
-    TDataBuffer* buffer = iEthernetFrameMemMngr->OnWriteEthernetFrame();
-
-    if ( !buffer )
+    TDataBuffer* buffer( NULL );
+    
+    if ( iEthernetFrameMemMngr )
         {
-        TraceDump(ERROR_LEVEL, 
-            ("WLANLDD: DWlanLogicalChannel::TxManagementData: "
-             "panic, no buffer"));
-        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        buffer = iEthernetFrameMemMngr->OnWriteEthernetFrame();
+        }
+
+    if ( buffer )
+        {
+        iUmac.WriteMgmtFrame( *buffer );
         }
     else
         {
-        iUmac.WriteMgmtFrame( *buffer );
+#ifndef NDEBUG
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+#endif
+        Kern::RequestComplete( 
+            iClient, iWlanSendFrameStatus, KErrGeneral );
         }
     }
 
@@ -998,7 +1124,7 @@ void DWlanLogicalChannel::TxManagementData()
 //
 void DWlanLogicalChannel::TxProtocolStackData()
     {
-#ifndef NDEBUG    
+#ifndef NDEBUG
     TUint packetsSubmitted ( 0 );
 #endif
     
@@ -1046,7 +1172,13 @@ void DWlanLogicalChannel::TxProtocolStackData()
 //
 TBool DWlanLogicalChannel::OnReadEthernetFrameRequest()
     {
-    const TBool ret = iEthernetFrameMemMngr->OnReadRequest();
+    TBool ret( EFalse );
+    
+    if ( iEthernetFrameMemMngr )
+        {
+        ret = iEthernetFrameMemMngr->OnReadRequest();
+        }
+    
     return ret;
     }
 
@@ -1448,17 +1580,17 @@ TInt DWlanLogicalChannel::OnMgmtSideDoRequest(
 
     switch ( aReqNo )
         {
-        case EWlanInitSystem:
+        case RWlanLogicalChannel::EWlanInitSystem:
             // bootup the chip and the system
             iWlanGeneralRequestStatus = aStatus; 
             InitSystem( a1, sizeof(TOpenParam) );
             break;
-        case EWlanFinitSystem:
+        case RWlanLogicalChannel::EWlanFinitSystem:
             // power down the chip and the system
             iWlanGeneralRequestStatus = aStatus; 
             FinitSystem();
             break;
-        case EWlanCommand:
+        case RWlanLogicalChannel::EWlanCommand:
             // management command
             iWlanGeneralRequestStatus = aStatus; 
 
@@ -1499,13 +1631,13 @@ TInt DWlanLogicalChannel::OnMgmtSideDoRequest(
                 output_buffer.iData, 
                 output_buffer.iLen );
             break;
-        case EWlanRequestNotify:
+        case RWlanLogicalChannel::EWlanRequestNotify:
             // store the USER mode indication address;
             iIndicationBuffer = static_cast<TIndication*>(a1);
             iWlanRequestNotifyStatus = aStatus;
             IndicationRequest( static_cast<TIndication*>(a1) );
             break;
-        case EWlanRequestFrame:
+        case RWlanLogicalChannel::EWlanRequestFrame:
             if ( OnReadEthernetFrameRequest() )
                 {
                 // rx data to be completed exists
@@ -1522,7 +1654,7 @@ TInt DWlanLogicalChannel::OnMgmtSideDoRequest(
                 iWlanReceiveFrameStatus = aStatus;
                 }
             break;
-        case EWlanRequestSend:
+        case RWlanLogicalChannel::EWlanRequestSend:
             iWlanSendFrameStatus = aStatus;
 
             TxManagementData();
@@ -1725,7 +1857,7 @@ TInt DWlanLogicalChannel::OnMgmtSideControl(
     TAny* /*a2*/ )
     {
     TInt ret( KErrNone );
-    if ( aFunction == EWlanSvControlInitBuffers )
+    if ( aFunction == RWlanLogicalChannel::EWlanSvControlInitBuffers )
         {
         // initiliaze buffers for wlan mgmt client data xfer
         if ( a1 )
@@ -1746,7 +1878,7 @@ TInt DWlanLogicalChannel::OnMgmtSideControl(
             os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
             }
         }
-    else if ( aFunction == EWlanSvControlFreeBuffers )
+    else if ( aFunction == RWlanLogicalChannel::EWlanSvControlFreeBuffers )
         {
         // free wlan mgmt client data xfer buffers
         OnReleaseEthernetFrameBuffers();        
@@ -1888,13 +2020,16 @@ void DWlanLogicalChannel::SetMgmtSideTxOffsets(
     if ( iEthernetFrameMemMngr )
         {
         TraceDump(NWSA_TX_DETAILS, 
-            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: aEthernetFrameTxOffset: %d"),
+            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: "
+              "aEthernetFrameTxOffset: %d"),
             aEthernetFrameTxOffset ));
         TraceDump(NWSA_TX_DETAILS, 
-            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: aDot11FrameTxOffset: %d"),
+            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: "
+              "aDot11FrameTxOffset: %d"),
             aDot11FrameTxOffset ));
         TraceDump(NWSA_TX_DETAILS, 
-            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: aSnapFrameTxOffset: %d"),
+            (("WLANLDD: DWlanLogicalChannel::SetMgmtSideTxOffsets: "
+              "aSnapFrameTxOffset: %d"),
             aSnapFrameTxOffset ));
 
         iEthernetFrameMemMngr->SetTxOffsets( 
@@ -1931,12 +2066,13 @@ TUint8* DWlanLogicalChannel::GetBufferForRxData(
 // ---------------------------------------------------------------------------
 //
 void DWlanLogicalChannel::MgmtDataReceiveComplete( 
-    const TDataBuffer*& aBufferStart, 
+    TDataBuffer*& aBufferStart, 
     TUint32 aNumOfBuffers )
     {
-    if ( iEthernetFrameMemMngr->OnEthernetFrameRxComplete( 
-        aBufferStart, 
-        aNumOfBuffers ) )
+    if ( iEthernetFrameMemMngr && 
+         ( iEthernetFrameMemMngr->OnEthernetFrameRxComplete( 
+               aBufferStart, 
+               aNumOfBuffers ) ) )
         {
         Kern::RequestComplete( iClient, iWlanReceiveFrameStatus, KErrNone );
         iWlanReceiveFrameStatus = NULL;
@@ -2171,23 +2307,32 @@ void DWlanLogicalChannel::IndicationRequest( TIndication* aBuffer )
 void DWlanLogicalChannel::ReleaseIndicationListEntry(
     TIndicationListEntry* aEntry )
     {
-    aEntry->next = NULL;
-
-    if ( !iFreeIndicationListHead )
+    if ( aEntry )
         {
-        iFreeIndicationListHead = aEntry;
+        aEntry->next = NULL;
+    
+        if ( !iFreeIndicationListHead )
+            {
+            iFreeIndicationListHead = aEntry;
+            }
+        else
+            {
+            TIndicationListEntry* tmp = iFreeIndicationListHead;
+    
+            while ( tmp->next )
+                {
+                tmp = tmp->next;
+                }
+    
+            tmp->next = aEntry;
+            }
         }
+#ifndef NDEBUG
     else
         {
-        TIndicationListEntry* tmp = iFreeIndicationListHead;
-
-        while ( tmp->next )
-            {
-            tmp = tmp->next;
-            }
-
-        tmp->next = aEntry;
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );        
         }
+#endif        
     }
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 
@@ -195,6 +195,15 @@ EXPORT_C void CWlmPlatform::PublishBgScanInterval( TUint32& aInterval )
     {
     iPlatformData->PublishBgScanInterval( aInterval );
     }
+    
+// ---------------------------------------------------------
+// CWlmPlatform::GetWlanOnOffState
+// ---------------------------------------------------------
+//
+EXPORT_C TWlanOnOffState CWlmPlatform::GetWlanOnOffState()
+    {
+	return iPlatformData->GetWlanOnOffState();
+	}
 
 // ---------------------------------------------------------
 // CWlmPlatform::SystemModeChanged
@@ -336,3 +345,26 @@ void CWlmPlatform::OnCacheClearTimerExpiration()
     
     iCallback.ClearRegionCache();
     }
+    
+// ---------------------------------------------------------
+// CWlmPlatform::WlanOn
+// ---------------------------------------------------------
+//
+void CWlmPlatform::WlanOn()
+    {
+	DEBUG( "CWlmPlatform::WlanOn()" );
+	
+	iCallback.WlanOn();
+	}
+
+// ---------------------------------------------------------
+// CWlmPlatform::WlanOff
+// ---------------------------------------------------------
+//
+void CWlmPlatform::WlanOff()
+    {
+	DEBUG( "CWlmPlatform::WlanOff()" );
+	
+	iCallback.WlanOff();
+	}
+

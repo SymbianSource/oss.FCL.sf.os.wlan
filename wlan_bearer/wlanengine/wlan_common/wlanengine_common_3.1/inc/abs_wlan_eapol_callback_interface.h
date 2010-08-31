@@ -114,6 +114,12 @@ public:
         core_type_list_c< protected_setup_credential_c > & credential_list ) = 0;
 
     /**
+     * The complete_disassociation() function completes disassociation function.
+     */
+    virtual core_error_e complete_disassociation(
+        network_id_c * receive_network_id ) = 0;
+
+    /**
      * The handle_error() function tells about error from EAPOL side.
      */
     virtual void handle_error(

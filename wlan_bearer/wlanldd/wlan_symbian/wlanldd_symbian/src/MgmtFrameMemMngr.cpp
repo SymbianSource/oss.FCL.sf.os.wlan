@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 20 %
+* %version: 21 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -226,6 +226,8 @@ TInt MgmtFrameMemMngr::DoOpenHandle(
                     + KMgmtSideTxBufferLength 
                     + KProtocolStackSideTxDataChunkSize );
 
+                iFrameXferBlockBase = iFrameXferBlock;
+                
                 TraceDump( INIT_LEVEL, 
                     (("WLANLDD: MgmtFrameMemMngr::DoOpenHandle: Engine RFrameXferBlock addr: 0x%08x"),
                     reinterpret_cast<TUint32>(iFrameXferBlock) ) );
@@ -275,55 +277,6 @@ TUint8* MgmtFrameMemMngr::DoGetNextFreeRxBuffer( TUint aLengthinBytes )
     TraceDump( RX_FRAME, 
         ("WLANLDD: MgmtFrameMemMngr::DoGetNextFreeRxBuffer") );
 
-    // if there are any Rx buffers which have been handled and
-    // can already be re-used, free them first
-    
-    const TUint32* rxHandledBuffersArray ( NULL );
-    TUint32 numOfHandled ( 0 );
-    
-    iFrameXferBlock->KeGetHandledRxBuffers(
-        rxHandledBuffersArray, 
-        numOfHandled );
-
-    if ( numOfHandled )
-        {
-        // there are buffers which can be freed, so free them
-        for ( TUint i = 0; i < numOfHandled; ++i )
-            {
-            // first free the actual Rx frame buffer
-
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoGetNextFreeRxBuffer: free Rx buf at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(reinterpret_cast<TDataBuffer*>(
-                    iRxDataChunk 
-                    + rxHandledBuffersArray[i])->KeGetBufferStart()) ) );
-
-            iRxFrameMemoryPool->Free( 
-                reinterpret_cast<TDataBuffer*>(
-                    iRxDataChunk + rxHandledBuffersArray[i])->KeGetBufferStart()
-                    // take into account the alignment padding 
-                    - iRxBufAlignmentPadding );
-            
-            // then free the Rx frame meta header
-
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoGetNextFreeRxBuffer: free Rx meta header at addr: 0x%08x"),
-                reinterpret_cast<TUint32>( iRxDataChunk + rxHandledBuffersArray[i])) );
-
-            iRxFrameMemoryPool->Free( iRxDataChunk + rxHandledBuffersArray[i] );
-            }
-
-        // remove the buffers we freed above from the completed buffers of this
-        // object so that they are not tried to be freed again once the Mgmt
-        // Client issues the next Rx request
-
-        iCountCompleted -= numOfHandled;
-        assign( 
-            iCompletedBuffers + numOfHandled, 
-            iCompletedBuffers, 
-            iCountCompleted );
-        }
-
     // reserve a new Rx buffer. 
     
     TUint8* buffer ( NULL );
@@ -366,191 +319,34 @@ TUint8* MgmtFrameMemMngr::DoGetNextFreeRxBuffer( TUint aLengthinBytes )
 // ---------------------------------------------------------------------------
 //
 TBool MgmtFrameMemMngr::DoEthernetFrameRxComplete( 
-    const TDataBuffer*& aBufferStart, 
+    TDataBuffer*& aBufferStart, 
     TUint32 aNumOfBuffers )
     {
     TraceDump( RX_FRAME, 
-        (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: aNumOfBuffers: %d"), 
+        (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: "
+          "aNumOfBuffers: %d"), 
         aNumOfBuffers) );
 
-    if ( aNumOfBuffers + iCountTobeCompleted > KMaxToBeCompletedRxBufs )
-        {
-        // too little space reserved for Rx buffer handles
-        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-        }
-
     TBool ret( EFalse );
+    TDataBuffer** metaHdrPtrArray(&aBufferStart);
 
-    if ( iReadStatus == EPending )
+    if ( iFrameXferBlock )
         {
-        // read pending
-        if ( !iCountTobeCompleted )
+        for ( TUint i = 0; i < aNumOfBuffers; ++i )
             {
-            // no existing Rx buffers to complete in queue
-            // we may complete these ones on the fly
-
-            // note the completed Rx buffers first so that we can change
-            // their addresses to offsets
-            assign( 
-                reinterpret_cast<TUint32*>(&aBufferStart), 
-                iCompletedBuffers, 
-                aNumOfBuffers );
-
-            // update the new Rx buffer start addresses added above to be 
-            // offsets from the Rx memory pool beginning
-            for( TUint i = 0; i < aNumOfBuffers; ++i )
+            if ( metaHdrPtrArray[i] )
                 {
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                    iCompletedBuffers[i]) );        
-                
-                iCompletedBuffers[i] 
-                    -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                    iCompletedBuffers[i]) );        
+                iFrameXferBlock->AddRxFrame( metaHdrPtrArray[i] );
                 }
-
-            iCountCompleted = aNumOfBuffers;
-
-            iFrameXferBlock->KeRxComplete( iCompletedBuffers, iCountCompleted);
-            }
-        else
-            {
-            // existing rx buffers to complete in queue.
-            // We must append these at the rear and after that 
-            // complete the existing read request
-            assign( 
-                reinterpret_cast<TUint32*>(&aBufferStart),
-                iTobeCompletedBuffers + iCountTobeCompleted, 
-                aNumOfBuffers );
-
-            // update the new Rx buffer start addresses added above to be 
-            // offsets from the Rx memory pool beginning
-            for( TUint i = 0; i < aNumOfBuffers; ++i )
-                {
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                    iTobeCompletedBuffers[iCountTobeCompleted + i]) );
-
-                iTobeCompletedBuffers[iCountTobeCompleted + i] 
-                    -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-                TraceDump( RX_FRAME, 
-                    (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                    iTobeCompletedBuffers[iCountTobeCompleted + i]) );
-                }
-
-            iCountCompleted = iCountTobeCompleted + aNumOfBuffers;
-
-            iFrameXferBlock->KeRxComplete( 
-                iTobeCompletedBuffers, 
-                iCountCompleted );  
-
-            // note the completed Rx buffers
-            assign( iTobeCompletedBuffers, iCompletedBuffers, iCountCompleted );
-            iCountTobeCompleted = 0;
-            }
-
-        ret = ETrue;
-        }
-    else
-        {
-        // no read pending
-        // append at the rear
-        assign( 
-            reinterpret_cast<TUint32*>(&aBufferStart),
-            iTobeCompletedBuffers + iCountTobeCompleted, 
-            aNumOfBuffers );
-
-        // update the new Rx buffer start addresses added above to be 
-        // offsets from the Rx memory pool beginning
-        for( TUint i = 0; i < aNumOfBuffers; ++i )
-            {
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: supplied Rx buf addr: 0x%08x"), 
-                iTobeCompletedBuffers[iCountTobeCompleted + i]) );        
-                
-            iTobeCompletedBuffers[iCountTobeCompleted + i] 
-                -= reinterpret_cast<TUint32>(iRxDataChunk);
-
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: Rx buf offset addr: 0x%08x"), 
-                iTobeCompletedBuffers[iCountTobeCompleted + i]) );        
             }
         
-        iCountTobeCompleted += aNumOfBuffers;
-        }
-
-    TraceDump( RX_FRAME, 
-        (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: end: iCountCompleted: %d"), 
-        iCountCompleted) );
-
-    TraceDump( RX_FRAME, 
-        (("WLANLDD: MgmtFrameMemMngr::DoEthernetFrameRxComplete: end: iCountTobeCompleted: %d"), 
-        iCountTobeCompleted) );
-
-    return ret;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-TUint32* MgmtFrameMemMngr::DoGetTobeCompletedBuffersStart()
-    {
-    return iTobeCompletedBuffers;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-TUint32* MgmtFrameMemMngr::DoGetCompletedBuffersStart()
-    {
-    return iCompletedBuffers;
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void MgmtFrameMemMngr::DoFreeRxBuffers()
-    {
-    if ( IsMemInUse() )
-        {
-        for ( TUint i = 0; i < iCountCompleted; ++i )
+        if ( iReadStatus == EPending )
             {
-            TDataBuffer* metaHdr ( reinterpret_cast<TDataBuffer*>(
-                    iRxDataChunk + iCompletedBuffers[i]) );  
-            
-            // first free the actual Rx frame buffer
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoFreeRxBuffers: free Rx buf at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(metaHdr->KeGetBufferStart()) ) );
-    
-            iRxFrameMemoryPool->Free( 
-                metaHdr->KeGetBufferStart()
-                // take into account the alignment padding 
-                - iRxBufAlignmentPadding );                            
-            
-            // free the Rx frame meta header
-    
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: MgmtFrameMemMngr::DoFreeRxBuffers: free Rx meta header at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(metaHdr)) );
-    
-            iRxFrameMemoryPool->Free( metaHdr );        
+            ret = ETrue;
             }
         }
-    else
-        {
-        // the whole Rx memory pool has already been deallocated, so nothing 
-        // is done in this case
-        TraceDump( RX_FRAME, 
-            ("WLANLDD: MgmtFrameMemMngr::DoFreeRxBuffers: Rx memory pool already deallocated; no action needed") );        
-        }
+
+    return ret;
     }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +359,7 @@ void MgmtFrameMemMngr::DoMarkRxBufFree( TUint8* aBufferToFree )
         (("WLANLDD: MgmtFrameMemMngr::DoMarkRxBufFree: free Rx buf at addr: 0x%08x"),
         reinterpret_cast<TUint32>(aBufferToFree) ) );
 
-    if ( IsMemInUse() )
+    if ( IsMemInUse() && iRxFrameMemoryPool )
         {
         iRxFrameMemoryPool->Free( 
             aBufferToFree
@@ -575,8 +371,92 @@ void MgmtFrameMemMngr::DoMarkRxBufFree( TUint8* aBufferToFree )
         // the whole Rx memory pool - including aBufferToFree - has already
         // been deallocated, so nothing is done in this case
         TraceDump( RX_FRAME, 
-            ("WLANLDD: MgmtFrameMemMngr::DoMarkRxBufFree: Rx memory pool already deallocated; no action needed") );                
+            ("WLANLDD: MgmtFrameMemMngr::DoMarkRxBufFree: Rx memory pool already "
+             "deallocated; no action needed") );                
         }    
+    }
+
+// ---------------------------------------------------------------------------
+//  
+// ---------------------------------------------------------------------------
+//
+TBool MgmtFrameMemMngr::OnReadRequest()
+    {
+    TBool ret( EFalse );
+
+    if ( IsMemInUse() && iFrameXferBlock )
+        {
+        if ( iFrameXferBlock->RxFrameAvailable() )
+            {
+            // there are Rx frames ready for the user mode client retrieval
+            ret = ETrue;
+            
+            // the frame Rx request won't be left pending as the callee will 
+            // complete it
+            iReadStatus = ENotPending;
+            }
+        else
+            {
+            // there are no Rx frames ready for the user mode client retrieval 
+            // the Rx request is left pending
+            iReadStatus = EPending;
+            }
+        }
+#ifndef NDEBUG
+    else
+        {
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        }
+#endif        
+
+    TraceDump( RX_FRAME, 
+        (("WLANLDD: MgmtFrameMemMngr::OnReadRequest: ret (bool): %d"), 
+        ret) );
+
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// Note! This method is executed in the context of the user mode client 
+// thread, but in supervisor mode
+// ---------------------------------------------------------------------------
+//
+TDataBuffer* MgmtFrameMemMngr::GetRxFrame( 
+    TDataBuffer* aFrameToFreeInUserSpace )
+    {
+    TDataBuffer* rxFrame( NULL );
+    
+    if ( IsMemInUse() && iFrameXferBlock )
+        {
+        if ( aFrameToFreeInUserSpace )
+            {
+            FreeRxPacket( aFrameToFreeInUserSpace );
+            }
+        
+        rxFrame = iFrameXferBlock->GetRxFrame();
+        }
+        
+    return rxFrame;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TDataBuffer* MgmtFrameMemMngr::OnWriteEthernetFrame() const
+    {
+    if ( iTxDataBuffer &&
+         ( iTxDataBuffer->GetLength() >= sizeof( SEthernetHeader ) ) )
+        {
+        return iTxDataBuffer;
+        }
+    else
+        {
+#ifndef NDEBUG    
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+#endif        
+        return NULL;
+        }
     }
 
 // ---------------------------------------------------------------------------
@@ -585,15 +465,23 @@ void MgmtFrameMemMngr::DoMarkRxBufFree( TUint8* aBufferToFree )
 //
 TInt MgmtFrameMemMngr::RxBufAlignmentPadding() const
     {
-    const TInt KMemMgrHdrLen = iRxFrameMemoryPool->HeaderSize();
-    const TInt KRemainder ( KMemMgrHdrLen % iRxFrameBufAllocationUnit );
-    TInt padding = KRemainder ? 
-        ( iRxFrameBufAllocationUnit - KRemainder ) : KRemainder;
+    if ( iRxFrameMemoryPool )
+        {
+        const TInt KMemMgrHdrLen = iRxFrameMemoryPool->HeaderSize();
+        const TInt KRemainder ( KMemMgrHdrLen % iRxFrameBufAllocationUnit );
+        TInt padding = KRemainder ? 
+            ( iRxFrameBufAllocationUnit - KRemainder ) : KRemainder;
+            
+        TraceDump(INIT_LEVEL, (("WLANLDD: MgmtFrameMemMngr::RxBufAlignmentPadding: %d"), 
+            padding));
         
-    TraceDump(INIT_LEVEL, (("WLANLDD: MgmtFrameMemMngr::RxBufAlignmentPadding: %d"), 
-        padding));
-    
-    return padding;
+        return padding;
+        }
+    else
+        {
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        return 0;
+        }
     }
 
 // ---------------------------------------------------------------------------
@@ -634,5 +522,5 @@ void MgmtFrameMemMngr::OnReleaseMemory( DThread& aThread )
         Kern::ChunkClose( iParent.SharedMemoryChunk() );
         iParent.SharedMemoryChunk() = NULL;
         MarkMemFree();
-        }    
+        }
     }

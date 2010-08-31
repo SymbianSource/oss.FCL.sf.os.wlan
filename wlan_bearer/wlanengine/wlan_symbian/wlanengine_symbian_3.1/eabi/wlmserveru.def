@@ -19,7 +19,7 @@ EXPORTS
 	_ZN10RWLMServer17ActivateNotifiesLER10MWLMNotifym @ 18 NONAME
 	_ZN10RWLMServer17GetConnectionRCPIERl @ 19 NONAME
 	_ZN10RWLMServer17RemoveIapSsidListEj @ 20 NONAME
-	_ZN10RWLMServer17RunProtectedSetupER14TRequestStatusmR5TDes8 @ 21 NONAME
+	_ZN10RWLMServer17RunProtectedSetupER14TRequestStatusRK5TBuf8ILi32EERKS2_ILi8EER5TDes8 @ 21 NONAME
 	_ZN10RWLMServer18CancelDirectedRoamEv @ 22 NONAME
 	_ZN10RWLMServer18ConfigureMulticastEjRK11TMacAddress @ 23 NONAME
 	_ZN10RWLMServer18GetAcTrafficStatusER11TFixedArrayI19TWlmAcTrafficStatusLi4EE @ 24 NONAME

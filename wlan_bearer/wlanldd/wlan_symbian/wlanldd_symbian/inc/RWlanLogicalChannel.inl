@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17.1.1 %
+* %version: 18 %
 */
 
 // -----------------------------------------------------------------------------
@@ -220,12 +220,12 @@ inline TInt RWlanLogicalChannel::InitialiseBuffers(
             + KMgmtSideTxBufferLength
             + KProtocolStackSideTxDataChunkSize );
 
-        aFrameXferBlock->SetRxDataChunkField( reinterpret_cast<TLinAddr>(
-            baseAddress) );
-
         aFrameXferBlock->SetTxDataBufferField( reinterpret_cast<TLinAddr>(
             baseAddress
             + KRxDataChunkSize ) );
+        
+        aFrameXferBlock->UserInitialize( 
+            reinterpret_cast<TUint32>(aFrameXferBlock) );
         }
     
     return status;
@@ -261,4 +261,16 @@ inline void RWlanLogicalChannel::RequestFrame(
     TRequestStatus &aStatus )
     {
     DoRequest( EWlanRequestFrame, aStatus );
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline TDataBuffer* RWlanLogicalChannel::GetRxFrame(
+    TDataBuffer* aFrameToFree )
+    {
+    return reinterpret_cast<TDataBuffer*>(DoControl( 
+        EWlanControlFastGetRxFrame,
+        reinterpret_cast<TAny*>(aFrameToFree) ));
     }

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 13 %
 */
 
 #ifndef DATAFRAMEMMNGR_H
@@ -42,6 +42,7 @@ public:
         TInt aTxFrameBufAllocationUnit ) : 
         DEthernetFrameMemMngr( aParent, aRxFrameMemoryPool ),
         iFrameXferBlockProtoStack( NULL ),
+        iUserToKernAddrOffset( 0 ),
         iTxDataChunk( NULL ),
         iTxFrameMemoryPool( NULL ),
         iTxFrameBufAllocationUnit ( aTxFrameBufAllocationUnit )
@@ -85,50 +86,85 @@ protected:
     *         EFalse otherwise
     */
     virtual TBool DoEthernetFrameRxComplete( 
-        const TDataBuffer*& aBufferStart, 
+        TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers );
 
     /**
     * From DEthernetFrameMemMngr
-    * Gets start address of Rx buffers (their offset addresses)
-    * that are waiting for completion to user mode
+    * To be called when user mode client issues a frame Rx request
     *
-    * @since S60 3.1
-    * @return see above
+    * @return ETrue if callee should complete the request immediately 
+    *         as there exists Rx frame(s) which can be retrieved by the user
+    *         mode client.
+    *         EFalse otherwise
     */
-    virtual TUint32* DoGetTobeCompletedBuffersStart();
-
+    virtual TBool OnReadRequest();
+    
     /**
-    * From DEthernetFrameMemMngr
-    * Gets start address of Rx buffers (their offset addresses)
-    * that have been completed to user mode
-    *
-    * @since S60 3.1
-    * @return see above
-    */
-    virtual TUint32* DoGetCompletedBuffersStart();
-
-    /**
-    * From DEthernetFrameMemMngr
-    * Gets called when user mode client issues a frame receive request 
-    * and Rx buffers have been completed to it. The completed Rx frame 
-    * buffers are freed.
-    *
-    * @since S60 3.1
-    */
-    virtual void DoFreeRxBuffers();
-
+     * From DEthernetFrameMemMngr
+     * Gets the highest priority frame (contained in a buffer allocated from
+     * the shared memory) from the Rx queues.
+     * Optionally frees the memory associated to a previously received frame. 
+     * 
+     * @param aFrameToFreeInUserSpace User space pointer to previously 
+     *        received frame which can now be freed.
+     *        NULL if nothing to free.
+     * @return User space pointer to the Rx frame to be handled next.
+     *         NULL, if there are no frames available.
+     */ 
+    virtual TDataBuffer* GetRxFrame( TDataBuffer* aFrameToFreeInUserSpace );
+    
     /**
      * From DEthernetFrameMemMngr
      * Allocates a Tx packet from the shared memory.
      * 
      * @param aLength Length of the requested Tx buffer in bytes
-     * @return Pointer to the meta header attached to the allocated packet, on
-     *         success.
+     * @return User space pointer to the meta header attached to the 
+     *         allocated packet, on success.
      *         NULL, in case of failure.
      */
     virtual TDataBuffer* AllocTxBuffer( TUint aLength );
 
+    /**
+     * From DEthernetFrameMemMngr
+     * Adds the specified Tx frame (contained in the buffer allocated from the 
+     * shared memory) to the relevant Tx queue according to its AC (i.e.
+     * priority).
+     *  
+     * @param aPacketInUserSpace Meta header attached to the frame; as a user
+     *        space pointer.
+     * @param aPacketInKernSpace If not NULL on return, the frame needs to be 
+     *        discarded and this is the kernel space pointer to its meta header.
+     *        If NULL on return, the frame must not be discarded. 
+     * @param aUserDataTxEnabled ETrue if user data Tx is enabled
+     *        EFalse otherwise
+     * @return ETrue if the client is allowed to continue calling this method
+     *         (i.e. Tx flow is not stopped).
+     *         EFalse if the client is not allowed to call this method again
+     *         (i.e. Tx flow is stopped) until it is re-allowed.
+     */
+    virtual TBool AddTxFrame( 
+        TDataBuffer* aPacketInUserSpace, 
+        TDataBuffer*& aPacketInKernSpace,
+        TBool aUserDataTxEnabled );
+    
+    /**
+     * From DEthernetFrameMemMngr
+     * Gets the frame to be transmitted next from the Tx queues.
+     * 
+     * @param aWhaTxQueueState State (full / not full) of every WHA transmit 
+     *        queue
+     * @param aMore On return is ETrue if another frame is also ready to be 
+     *        transmitted, EFalse otherwise
+     * @return Pointer to the meta header of the frame to be transmitted, on
+     *         success
+     *         NULL, if there's no frame that could be transmitted, given the
+     *         current status of the WHA Tx queues
+     */ 
+    virtual TDataBuffer* GetTxFrame( 
+        const TWhaTxQueueState& aTxQueueState,
+        TBool& aMore );
+    
     /**
      * From DEthernetFrameMemMngr
      * Deallocates a Tx packet.
@@ -138,7 +174,27 @@ protected:
      * 
      * @param aPacket Meta header of the packet to the deallocated
      */ 
-    virtual void FreeTxPacket( TDataBuffer*& aPacket );    
+    virtual void FreeTxPacket( TDataBuffer*& aPacket );
+
+    /** 
+     * From DEthernetFrameMemMngr
+     * Determines if Tx from protocol stack side client should be resumed
+     *  
+     * @param aUserDataTxEnabled ETrue if user data Tx is enabled
+     *        EFalse otherwise
+     * @return ETrue if Tx should be resumed
+     *         EFalse otherwise
+     */
+    virtual TBool ResumeClientTx( TBool aUserDataTxEnabled ) const;
+    
+    /** 
+     * From DEthernetFrameMemMngr
+     * Determines if all protocol stack side client's Tx queues are empty
+     * 
+     * @return ETrue if all Tx queues are empty
+     *         EFalse otherwise
+     */
+    virtual TBool AllTxQueuesEmpty() const;
     
 private:
 
@@ -157,20 +213,14 @@ private:
     
 private:    // Data
 
-    /** 
-    * array of TDataBuffer offset addresses, denoting Rx buffers,
-    * which are waiting here in kernel mode to be completed 
-    * to user mode, when the next frame receive request arrives
-    */
-    TUint32 iTobeCompletedBuffers[KMaxToBeCompletedRxBufs];
-
-    /** 
-    * array of TDataBuffer offset addresses, denoting Rx buffers, that are
-    * currently under processing in user mode
-    */
-    TUint32 iCompletedBuffers[KMaxCompletedRxBufs];
-    
+    /** kernel address of frame xfer block */
     RFrameXferBlockProtocolStack* iFrameXferBlockProtoStack;
+    
+    /** 
+    * the offset from a User space address to the corresponding address
+    * in the Kernel space in the shared memory chunk. May also be negative 
+    */
+    TInt32 iUserToKernAddrOffset;
     
     /** 
     * pointer to protocol stack side Tx area start in the kernel address 

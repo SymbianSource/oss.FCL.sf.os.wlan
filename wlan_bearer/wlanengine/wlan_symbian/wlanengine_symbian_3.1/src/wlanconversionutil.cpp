@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 86.1.2 %
+* %version: 89 %
 */
 
 #include <in_sock.h>
@@ -101,6 +101,21 @@ void TWlanConversionUtil::ConvertSSID(
     {
     Mem::Copy( aAmSSID.ssid, aCoreSSID.ssid, aCoreSSID.length );
     aAmSSID.ssidLength = aCoreSSID.length;
+    }
+
+// ---------------------------------------------------------
+// TWlanConversionUtil::ConvertWpaPreSharedKey()
+// ---------------------------------------------------------
+//
+void TWlanConversionUtil::ConvertWpaPreSharedKey(
+    core_wpa_preshared_key_s& aWpaPreSharedKey,
+    const TDesC8& aWspPin )
+    {        
+    Mem::Copy(
+        aWpaPreSharedKey.key_data,
+        aWspPin.Ptr(),
+        aWspPin.Length() );
+    aWpaPreSharedKey.key_length = aWspPin.Length();
     }
 
 // ---------------------------------------------------------

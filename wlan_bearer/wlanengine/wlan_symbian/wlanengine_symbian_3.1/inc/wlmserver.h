@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 55.1.2 %
+* %version: 59 %
 */
 
 #ifndef WLMSERVER_H
@@ -79,6 +79,10 @@ NONSHARABLE_CLASS( CWlmServer ) :
     public MWlanEapolCallbackInterface,
     public MWlanScanResultProvider
     {
+    
+    // Friend class for Unit Testing
+    friend class UT_CWlmServer;
+    
     public:  // Constructors and destructor
 
         /** 
@@ -1190,6 +1194,40 @@ NONSHARABLE_CLASS( CWlmServer ) :
          * @param aInterval WLAN BG scan interval in seconds.
          */
         void PublishBgScanInterval( TUint32& aInterval );
+
+        /**
+         * Callback method for indicating WLAN Server that WLAN has been
+         * set ON.
+         *
+         * @see MWlmPlatformCallback
+         */
+         void WlanOn();
+         
+         /**
+          * Callback method for indicating WLAN Server that WLAN has been
+          * set OFF.
+          *
+          * @see MWlmPlatformCallback
+          */
+         void WlanOff();
+         
+         /**
+          * Method for cancelling external requests by type.
+          * 
+          * @param aCommand Commands that need to be cancelled
+          */
+         void CancelExternalRequestsByType(
+             const TWLMCommands aCommand );
+         
+         /**
+          * Method for sending notifications to the subscribers
+          * 
+          * @param amNotification Notification to be sent.
+          * @param aParams Notification parameters.
+          */
+         void SendNotification(
+             TWlmNotify amNotification,
+             TBuf8<KMaxNotificationLength>& aParams );
 
     private:    // Data
     

@@ -1,7 +1,7 @@
 EXPORTS
 	?CancelCreateTrafficStream@RWLMServer@@QAEXXZ @ 1 NONAME ; void RWLMServer::CancelCreateTrafficStream(void)
 	?GetScanResults@RWLMServer@@QAEXAAVScanList@@ABVTDesC8@@AAHAAIAAVTRequestStatus@@@Z @ 2 NONAME ; void RWLMServer::GetScanResults(class ScanList &, class TDesC8 const &, int &, unsigned int &, class TRequestStatus &)
-	?RunProtectedSetup@RWLMServer@@QAEXAAVTRequestStatus@@ABV?$TBuf8@$0CA@@@ABV?$TBuf8@$07@@AAVTDes8@@@Z @ 3 NONAME ; void RWLMServer::RunProtectedSetup(class TRequestStatus &, class TBuf8<32> const &, class TBuf8<8> const &, class TDes8 &)
+	?RunProtectedSetup@RWLMServer@@QAEXAAVTRequestStatus@@KAAVTDes8@@@Z @ 3 NONAME ; void RWLMServer::RunProtectedSetup(class TRequestStatus &, unsigned long, class TDes8 &)
 	?RemoveIapSsidList@RWLMServer@@QAEHI@Z @ 4 NONAME ; int RWLMServer::RemoveIapSsidList(unsigned int)
 	?ClearPacketStatistics@RWLMServer@@QAEXXZ @ 5 NONAME ; void RWLMServer::ClearPacketStatistics(void)
 	?AddIapSsidList@RWLMServer@@QAEHIABV?$CArrayFixFlat@V?$TBuf8@$0CA@@@@@@Z @ 6 NONAME ; int RWLMServer::AddIapSsidList(unsigned int, class CArrayFixFlat<class TBuf8<32> > const &)

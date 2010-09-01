@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 8 %
+* %version: 7 %
 */
 
 #ifndef _RECEIVER_HW_H_
@@ -82,9 +82,6 @@ private:    // Data
     /** */
     TDataBuffer* iDataBuffer;
     
-	/** Rx frame to free */
-    TDataBuffer* iFrameToFree;
-
     };
 
 #endif //_RECEIVER_HW_H_

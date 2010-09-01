@@ -12,5 +12,3 @@ EXPORTS
 	_ZN12CWlmPlatformD2Ev @ 11 NONAME
 	_ZN12CWlmPlatform27InitializeSystemTimeHandlerEv @ 12 NONAME
 	_ZN12CWlmPlatform21PublishBgScanIntervalERm @ 13 NONAME
-	_ZN12CWlmPlatform17GetWlanOnOffStateEv @ 14 NONAME
-

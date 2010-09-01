@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 9 %
 */
 
 #ifndef __CARDDRV_H__
@@ -139,6 +139,9 @@ private:
     CReceiver* iReceiver;
     /** */
     RPcmNetCardIf iCard;
+
+    /** */
+    RFrameXferBlockProtocolStack* iFrameXferBlock;
     
 	};
 

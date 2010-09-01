@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 33 %
+* %version: 32 %
 */
 
 #ifndef DWLANLOGICALCHANNEL_H
@@ -139,37 +139,17 @@ public:
 	
     /**
      * Process a function for this logical channel.
+     * This function is executed in the context of client's thread in 
+     * supervisor mode. All code executed in this mode MUST NOT
+     * take a lot of time and MUST NOT access the WHA layer.
      * @param aFunction Defines the operation/function to be performed.
      * @param param     Function specific parameter
      * @return function specific return value.
      */
-	virtual TAny* DoControlFast( TInt aFunction, TAny* aParam );
+	virtual TAny* DoControlFast( TInt aFunction, TAny* param );
 	
 private:
 
-    /**
-     * Process a function for this logical channel.
-	 *
-     * @param aFunction Defines the operation/function to be performed.
-     * @param aParam Function specific parameter
-     * @return Function specific return value.
-     */
-    TAny* OnMgmtSideControlFast( TInt aFunction, TAny* aParam );
-    
-    /**
-     * Process a function for this logical channel.
-	 *
-     * @param aFunction Defines the operation/function to be performed.
-     * @param aParam Function specific parameter
-     * @param aTriggerTx ETrue if Tx operation should be triggered
-     *                   EFalse otherwise
-     * @return Function specific return value.
-     */
-    TAny* OnEthernetSideControlFast( 
-        TInt aFunction, 
-        TAny* aParam,
-        TBool& aTriggerTx );    
-    
     /**
     * Called from statemachine when oid has been completed. 
     * Triggers handling of a new oid
@@ -210,7 +190,7 @@ private:
     * @param aNumOfBuffers number of meta header pointers in the array
     */
     virtual void MgmtDataReceiveComplete( 
-        TDataBuffer*& aBufferStart, 
+        const TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers );
 
     /**
@@ -276,7 +256,7 @@ private:
     *         EFalse otherwise
     */
     virtual TBool ProtocolStackDataReceiveComplete( 
-        TDataBuffer*& aBufferStart, 
+        const TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers );
 
     /**

@@ -15,9 +15,6 @@
 *
 */
 
-/*
-* %version: 11 %
-*/
 
 // INCLUDE FILES
 #include <e32std.h>
@@ -152,8 +149,7 @@ void CWlanMgmtFrameHandler::RunL()
         {
         DEBUG( "CWlanMgmtFrameHandler::RunL() iDataBlock is not NULL" );
         TDataBuffer* buffer = NULL;
-        TDataBuffer* frameToFree = NULL;
-        while( ( buffer = iServiceProvider.GetRxFrame( frameToFree ) ) != NULL )
+        while( iDataBlock->GetNextRxDataBuffer( buffer ) )
             {
             DEBUG1( "EAPOL packet received, length=%d", 
                     buffer->GetLength() );
@@ -163,8 +159,6 @@ void CWlanMgmtFrameHandler::RunL()
                 buffer->GetLength(),
                 buffer->GetBuffer(),
                 buffer->Rcpi() );
-            
-            frameToFree = buffer;
             }
         }
     // Wait for next packets.

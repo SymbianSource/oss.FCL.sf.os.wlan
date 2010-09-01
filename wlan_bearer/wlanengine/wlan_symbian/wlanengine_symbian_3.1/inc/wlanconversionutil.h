@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 35 %
+* %version: 34 %
 */
 
 #ifndef WLANCONVERSIONUTIL_H
@@ -83,16 +83,6 @@ class TWlanConversionUtil
         static void ConvertSSID(
             TSSID& aAmSSID,
             const core_ssid_s& aCoreSSID );
-        
-        /**
-        * ConvertWpaPreSharedKey
-        * @since Series 60 3.0
-        * @param aWpaPreSharedKey (OUT)
-        * @param aWspPin (IN)
-        */    
-        static void ConvertWpaPreSharedKey(
-            core_wpa_preshared_key_s& aWpaPreSharedKey,
-            const TDesC8& aWspPin );
 
         /**
         * ConvertScanRate

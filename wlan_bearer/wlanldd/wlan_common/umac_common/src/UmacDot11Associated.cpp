@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 99 %
+* %version: 96.1.2 %
 */
 
 #include "config.h"
@@ -658,8 +658,8 @@ void WlanDot11Associated::OnDataFrameRx(
     TUint nbrOfpacketsForMgmtClient ( 0 );
     const TUint KMaxNbrOfPacketsForUsr ( 30 );
     const TUint KMaxNbrOfPacketsForMgmtClient ( 10 );
-    TDataBuffer* packetsForUsr[KMaxNbrOfPacketsForUsr];
-    TDataBuffer* packetsForMgmtClient[KMaxNbrOfPacketsForMgmtClient];
+    const TDataBuffer* packetsForUsr[KMaxNbrOfPacketsForUsr];
+    const TDataBuffer* packetsForMgmtClient[KMaxNbrOfPacketsForMgmtClient];
     // one byte past the last actual payload byte (so excluding the potentially
     // present security trailer) of the MPDU
     const TUint8* const KMpduPayloadEnd ( 
@@ -1006,7 +1006,8 @@ void WlanDot11Associated::OnManagementActionFrameRx(
             - aBuffer );                              // buffer beginning
         
         // complete
-        aCtxImpl.iUmac.MgmtDataReceiveComplete( metaHdr, 1 );
+        const TDataBuffer* KMetaHdr ( metaHdr );
+        aCtxImpl.iUmac.MgmtDataReceiveComplete( KMetaHdr, 1 );
         }
     else
         {
@@ -1368,7 +1369,7 @@ TUint WlanDot11Associated::EncryptTrailerLength(
     if ( // our client has instructed us not the encrypt this frame under
          // any circumstances OR
          ( aDataBuffer.KeFlags() & TDataBuffer::KTxFrameMustNotBeEncrypted ) ||
-         // no space is reserved for security trailer on this sw layer. It is
+         // no space is reserved for security header on this sw layer. It is
          // done on lower layers; when necessary.
          ( aCtxImpl.WHASettings().iCapability & 
            WHA::SSettings::KNoSecHdrAndTrailer ) )

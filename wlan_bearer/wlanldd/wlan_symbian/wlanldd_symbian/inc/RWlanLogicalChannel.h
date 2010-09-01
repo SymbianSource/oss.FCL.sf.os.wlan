@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 18.1.1 %
 */
 
 #ifndef RWLAN_LOGICAL_CHANNEL_H_
@@ -28,6 +28,15 @@
 #ifndef __KERNEL_MODE__
 #include <e32std.h> // for RChunk
 #endif
+
+// Enumeration values for control messages
+enum TWlanControl
+	{
+    EWlanSvControlInitBuffers,  // Allocate frame transfer memory for WLAN Mgmt
+                                // client
+    EWlanSvControlFreeBuffers   // Deallocate memory allocated by 
+                                // EWlanSvControlInitBuffers
+	};
 
 // Open parameters
 struct TOpenParam 
@@ -46,42 +55,23 @@ struct TOpenParam
     TUint32 iFirmWareLength;    // length of firmware in bytes 	
 	};
 
+// Enumeration values for asynchronous requests. Do not exceed KMaxRequests!
+enum TWlanRequest
+    {
+	EWlanRequestNotify,        // request a notification
+	EWlanRequestFrame,         // frame Rx request
+	EWlanRequestSend,          // frame Tx request
+	EWlanCommand,		       // WLAN management command
+    EWlanInitSystem,           // internal init
+    EWlanFinitSystem,          // internal finit
+	EWlanMaxRequest
+    };
+
 class RWlanLogicalChannel : public RBusLogicalChannel
     {
+
 public:
 
-    // Enumeration values for control messages
-    enum TWlanControl
-        {
-        EWlanSvControlInitBuffers,  // Allocate frame transfer memory for WLAN Mgmt
-                                    // client
-        EWlanSvControlFreeBuffers   // Deallocate memory allocated by 
-                                    // EWlanSvControlInitBuffers
-        };
-
-    // Enumeration values for asynchronous requests. Do not exceed KMaxRequests!
-    enum TWlanRequest
-        {
-        EWlanRequestNotify,        // request a notification
-        EWlanRequestFrame,         // frame Rx request
-        EWlanRequestSend,          // frame Tx request
-        EWlanCommand,              // WLAN management command
-        EWlanInitSystem,           // internal init
-        EWlanFinitSystem,          // internal finit
-        EWlanMaxRequest
-        };
-
-    /** 
-    * Calls executed in the context of the client's thread, but in 
-    * supervisor mode
-    */
-    enum TControlFast
-        {
-        EWlanControlFastGetRxFrame = 0x0E000000
-        };
-    
-public:
-    
     /** 
       * Opens a channel to the WLAN device driver.
       *
@@ -163,7 +153,7 @@ public:
     *
     * @since S60 3.1
     * @param aFrameXferBlock FrameXferBlock to be initialised by 
-    *        the device driver.
+    * the device driver.
     * @return KErrNone on success, any other on failure
     */
     inline TInt InitialiseBuffers( RFrameXferBlock*& aFrameXferBlock );
@@ -204,20 +194,6 @@ public:
       */
     inline void CancelRxRequests();
 
-    /**
-     * Gets the next frame (contained in a buffer allocated from
-     * the shared memory) from the Rx queue.
-     * Optionally frees the memory associated to a previously received frame. 
-     * 
-     * @param aFrameToFree Previously received frame which can now be freed.
-     *        NULL if nothing to free.
-     * @return Pointer to the Rx frame to be handled next.
-     *         NULL, if there are no frames available. If NULL is returned
-     *         the client should re-issue the asynchronous frame Rx request
-     *         (i.e. RequestFrame())
-     */ 
-    inline TDataBuffer* GetRxFrame( TDataBuffer* aFrameToFree );    
-    
 private:
 
     inline TInt InitWlanSystem( TOpenParam& aOpenParam );

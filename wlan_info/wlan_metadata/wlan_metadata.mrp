@@ -1,0 +1,6 @@
+component           wlan_metadata
+source   \sf\os\wlan\wlan_info\wlan_metadata 
+source   \sf\os\wlan\package_definition.xml
+source   \sf\os\wlan\distribution.policy.s60
+notes_source      \component_defs\release.src
+ipr T 

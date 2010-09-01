@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <api id="ae1474793294262aa68600f30a1a2e8d" dataversion="1.0">
-<name>WLAN Bus Access API</name>
-<description>WLAN Bus Access API</description>
+<name>WLAN SPIA API</name>
+<description>WLAN SPI Abstraction API</description>
 <type>c++</type>
 <subsystem>wlan_bearer</subsystem>
 <libs></libs>

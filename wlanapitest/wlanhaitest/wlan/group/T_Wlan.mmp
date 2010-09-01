@@ -1,0 +1,66 @@
+/*
+* Copyright (c) 2005-2009 Nokia Corporation and/or its subsidiary(-ies).
+* All rights reserved.
+* This component and the accompanying materials are made available
+* under the terms of "Eclipse Public License v1.0"
+* which accompanies this distribution, and is available
+* at the URL "http://www.eclipse.org/legal/epl-v10.html".
+*
+* Initial Contributors:
+* Nokia Corporation - initial contribution.
+*
+* Contributors:
+*
+* Description: 
+*
+*/
+
+
+#include <platform_paths.hrh>
+OS_LAYER_SYSTEMINCLUDE_SYMBIAN
+
+TARGET			t_wlan.exe
+TARGETTYPE		exe
+UID				0x102863E6 0xA00041CB
+VENDORID		0x70000001
+
+capability		All -Tcb
+
+SOURCEPATH		../src
+
+SOURCE			../../common/src/datawrapperbase.cpp
+SOURCE			t_wlandriverserver.cpp
+SOURCE          t_wlanmgmtclientdata.cpp
+SOURCE          t_wlanscaninfodata.cpp
+SOURCE			t_rsocketservdata.cpp
+SOURCE			t_rconnectiondata.cpp
+SOURCE			t_ccommsdatabasedata.cpp
+SOURCE			t_ccommsdbtableviewdata.cpp
+SOURCE          t_rsocketdata.cpp
+SOURCE			t_rfiledata.cpp
+
+USERINCLUDE		../inc
+USERINCLUDE		../../common/inc 
+
+
+SYSTEMINCLUDE	/epoc32/include
+SYSTEMINCLUDE	/epoc32/include/test
+SYSTEMINCLUDE	/epoc32/include/kernel
+SYSTEMINCLUDE   /epoc32/include/ecom
+SYSTEMINCLUDE   /epoc32/include/mw
+
+LIBRARY			testexecuteutils.lib
+LIBRARY			testexecutelogclient.lib
+LIBRARY			iniparser.lib
+LIBRARY         euser.lib
+LIBRARY			ecom.lib
+LIBRARY			flogger.lib
+LIBRARY			commdb.lib
+LIBRARY			esock.lib
+LIBRARY			insock.lib
+LIBRARY			wlandbif.lib
+LIBRARY			efsrv.lib
+LIBRARY			eikcore.lib
+LIBRARY			apengine.lib     
+
+SMPSAFE

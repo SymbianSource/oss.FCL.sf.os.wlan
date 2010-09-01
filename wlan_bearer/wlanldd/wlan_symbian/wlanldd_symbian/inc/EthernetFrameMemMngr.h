@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 19 %
+* %version: 18 %
 */
 
 #ifndef DETHERNETFRAMEMEMMNGR_H
@@ -34,6 +34,11 @@ class WlanChunk;
 
 /**
 * Manager object for frame Tx and Rx memory
+*
+* Consumed count of Rx-buffers = 
+* nbr of Rx buffers currently under processing in user mode        
+* + nbr of Rx buffers given to wlanpdd
+* + nbr of Rx buffers waiting for completion to user mode
 *
 *  @since S60 v3.1
 */
@@ -89,9 +94,9 @@ public:
     *
     * @since S60 3.1
     * @return memory block that can be used for tx frame write, 
-    *         NULL upon failure
+    * NULL upon failure
     */
-    virtual TDataBuffer* OnWriteEthernetFrame() const;
+    TDataBuffer* OnWriteEthernetFrame() const;
 
     /**
     * Gets a memory block that can be used as rx frame buffer
@@ -118,14 +123,6 @@ public:
     void FreeRxFrameMetaHeader( TDataBuffer* aMetaHeader );
     
     /**
-     * Frees the memory associated to a frame. 
-     * 
-     * @param aFrameToFreeInUserSpace User space pointer to the meta header
-     *        of the frame to be freed.
-     */ 
-    void FreeRxPacket( TDataBuffer* aFrameToFreeInUserSpace );
-    
-    /**
     * To be called when rx frame read cycle has ended.
     *
     * @since S60 3.1
@@ -137,34 +134,18 @@ public:
     *         EFalse otherwise
     */
     TBool OnEthernetFrameRxComplete( 
-        TDataBuffer*& aBufferStart, 
+        const TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers );
 
     /**
-    * To be called when user mode client issues a frame Rx request
+    * To be called when user mode issues a rx frame read request
     *
     * @since S60 3.1
-    * @return ETrue if callee should complete the request immediately 
-    *         as there exists Rx frame(s) which can be retrieved by the user
-    *         mode client.
-    *         EFalse otherwise
+    * @return ETrue if callee should complete the request immediadly 
+    * as their exist data to be completed, EFalse otherwise
     */
-    virtual TBool OnReadRequest() = 0;
+    TBool OnReadRequest();
 
-    /**
-     * Gets the highest priority frame (contained in a buffer allocated from
-     * the shared memory) from the Rx queues.
-     * Optionally frees the memory associated to a previously received frame. 
-     * 
-     * @param aFrameToFree Previously received frame which can now be freed.
-     *        NULL if nothing to free.
-     * @return Pointer to the Rx frame to be handled next.
-     *         NULL, if there are no frames available. If NULL is returned
-     *         the client should re-issue the asynchronous frame Rx request
-     *         (i.e. RequestFrame())
-     */ 
-    virtual TDataBuffer* GetRxFrame( TDataBuffer* aFrameToFree ) = 0;
-    
     /**
     * Frees the specified Rx frame buffer
     *
@@ -177,8 +158,8 @@ public:
      * Allocates a Tx packet from the shared memory.
      * 
      * @param aLength Length of the requested Tx buffer in bytes
-     * @return User space pointer to the meta header attached to the 
-     *         allocated packet, on success.
+     * @return Pointer to the meta header attached to the allocated packet, on
+     *         success.
      *         NULL, in case of failure.
      */
     virtual TDataBuffer* AllocTxBuffer( TUint aLength );
@@ -200,7 +181,7 @@ public:
      *         EFalse if the client is not allowed to call this method again
      *         (i.e. Tx flow is stopped) until it is re-allowed.
      */
-    virtual TBool AddTxFrame( 
+    TBool AddTxFrame( 
         TDataBuffer* aPacketInUserSpace, 
         TDataBuffer*& aPacketInKernSpace,
         TBool aUserDataTxEnabled );
@@ -217,7 +198,7 @@ public:
      *         NULL, if there's no frame that could be transmitted, given the
      *         current status of the WHA Tx queues
      */ 
-    virtual TDataBuffer* GetTxFrame( 
+    TDataBuffer* GetTxFrame( 
         const TWhaTxQueueState& aTxQueueState,
         TBool& aMore );
     
@@ -239,7 +220,7 @@ public:
      * @return ETrue if Tx should be resumed
      *         EFalse otherwise
      */
-    virtual TBool ResumeClientTx( TBool aUserDataTxEnabled ) const;
+    TBool ResumeClientTx( TBool aUserDataTxEnabled ) const;
     
     /** 
      * Determines if all protocol stack side client's Tx queues are empty
@@ -247,7 +228,7 @@ public:
      * @return ETrue if all Tx queues are empty
      *         EFalse otherwise
      */
-    virtual TBool AllTxQueuesEmpty() const;
+    TBool AllTxQueuesEmpty() const;
     
     /**
     * Static creator of the class instance
@@ -291,7 +272,10 @@ protected:
         DWlanLogicalChannel& aParent, 
         WlanChunk*& aRxFrameMemoryPool ) :
         iReadStatus( ENotPending ), 
-        iFrameXferBlockBase( NULL ),
+        iFrameXferBlock( NULL ), 
+        iCountCompleted( 0 ), 
+        iCountTobeCompleted( 0 ),
+        iTxDataBuffer( NULL ), 
         iRxDataChunk( NULL ),
         iParent( aParent ),
         iRxFrameMemoryPool( aRxFrameMemoryPool ),
@@ -350,8 +334,35 @@ protected:
     *         EFalse otherwise
     */
     virtual TBool DoEthernetFrameRxComplete( 
-        TDataBuffer*& aBufferStart, 
+        const TDataBuffer*& aBufferStart, 
         TUint32 aNumOfBuffers ) = 0;
+
+    /**
+    * Gets start address of Rx buffers (their offset addresses)
+    * that are waiting for completion to user mode
+    *
+    * @since S60 3.1
+    * @return see above statement
+    */
+    virtual TUint32* DoGetTobeCompletedBuffersStart() = 0;
+
+    /**
+    * Gets start address of Rx buffers (their offset addresses)
+    * that have been completed to user mode
+    *
+    * @since S60 3.1
+    * @return see above statement
+    */
+    virtual TUint32* DoGetCompletedBuffersStart() = 0;        
+
+    /**
+    * Gets called when user mode client issues a frame receive request 
+    * and Rx buffers have been completed to it. The completed Rx frame 
+    * buffers are freed.
+    *
+    * @since S60 3.1
+    */
+    virtual void DoFreeRxBuffers() = 0;
 
     /**
     * Marks memory as not in use, meaning that it is not allocated 
@@ -388,8 +399,22 @@ protected:  // Data
     /** state  of the rx frame read request */
     TFrameReadState    iReadStatus;
 
-    /** kernel address of xfer block; as base class pointer */
-    RFrameXferBlockBase* iFrameXferBlockBase;
+    /** kernel address of xfer block */
+    RFrameXferBlock*    iFrameXferBlock;
+
+    /**
+    * amount of rx frame buffers that are 
+    * currently under processing in user mode
+    */
+    TUint32 iCountCompleted;
+
+    /**
+    * amount of rx frame buffers waiting completion to user mode
+    */
+    TUint32 iCountTobeCompleted;
+
+    /** kernel address of Tx-data buffer */
+    TDataBuffer*        iTxDataBuffer;
 
     /** pointer to Rx area start in the kernel address space */
     TUint8*             iRxDataChunk;

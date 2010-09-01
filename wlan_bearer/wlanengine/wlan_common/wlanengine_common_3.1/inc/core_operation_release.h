@@ -37,7 +37,6 @@ public:
     enum core_state_e
         {
         core_state_init = core_base_state_next,
-        core_state_eapol_disassociated,
         core_state_disable_user_data,
         core_state_tx_power_level,
         core_state_disconnect,

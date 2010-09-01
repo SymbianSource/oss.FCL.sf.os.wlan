@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 38 %
+* %version: 37 %
 */
 
 #include "core_connection_data.h"
@@ -52,11 +52,9 @@ core_connection_data_c::core_connection_data_c(
     is_eapol_authentication_started_m( false_t ),
     is_eapol_authenticating_m( false_t ),
     eapol_auth_bssid_m( ZERO_MAC_ADDR ),
-    eapol_auth_failure_m( core_error_ok ),
     traffic_stream_list_m( ),
     virtual_traffic_stream_list_m( ),
     is_eapol_connecting_m( false_t ),
-    is_eapol_disconnecting_m( false_t ),
     is_disconnecting_m( false_t ),
     last_roam_reason_m( core_roam_reason_none ),
     last_roam_failed_reason_m( core_roam_failed_reason_none ),
@@ -674,23 +672,6 @@ void core_connection_data_c::set_eapol_auth_bssid(
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 //
-core_error_e core_connection_data_c::eapol_auth_failure() const
-    {
-    return eapol_auth_failure_m;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-//
-void core_connection_data_c::set_eapol_auth_failure(
-    core_error_e error )
-    {
-    eapol_auth_failure_m = error;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-//
 core_traffic_stream_list_c& core_connection_data_c::traffic_stream_list()
     {
     return traffic_stream_list_m;
@@ -719,23 +700,6 @@ void core_connection_data_c::set_eapol_connecting(
     bool_t is_eapol_connecting )
     {
     is_eapol_connecting_m = is_eapol_connecting;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-//
-bool_t core_connection_data_c::is_eapol_disconnecting() const
-    {
-    return is_eapol_disconnecting_m;
-    }
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-//
-void core_connection_data_c::set_eapol_disconnecting(
-    bool_t is_eapol_disconnecting )
-    {
-    is_eapol_disconnecting_m = is_eapol_disconnecting;
     }
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 12 %
+* %version: 10 %
 */
 
 #ifndef WLANBGSCAN_H
@@ -93,7 +93,7 @@ public:
      * 
      * @param aState New WLAN state
      */
-    void SetBgScanState( const MWlanBgScanProvider::TWlanBgScanState &aState );
+    void WlanStateChanged( const MWlanBgScanProvider::TWlanBgScanWlanState &aState );
     
     /**
      * From MWlanBgScanProvider.
@@ -112,6 +112,20 @@ public:
      * @since S60 v5.2
      */
     void NotifyChangedSettings( MWlanBgScanProvider::TWlanBgScanSettings& aSettings );
+    
+    /**
+     * From MAwsBgScanProvider.
+     * Set new background scan interval.
+     * Asynchronous method to set new background scan interval, executed in
+     * AWS thread context.
+     *
+     * @since S60 v5.2
+     * @param aNewInterval new interval to be taken into use
+     * @param aStatus Status of the calling active object. On successful
+     *                completion contains KErrNone, otherwise one of the
+     *                system-wide error codes.
+     */
+    void SetInterval( TUint32 aNewInterval, TRequestStatus& aReportStatus );
     
     /**
      * From MWlanTimerServiceCallback.

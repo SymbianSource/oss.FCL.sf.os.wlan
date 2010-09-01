@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2007 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 7 %
+* %version: 5 %
 */
 
 #ifndef WLANERRORCODES_H
@@ -277,19 +277,6 @@ const TInt KErrWlanEapFastAuthFailed                                  = -30233;
  * @ingroup rconn_cfg
  */
 const TInt KErrWlanEapFastPacStoreCorrupted                           = -30234;
-/**
- * The received request cannot be serviced as WLAN is OFF. In typical case
- * WLAN is OFF because the end-user has set it OFF from WLAN UI.
- * @ingroup rconn_cfg
- */
-const TInt KErrWlanOff                                                = -30235;
-/**
- * The received request cannot be serviced as WLAN is forcibly disabled.
- * In typical case the Device Management has disabled WLAN based on operator
- * configuration.
- * @ingroup rconn_cfg
- */
-const TInt KErrWlanForceOff                                           = -30236;
 
 /**
  * @} 

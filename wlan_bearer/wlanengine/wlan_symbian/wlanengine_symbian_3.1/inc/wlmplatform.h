@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 12 %
 */
 
 #ifndef WLMPLATFORM_H
@@ -103,16 +103,6 @@ class MWlmPlatformCallback
          */
         virtual void ClearRegionCache() = 0;
         
-        /**
-         * WLAN has been set ON.
-         */
-        virtual void WlanOn() = 0;
-        
-        /**
-         * WLAN has been set OFF.
-         */
-        virtual void WlanOff() = 0;
-        
     };
 
 /**
@@ -195,12 +185,6 @@ NONSHARABLE_CLASS( CWlmPlatform ) : public CBase, public MWlmSystemNotify, publi
          * @param aInterval WLAN BG scan interval in seconds.
          */
         IMPORT_C void PublishBgScanInterval( TUint32& aInterval );
-        
-        /**
-         * Get current WLAN on/off state.
-         * @return WLAN on/off state.
-         */
-        IMPORT_C TWlanOnOffState GetWlanOnOffState();
 
     protected:  // Methods
 
@@ -235,16 +219,6 @@ NONSHARABLE_CLASS( CWlmPlatform ) : public CBase, public MWlmSystemNotify, publi
         * (From MWlmSystemNotify) BT connection has been disconnected.        
         */
         void BtConnectionDisabled();
-        
-        /**
-         * (From MWlmSystemNotify) WLAN has been set ON.
-         */
-        void WlanOn();
-        
-        /**
-         * (From MWlmSystemNotify) WLAN has been set OFF.
-         */
-        void WlanOff();
         
         /**
          * (From MWlanSystemTimeCallback) 

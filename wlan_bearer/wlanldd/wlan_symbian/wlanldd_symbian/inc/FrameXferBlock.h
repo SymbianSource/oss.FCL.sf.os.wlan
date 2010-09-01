@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 26 %
+* %version: 25 %
 */
 
 #ifndef FRAMEXFERBLOCK_H
@@ -27,6 +27,11 @@
 #include "pack.h"
 #include "wllddcircularbuffer.h"
 
+/** Max number of completed Rx buffers */
+static const TUint KMaxCompletedRxBufs = 300;
+
+/** Max number of to be completed Rx buffers */
+static const TUint KMaxToBeCompletedRxBufs = KMaxCompletedRxBufs;
 
 /** 
 * This value (bytes) should be at least as large as the Tx offset required
@@ -127,7 +132,7 @@ class TDataBuffer
 
 public:
 
-    typedef TUint16 TFrameType;
+    typedef TUint32 TFrameType;
 
     /** ethernet II frame */
     static const TFrameType KEthernetFrame      = 0;
@@ -224,7 +229,7 @@ public:
     inline TUint8 UserPriority() const;
 
     /**
-    * Gets the RCPI value of the Rx frame
+    * Gets the RCPI value of a received frame
     *
     * @since S60 3.2
     * @return RCPI value
@@ -333,15 +338,14 @@ private:
     /** Default Ctor */
     TDataBuffer() :
         iFrameType( KEthernetFrame ), 
+        iLength( 0 ), 
         iUp( 0 ), 
         iRcpi( 0 ),
-        iLength( 0 ), 
         iDestinationAddress( KZeroMacAddr ),
         iBufLength( 0 ),
         iOffsetToFrameBeginning( 0 ),
         iBufferOffsetAddr( sizeof( TDataBuffer ) ),
-        iFlags( 0 ),
-        iNext( NULL )
+        iFlags( 0 )
         {};
 
     /**
@@ -391,19 +395,23 @@ private:    // Data
     /** type of the frame in buffer */
     TFrameType iFrameType;
         
-    /** 
-    * 802.1D User Priority of the frame
-    */
-    TUint8 iUp;
-
-    /** 
-    * RCPI of the received frame; range: [0..250]
-    */
-    TUint8 iRcpi;
-
     /** length of the data in buffer */
     TUint32 iLength;
     
+    /** 
+    * 802.1D User Priority of the frame
+    * stored as a 32-bit value to keep the length of this object 32-bit
+    * aligned
+    */
+    TUint32 iUp;
+
+    /** 
+    * RCPI of the received frame; range: [0..250]
+    * stored as a 32-bit value to keep the length of this object 32-bit
+    * aligned
+    */
+    TUint32 iRcpi;
+
     /** 
     * Destination address of the frame to be transmitted. Used only when
     * the address cannot be determined from the frame content  
@@ -427,9 +435,6 @@ private:    // Data
 
     /** may contain a combination of the flags defined for this class */
     TFlag iFlags;
-    
-    /** pointer to the meta header of the next frame in the same Rx queue */ 
-    TDataBuffer* iNext;
     
     /** 
     * Note! The total length of this object needs to be divisible by four
@@ -685,21 +690,67 @@ public:
 
 #ifndef __KERNEL_MODE__ /* User mode */
     
+    /**
+    * Gets next Rx-data buffer that has data to be read
+    *
+    * @since S60 3.1
+    * @param aBuf OUT parameter where Rx-data buffers address that is to
+    * be read is copied
+    * @return ETrue Rx-data exists after this call still to read,
+    * otherwise EFalse
+    */
+    inline TBool GetNextRxDataBuffer( TDataBuffer*& aBuf );
+
     //////////////////////////////////////////////////////////////////////////
     // Rest of the methods are meant to be used only in the device driver code
     //////////////////////////////////////////////////////////////////////////
 
-    /** 
-     * Initializes the object instance, with the address of this in user space.
-     * 
-     * @param aThisAddrUserSpace Address of this object in user space.
-     */
-    inline void UserInitialize( TUint32 aThisAddrUserSpace );
-    
+    /**
+    * Set data chunk address
+    *
+    * Note! This method is executed in user mode context by the user mode
+    * client interface, i.e. not the client itself!
+    * @since S60 3.1
+    * @param aUserAddr user address of the buffer
+    */
+    inline void SetRxDataChunkField( TLinAddr aUserAddr );
+
 #endif /* User mode end */
 
 #ifdef __KERNEL_MODE__ /* Kernel mode */
     
+    /**
+    * Completes Rx buffers to user space
+    *
+    * @since S60 3.1
+    * @param aRxCompletionBuffersArray Rx buffer addresses as offsets from
+    *        Rx memory pool beginning
+    * @param aNumOfCompleted number of buffers
+    */
+    void KeRxComplete( 
+        const TUint32* aRxCompletionBuffersArray, 
+        TUint32 aNumOfCompleted );
+
+    /**
+    * Gets the array of Rx buffers (their offset addresses) which have already
+    * been handled by the user space client
+    *
+    * @since S60 5.0
+    * @param aRxHandledBuffersArray Pointer to the beginning of the array
+    * @param aNumOfHandled Number of buffers (offset addresses) on the array
+    */
+    void KeGetHandledRxBuffers( 
+        const TUint32*& aRxHandledBuffersArray, 
+        TUint32& aNumOfHandled );
+
+    /**
+    * Notes, that all Rx buffers, which were completed to user space
+    * the previous time, are now free.
+    *
+    * @since S60 5.0
+    */
+    void KeAllUserSideRxBuffersFreed();
+
     /**
     * Sets the Tx offset for every frame type which can be transmitted
     *
@@ -712,17 +763,8 @@ public:
     void KeSetTxOffsets( 
         TUint32 aEthernetFrameTxOffset,
         TUint32 aDot11FrameTxOffset,
-        TUint32 aSnapFrameTxOffset );
+        TUint32 aSnapFrameTxOffset );    
 
-    /**
-    * Returns the offset from a User space address to the corresponding address
-    * in the Kernel space in the shared memory chunk. 
-    * May also be negative.
-    * 
-    * @return The offset
-    */
-    inline TInt32 UserToKernAddrOffset() const;
-    
 protected:
     
     /**
@@ -746,20 +788,39 @@ private:
     
 protected:    // Data
 
-    /** Address of this object instance in the kernel mode address space */
-    TUint32 iThisAddrKernelSpace;
-    
-    /** 
-    * the offset from a User space address to the corresponding address
-    * in the Kernel space in the shared memory chunk. May also be negative 
-    */
-    TInt32 iUserToKernAddrOffset;
+    /** the beginning of the Rx data area in user address space */
+    TUint8*         iRxDataChunk;
 
+    /**
+    * number of Rx-data buffers that were completed by the device driver
+    */
+    TUint32         iNumOfCompleted;
+
+    /**
+    * index to iRxCompletedBuffers denoting the Rx buffer that is to be
+    * extracted next by the user application
+    */
+    TUint32         iCurrentRxBuffer;
+
+    /** 
+    * index of the first Rx buffer in iRxCompletedBuffers array
+    * - which the user side client has already handled and
+    *   which can therefore be freed & re-used AND
+    * - which hasn't been freed yet
+    */
+    TUint32         iFirstRxBufferToFree;
+    
     /** 
     * defines a Tx offset for every frame type which can be transmitted
     */
-    TUint32 iTxOffset[TDataBuffer::KFrameTypeMax];
+    TUint32         iTxOffset[TDataBuffer::KFrameTypeMax];
 
+    /** 
+    * array of TDataBuffer offset addresses from the memory pool start address,
+    * denoting Rx buffers which are ready to be read
+    */
+    TUint32         iRxCompletedBuffers[KMaxCompletedRxBufs];
+    
     /**
     * Note! The length of this object needs to be divisible by 4 to make
     * the objects following it to be aligned correctly
@@ -768,31 +829,40 @@ protected:    // Data
 
 #ifndef __KERNEL_MODE__ /* User mode */
 
-// -----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // 
-// -----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 //
-inline void RFrameXferBlockBase::UserInitialize( 
-    TUint32 aThisAddrUserSpace)
+inline TBool RFrameXferBlockBase::GetNextRxDataBuffer( TDataBuffer*& aBuf )
     {
-    iUserToKernAddrOffset = iThisAddrKernelSpace - aThisAddrUserSpace;
+    TBool ret( EFalse );
+
+    if ( iNumOfCompleted )
+        {
+        --iNumOfCompleted;
+        aBuf = reinterpret_cast<TDataBuffer*>(
+                // Rx memory pool user mode start address
+                iRxDataChunk + 
+                // offset from the memory pool start address
+                iRxCompletedBuffers[iCurrentRxBuffer]);
+                
+        ++iCurrentRxBuffer;
+        ret = ETrue;
+        }
+
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline void RFrameXferBlockBase::SetRxDataChunkField( TLinAddr aUserAddr )
+    {
+    iRxDataChunk = reinterpret_cast<TUint8*>(aUserAddr); 
     }
 
 #endif /* User mode end */
-
-#ifdef __KERNEL_MODE__ /* Kernel mode */
-
-// -----------------------------------------------------------------------------
-// Note! This method is executed in the context of the user mode client 
-// thread, but in supervisor mode
-// -----------------------------------------------------------------------------
-//
-inline TInt32 RFrameXferBlockBase::UserToKernAddrOffset() const
-    {
-    return iUserToKernAddrOffset;
-    }
-
-#endif /* Kernel mode end */
 
 
 /**
@@ -823,7 +893,6 @@ public:
     * @return KErrNone on success,
     *         KErrOverflow if aLength is greater than the available space in
     *         the Tx buffer
-    *         KErrNoMemory if frame transfer memory hasn't been allocated
     */
     inline TInt AppendTxDataBuffer( 
         const TUint8* aData, 
@@ -855,40 +924,12 @@ public:
 #ifdef __KERNEL_MODE__ /* Kernel mode */
     
     /**
-    * Initializes Kernel side memory interface to shared memory between User
-    * and Kernel Space.
+    * Initialises the buffer.
     *
     *  @param aTxBufLength
     */
-    void Initialize( TUint32 aTxBufLength );
+    inline void Initialize( TUint32 aTxBufLength );
     
-    /**
-     * Adds the specified Rx frame (contained in a buffer allocated from the 
-     * shared memory) to the Rx queue
-     *  
-     * @param aFrame Meta header attached to the frame; as a kernel
-     *        space pointer.
-     */
-    void AddRxFrame( TDataBuffer* aFrame );
-    
-    /**
-     * Gets the next frame from the Rx queue for passing it to
-     * the WLAN Mgmt client.
-     * 
-     * @return User space pointer to the meta header of the Rx frame to be
-     *         passed to the user mode client.
-     *         NULL, if there's no frame available.
-     */ 
-    TDataBuffer* GetRxFrame();
-    
-    /**
-     * Finds out if there is an Rx frame ready for user mode client retrieval
-     * 
-     * @return ETrue if an Rx frame is ready for retrival
-     *         EFalse otherwise
-     */ 
-    TBool RxFrameAvailable() const;
-        
 #endif /* Kernel mode end */
     
 private:
@@ -903,20 +944,14 @@ private:
     
 private: // data
 
-    /** Tx data buffer */
-    TDataBuffer* iTxDataBuffer;
+    /** Tx-data buffer */
+    TDataBuffer*    iTxDataBuffer;
 
     /** 
     * stores the total capacity (length) of the Tx buffer (iTxDataBuffer) 
     * associated with this object instance
     */
-    TUint32 iTxBufLength;
-    
-    /** pointer to the meta header of the 1st frame in the Rx queue */
-    TDataBuffer* iRxQueueFront;
-    
-    /** pointer to the meta header of the last frame in the Rx queue */
-    TDataBuffer* iRxQueueRear;    
+    TUint32         iTxBufLength;
     };
 
 #ifndef __KERNEL_MODE__ /* User mode */
@@ -933,46 +968,39 @@ inline TInt RFrameXferBlock::AppendTxDataBuffer(
     TBool aMustNotBeEncrypted,
     const TMacAddress* aDestinationAddress )
     {
-    if ( iTxDataBuffer )
+    if ( aLength <= 
+        iTxBufLength - 
+        iTxOffset[aFrameType] - 
+        iTxDataBuffer->GetLength() )
         {
-        if ( aLength <= 
-            iTxBufLength - 
-            iTxOffset[aFrameType] - 
-            iTxDataBuffer->GetLength() )
+        // provided data fits into buffer
+        
+        iTxDataBuffer->FrameType( aFrameType );
+        iTxDataBuffer->AppendBuffer( aData, aLength, iTxOffset[aFrameType] );
+        iTxDataBuffer->SetUserPriority( aUserPriority );
+
+        if ( aMustNotBeEncrypted )
             {
-            // provided data fits into buffer
-            
-            iTxDataBuffer->FrameType( aFrameType );
-            iTxDataBuffer->AppendBuffer( aData, aLength, iTxOffset[aFrameType] );
-            iTxDataBuffer->SetUserPriority( aUserPriority );
-    
-            if ( aMustNotBeEncrypted )
-                {
-                iTxDataBuffer->KeSetFlags( 
-                    TDataBuffer::KTxFrameMustNotBeEncrypted );
-                }
-            else
-                {
-                iTxDataBuffer->KeClearFlags( 
-                    TDataBuffer::KTxFrameMustNotBeEncrypted );
-                }
-    
-            if ( aDestinationAddress )
-                {
-                iTxDataBuffer->SetDestinationAddress( *aDestinationAddress );
-                }
-            
-            return KErrNone;
+            iTxDataBuffer->KeSetFlags( 
+                TDataBuffer::KTxFrameMustNotBeEncrypted );
             }
         else
             {
-            return KErrOverflow;        
+            iTxDataBuffer->KeClearFlags( 
+                TDataBuffer::KTxFrameMustNotBeEncrypted );
             }
+
+        if ( aDestinationAddress )
+            {
+            iTxDataBuffer->SetDestinationAddress( *aDestinationAddress );
+            }
+        
+        return KErrNone;
         }
     else
         {
-        return KErrNoMemory;
-        }
+        return KErrOverflow;        
+        }    
     }
 
 // ---------------------------------------------------------------------------
@@ -981,10 +1009,7 @@ inline TInt RFrameXferBlock::AppendTxDataBuffer(
 //
 inline void RFrameXferBlock::ClearTxDataBuffer()
     {
-    if ( iTxDataBuffer )
-        {
-        iTxDataBuffer->SetLength( 0 );
-        }
+    iTxDataBuffer->SetLength( 0 );
     }
 
 // ---------------------------------------------------------------------------
@@ -998,32 +1023,59 @@ inline void RFrameXferBlock::SetTxDataBufferField( TLinAddr aUserAddr )
 
 #endif /* User mode end */
 
+#ifdef __KERNEL_MODE__ /* Kernel mode */
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+inline void RFrameXferBlock::Initialize( TUint32 aTxBufLength )
+    {
+    // perform base class initialization first
+    KeInitialize();
+    
+    iTxDataBuffer = NULL;
+    iTxBufLength = aTxBufLength;
+    }
+
+#endif  /* Kernel mode end */
 
 /**
 * Ethernet frame transfer context block between user and kernel space 
 * for the protocol stack side client 
 * 
 */
-class RFrameXferBlockProtocolStack : public RFrameXferBlockBase
+class RFrameXferBlockProtocolStack : public RFrameXferBlock
     {
 
 public:
 
+#ifndef __KERNEL_MODE__ /* User mode */
+    
+    /** 
+     * Initializes TX Data pool, with the address of this in user space.
+     * 
+     * @param aThisAddrUserSpace Address of this object in user space.
+     */
+    inline void UserInitialize( TUint32 aThisAddrUserSpace );
+    
+#endif /* User mode end */    
+
 #ifdef __KERNEL_MODE__ /* Kernel mode */
     
     /**
-     * Initializes Kernel side memory interface to shared memory between User
+     * Initialises Kernel's memory interface to shared memory between User
      * and Kernel Space.
      */ 
-    void Initialize();
+    void Initialise();
     
     /**
      * Allocates a Tx buffer from the shared memory.
      * 
-     * @param aTxBuf Kernel space pointer to the pre-allocated actual Tx buffer
+     * @param aTxBuf Pointer to the pre-allocated actual Tx buffer.
      * @param aBufLength Length of the Tx buffer.
-     * @return User space pointer to the meta header attached to the 
-     *         allocated buffer, on success.
+     * @return Pointer to the meta header attached to the allocated buffer, on
+     *         success.
      *         NULL, in case of allocation failure.
      */
     TDataBuffer* AllocTxBuffer( const TUint8* aTxBuf, TUint16 aBufLength );
@@ -1093,35 +1145,7 @@ public:
      *         EFalse otherwise
      */
     inline TBool AllTxQueuesEmpty() const;
-        
-    /**
-     * Adds the specified Rx frame (contained in a buffer allocated from the 
-     * shared memory) to the relevant Rx queue according to its AC (i.e.
-     * priority).
-     *  
-     * @param aFrame Meta header attached to the frame; as a kernel
-     *        space pointer.
-     */
-    void AddRxFrame( TDataBuffer* aFrame );
 
-    /**
-     * Gets the highest priority frame from the Rx queues for passing it to
-     * the protocol stack side client.
-     * 
-     * @return User space pointer to the meta header of the Rx frame to be
-     *         passed to the user mode client.
-     *         NULL, if there's no frame available.
-     */ 
-    TDataBuffer* GetRxFrame();
-    
-    /**
-     * Finds out if there is an Rx frame ready for user mode client retrieval
-     * 
-     * @return ETrue if an Rx frame is ready for retrival
-     *         EFalse otherwise
-     */ 
-    inline TBool RxFrameAvailable() const;
-    
 #endif /* Kernel mode end */
     
 private:
@@ -1179,30 +1203,18 @@ private:    // Data
     /** Tx frame meta header objects */
     TDataBuffer iDataBuffers[KTxPoolSizeInPackets];
     
-    /** pointer to the meta header of the 1st frame in the VO Rx queue */
-    TDataBuffer* iVoiceRxQueueFront;
+    /** Address of this object instance in the user mode address space */
+    TUint32 iThisAddrUserSpace;
     
-    /** pointer to the meta header of the last frame in the VO Rx queue */
-    TDataBuffer* iVoiceRxQueueRear;
+    /** Address of this object instance in the kernel mode address space */
+    TUint32 iThisAddrKernelSpace;
     
-    /** pointer to the meta header of the 1st frame in the VI Rx queue */
-    TDataBuffer* iVideoRxQueueFront;
-    
-    /** pointer to the meta header of the last frame in the VI Rx queue */
-    TDataBuffer* iVideoRxQueueRear;
-    
-    /** pointer to the meta header of the 1st frame in the BE Rx queue */
-    TDataBuffer* iBestEffortRxQueueFront;
-    
-    /** pointer to the meta header of the last frame in the BE Rx queue */
-    TDataBuffer* iBestEffortRxQueueRear;
-    
-    /** pointer to the meta header of the 1st frame in the BG Rx queue */
-    TDataBuffer* iBackgroundRxQueueFront;
-    
-    /** pointer to the meta header of the last frame in the BG Rx queue */
-    TDataBuffer* iBackgroundRxQueueRear;
-    
+    /** 
+    * the offset from a User space address to the corresponding address
+    * in the Kernel space in the shared memory chunk. May also be negative 
+    */
+    TInt32 iUserToKernAddrOffset;
+
     /**
     * Note! The length of this object needs to be divisible by 4 to make
     * the objects following it to be aligned correctly
@@ -1210,28 +1222,38 @@ private:    // Data
     };
 
 
+#ifndef __KERNEL_MODE__ /* User mode */
+#include <e32debug.h>
+
+// -----------------------------------------------------------------------------
+// 
+// -----------------------------------------------------------------------------
+//
+inline void RFrameXferBlockProtocolStack::UserInitialize( 
+    TUint32 aThisAddrUserSpace)
+    {
+    iThisAddrUserSpace = aThisAddrUserSpace;
+    iUserToKernAddrOffset = iThisAddrKernelSpace - iThisAddrUserSpace;
+    }
+#endif /* User mode end */
+
 #ifdef __KERNEL_MODE__ /* Kernel mode */
 
 // -----------------------------------------------------------------------------
-// Note! This method is executed also in the context of the user mode client 
-// thread, but in supervisor mode
+// 
 // -----------------------------------------------------------------------------
 //
 inline void RFrameXferBlockProtocolStack::FreeTxPacket( TDataBuffer*& aPacket )
     {
-    if ( aPacket )
-        {
-        aPacket->SetLength( 0 );
-        aPacket->SetUserPriority( 0 );
-        // put the packet to the Free Queue
-        iFreeQueue.PutPacket( aPacket );
-        aPacket = NULL;
-        }
+    aPacket->SetLength( 0 );
+    aPacket->SetUserPriority( 0 );
+    // put the packet to the Free Queue
+    iFreeQueue.PutPacket( aPacket );
+    aPacket = NULL;
     }
 
 // -----------------------------------------------------------------------------
-// Note! This method is executed in the context of the user mode client 
-// thread, but in supervisor mode
+// 
 // -----------------------------------------------------------------------------
 //
 inline TBool RFrameXferBlockProtocolStack::AllTxQueuesEmpty() const
@@ -1240,25 +1262,6 @@ inline TBool RFrameXferBlockProtocolStack::AllTxQueuesEmpty() const
              iVideoTxQueue.IsEmpty() &&
              iBestEffortTxQueue.IsEmpty() &&
              iBackgroundTxQueue.IsEmpty() ) ? ETrue : EFalse;
-    }
-
-// -----------------------------------------------------------------------------
-// 
-// -----------------------------------------------------------------------------
-//
-inline TBool RFrameXferBlockProtocolStack::RxFrameAvailable() const
-    {
-    if ( reinterpret_cast<TBool>(iVoiceRxQueueFront) || 
-         reinterpret_cast<TBool>(iVideoRxQueueFront) || 
-         reinterpret_cast<TBool>(iBestEffortRxQueueFront) ||
-         reinterpret_cast<TBool>(iBackgroundRxQueueFront ) )
-        {
-        return ETrue;
-        }
-    else
-        {
-        return EFalse;
-        }
     }
 
 #endif /* Kernel mode end */

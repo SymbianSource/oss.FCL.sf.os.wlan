@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2009 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 20 %
+* %version: 19 %
 */
 
 #include "config.h"
@@ -121,7 +121,7 @@ TUint8* WlanManagementSideUmacCb::DmaPrivateTxMemory()
 // ---------------------------------------------------------------------------
 //
 void WlanManagementSideUmacCb::MgmtDataReceiveComplete( 
-    TDataBuffer*& aBufferStart, 
+    const TDataBuffer*& aBufferStart, 
     TUint32 aNumOfBuffers )
     {
     if ( iSelf )

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 18 %
+* %version: 17 %
 */
 
 #include "core_operation_release.h"
@@ -175,21 +175,10 @@ core_error_e core_operation_release_c::next_state()
                 DEBUG6( "core_operation_release_c::next_state() - EAPOL disassociation from BSSID %02X:%02X:%02X:%02X:%02X:%02X",
                     bssid.addr[0], bssid.addr[1], bssid.addr[2],
                     bssid.addr[3], bssid.addr[4], bssid.addr[5] );
-                DEBUG( "core_operation_release_c::next_state() - marking is_eapol_disconnecting as true" );
-                server_m->get_connection_data()->set_eapol_disconnecting(
-                    true );
 
                 server_m->get_eapol_instance().disassociation( &network );
-                operation_state_m = core_state_eapol_disassociated;
-
-                return core_error_request_pending;
                 }
 
-            return goto_state( core_state_eapol_disassociated );
-            }
-        case core_state_eapol_disassociated:
-            {
-            DEBUG( "core_operation_release_c::next_state() - core_state_eapol_disassociated" );
             // disable user data
             drivers_m->disable_user_data( request_id_m );
             operation_state_m = core_state_disable_user_data;

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 28 %
+* %version: 25.1.1 %
 */
 
 #ifndef RWLMSERVER_H
@@ -369,15 +369,12 @@ NONSHARABLE_CLASS( RWLMServer ) : public RSessionBase, public MWLMNotify
         /**
          * Run Protected Setup.
          * @param aStatus  Status of the calling active object.
-         * @param aSsid SSID of the network to configure.
-         * @param aWpsPin PIN value to be used. "00000000" (string of eight zeros)
-         *                if push button method is used.
+         * @param aId IAP ID of network which user has selected to be configured.
          * @param Results of a successful Protected Setup operation.
          */
         IMPORT_C void RunProtectedSetup(
             TRequestStatus& aStatus,
-            const TWlanSsid& aSsid,
-            const TWlanWpsPin& aWspPin,  
+            TUint32 aId,
             TDes8& aCredentials );
 
         /**
@@ -599,13 +596,6 @@ NONSHARABLE_CLASS( RWLMServer ) : public RSessionBase, public MWLMNotify
 
         /** Buffer for storing BSSID to roam to. */
         TPckgBuf<TMacAddress> iRoamBssidPckg; 
-
-        /** Buffer for storing SSID for Protected setup. */
-        TPckgBuf<TWlanSsid> iWlanSsidPckg; 
-
-        /** Buffer for storing pincode for Protected setup. */
-        TPckgBuf<TWlanWpsPin> iWlanWpsPinPckg; 
-
     };
 
 #endif // RWLMSERVER_H

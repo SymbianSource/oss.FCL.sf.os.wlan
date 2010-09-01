@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 13 %
+* %version: 12 %
 */
 
 #include <nifmbuf.h>
@@ -31,8 +31,7 @@
 //
 CReceiver::CReceiver( CPcCardPktDrv* aParent ) : 
     CActive(EPriorityStandard),
-    iParent(aParent),
-    iFrameToFree( NULL )
+    iParent(aParent)
     {
     }
 
@@ -68,7 +67,6 @@ CReceiver::~CReceiver()
     {
     DEBUG("CReceiver::~CReceiver()");
     Cancel();
-    iFrameToFree = NULL;
     }
 
 // ---------------------------------------------------------
@@ -100,11 +98,7 @@ void CReceiver::RunL()
     {
     DEBUG("CReceiver::RunL()" );
 
-    TUint rxCount( 0 );
-    const TUint KMaxRxCount( 4 );
-    
-    while( ( rxCount < KMaxRxCount ) &&
-           ( iDataBuffer = iParent->iCard.GetRxFrame( iFrameToFree ) ) != NULL )
+    while( iParent->iFrameXferBlock->GetNextRxDataBuffer( iDataBuffer ) )
         {
         TUint8* buf = iDataBuffer->GetBuffer();
         TUint32 len = iDataBuffer->GetLength();
@@ -132,27 +126,10 @@ void CReceiver::RunL()
                 iParent->iParent->Process( pFrame, bufOrig, iDataBuffer->UserPriority() );
                 }
             }
-            
-        iFrameToFree = iDataBuffer;
-        ++rxCount;
-		DEBUG1("CReceiver::RunL() - %u packet(s) processed", rxCount );
         }
 
-    if ( rxCount == KMaxRxCount )
+    if( iParent->CardOpen() )
         {
-		DEBUG("CReceiver::RunL() - yield");
-		
-        SetActive();
-        TRequestStatus* status = &iStatus;
-        User::RequestComplete( status, KErrNone );
-        }
-    else
-        {
-        iFrameToFree = NULL;
-            
-        if( iParent->CardOpen() )
-            {
-            QueueRead();
-            }
+        QueueRead();
         }
     }

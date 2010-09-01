@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 2 %
 */
 
 #ifndef D_WLANLOGICALCHANNELBASE_H
@@ -26,9 +26,8 @@
 
 /**
 * An abstract base class for a logical channel that provides a framework in 
-* which user side client requests are executed in the context of a single 
-* kernel side thread or in the context of the client thread in supervisor 
-* mode
+* which user-side client requests are executed in the context of a single 
+* kernel-side thread.
 *
 *  @since S60 v5.1
 */
@@ -74,9 +73,9 @@ public:
   
     /**
      * Process a function for this logical channel.
-     * This method is executed in the context of the user mode client 
-     * thread, but in supervisor mode. Code executed in this mode 
-     * MUST NOT take a lot of time.
+     * This function is executed in the context of client's thread in 
+     * supervisor mode. All code executed in this mode MUST not
+     * take a lot of time and MUST NOT access the WHA layer.
      * @param aFunction Defines the operation/function to be performed.
      * @param param     Function specific parameter
      * @return function specific return value.
@@ -98,7 +97,7 @@ private: // definitions
          * The smallest Fast Control Function ID that DoControlFast()
          * accepts.
          */
-        EMinControlFast = static_cast<TInt>(0x0E000000),
+        EMinControlFast = static_cast<TInt>(0x0F000000),
         
         /**
          * The largest Fast Control Function ID that DoControlFast()

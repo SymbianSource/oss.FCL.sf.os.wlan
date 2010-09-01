@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 4 %
+* %version: 3 %
 */
 
 #ifndef WLANBGSCANSTATES_H
@@ -533,7 +533,7 @@ protected: // data
     /**
      * Current WLAN state. 
      */
-    MWlanBgScanProvider::TWlanBgScanState iWlanBgScanState;
+    MWlanBgScanProvider::TWlanBgScanWlanState iWlanState;
     
     };
 

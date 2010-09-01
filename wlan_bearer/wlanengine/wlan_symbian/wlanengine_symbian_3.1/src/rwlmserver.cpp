@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 31 %
+* %version: 28.1.1 %
 */
 
 #include <in_sock.h>
@@ -544,18 +544,13 @@ EXPORT_C TInt RWLMServer::SetPowerSaveSettings(
 //
 EXPORT_C void RWLMServer::RunProtectedSetup(
     TRequestStatus& aStatus,
-    const TWlanSsid& aSsid,
-    const TWlanWpsPin& aWspPin,  
+    TUint32 aId,
     TDes8& aCredentials )
     {
     DEBUG( "RWLMServer::RunProtectedSetup(TRequestStatus)" );
 
     aStatus = KRequestPending;
-    
-    iWlanSsidPckg = aSsid;
-    iWlanWpsPinPckg = aWspPin;
-    
-    TIpcArgs params( &iWlanSsidPckg, &iWlanWpsPinPckg, &aCredentials );
+    TIpcArgs params( aId, &aCredentials );
 
     // Send the command
     SendReceive( ERunProtectedSetup, params, aStatus );

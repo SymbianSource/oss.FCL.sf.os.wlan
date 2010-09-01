@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2009 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 9 %
 */
 
 // ---------------------------------------------------------------------------
@@ -78,9 +78,11 @@ inline TInt RPcmNetCardIf::GetConfig( TDes8& aConfig )
 // 
 // ---------------------------------------------------------------------------
 //
-inline TInt RPcmNetCardIf::InitialiseBuffers()
+inline TInt RPcmNetCardIf::InitialiseBuffers( 
+    RFrameXferBlockProtocolStack*& aFrameXferBlock )
     {
     TInt status ( KErrNone );
+    
     TSharedChunkInfo info;
     
     status = DoSvControl( 
@@ -107,17 +109,25 @@ inline TInt RPcmNetCardIf::InitialiseBuffers()
                 + sizeof( RFrameXferBlock ) 
                 + sizeof( RFrameXferBlockProtocolStack ) ) );
 
-        RFrameXferBlockProtocolStack* frameXferBlock = 
-            reinterpret_cast<RFrameXferBlockProtocolStack*>(
-                baseAddress
-                + KRxDataChunkSize
-                + sizeof( TDataBuffer )
-                + KMgmtSideTxBufferLength
-                + KProtocolStackSideTxDataChunkSize
-                + sizeof( RFrameXferBlock ) );
+        aFrameXferBlock = reinterpret_cast<RFrameXferBlockProtocolStack*>(
+            baseAddress
+            + KRxDataChunkSize
+            + sizeof( TDataBuffer )
+            + KMgmtSideTxBufferLength
+            + KProtocolStackSideTxDataChunkSize
+            + sizeof( RFrameXferBlock ) );
 
-        frameXferBlock->UserInitialize( 
-            reinterpret_cast<TUint32>(frameXferBlock) );
+        aFrameXferBlock->SetRxDataChunkField( reinterpret_cast<TLinAddr>(
+            baseAddress) );
+
+        aFrameXferBlock->SetTxDataBufferField( reinterpret_cast<TLinAddr>(
+            baseAddress
+            + KRxDataChunkSize
+            + sizeof( TDataBuffer )
+            + KMgmtSideTxBufferLength) );
+        
+        aFrameXferBlock->UserInitialize( 
+            reinterpret_cast<TUint32>(aFrameXferBlock) );
         }
     
     return status;
@@ -173,15 +183,4 @@ inline TBool RPcmNetCardIf::AddTxFrame( TDataBuffer* aPacket )
     return static_cast<TBool>(DoControl( 
         EControlFastAddTxFrame, 
         reinterpret_cast<TAny*>(aPacket) ));
-    }
-
-// ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-inline TDataBuffer* RPcmNetCardIf::GetRxFrame( TDataBuffer* aFrameToFree )
-    {
-    return reinterpret_cast<TDataBuffer*>(DoControl( 
-        EControlFastGetRxFrame,
-        reinterpret_cast<TAny*>(aFrameToFree) ));
     }

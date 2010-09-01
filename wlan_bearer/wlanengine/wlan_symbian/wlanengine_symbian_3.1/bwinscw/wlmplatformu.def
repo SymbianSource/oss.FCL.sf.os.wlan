@@ -10,5 +10,3 @@ EXPORTS
 	?SetIconState@CWlmPlatform@@QAEHW4TWlmIconStatus@@@Z @ 9 NONAME ; int CWlmPlatform::SetIconState(enum TWlmIconStatus)
 	?InitializeSystemTimeHandler@CWlmPlatform@@QAEXXZ @ 10 NONAME ; void CWlmPlatform::InitializeSystemTimeHandler(void)
 	?PublishBgScanInterval@CWlmPlatform@@QAEXAAK@Z @ 11 NONAME ; void CWlmPlatform::PublishBgScanInterval(unsigned long &)
-	?GetWlanOnOffState@CWlmPlatform@@QAE?AW4TWlanOnOffState@@XZ @ 12 NONAME ; enum TWlanOnOffState CWlmPlatform::GetWlanOnOffState(void)
-

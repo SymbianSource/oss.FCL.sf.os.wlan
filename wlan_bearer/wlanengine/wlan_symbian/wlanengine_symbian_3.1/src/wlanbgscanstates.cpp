@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 5 %
+* %version: 4 %
 */
 
 #include <e32base.h>
@@ -58,7 +58,7 @@ CWlanBgScanStates::CWlanBgScanStates( CWlanBgScan& aBgScan, MWlanScanResultProvi
     iIntervalChangeRequestId( 0 ),
     iCompletedAwsCommand( MWlanBgScanAwsComms::EAwsCommandMax ),
     iAwsCommandCompletionCode( KErrNone ),
-    iWlanBgScanState( MWlanBgScanProvider::EWlanBgScanOff )
+    iWlanState( MWlanBgScanProvider::EWlanStateMax )
     {
     DEBUG( "CWlanBgScanStates::CWlanBgScanStates()" );
     }
@@ -837,13 +837,13 @@ void CWlanBgScanStates::RefreshUsedInterval()
     {
     TUint oldInterval = iUsedBgScanInterval;
     
-    DEBUG4( "CWlanBgScanStates::RefreshUsedInterval() - agg: %u, normal: %u, used: %u, bg scan state: %u",
-        iAggressiveBgScanInterval, iBgScanInterval, iUsedBgScanInterval, iWlanBgScanState );
+    DEBUG4( "CWlanBgScanStates::RefreshUsedInterval() - agg: %u, normal: %u, used: %u, wlan state: %u",
+        iAggressiveBgScanInterval, iBgScanInterval, iUsedBgScanInterval, iWlanState );
     
-    // If      ( WLAN BG scanning is OFF )               -> use interval: KWlanNoScanning 
+    // If      ( WLAN state is connected )               -> use interval: KWlanNoScanning 
     // Else If ( aggressive interval < normal interval ) -> use interval: aggressive interval
     // Otherwise                                         -> use interval: background scan interval
-    if( iWlanBgScanState == MWlanBgScanProvider::EWlanBgScanOff )
+    if( iWlanState == MWlanBgScanProvider::EWlanStateConnected )
         {
         iUsedBgScanInterval = KWlanNoScanning;
         }

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 10 %
+* %version: 8 %
 */
 
 
@@ -78,10 +78,11 @@ class MWlanBgScanProvider
 
 public:
     
-    enum TWlanBgScanState
+    enum TWlanBgScanWlanState
         {
-        EWlanBgScanOff,
-        EWlanBgScanOn
+        EWlanStateConnected = 1,
+        EWlanStateDisconnected,
+        EWlanStateMax // not used
         };
     
     struct TWlanBgScanSettings
@@ -131,13 +132,13 @@ public:
     virtual void ScanComplete() = 0;
         
     /**
-     * Called to set BG scan state (on/off).
+     * Called to indicate that WLAN state has changed.
      *
      * @since S60 v5.2
      * 
      * @param aState New WLAN state
      */
-    virtual void SetBgScanState( const TWlanBgScanState &aState ) = 0;
+    virtual void WlanStateChanged( const TWlanBgScanWlanState &aState ) = 0;
     
     /**
      * Whether background scan is enabled.

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 90 %
+* %version: 86.1.3 %
 */
 
 #include "config.h"
@@ -2684,7 +2684,8 @@ TBool WlanDot11State::XferDot11FrameToMgmtClient(
             - aBuffer );                              // buffer beginning
                     
         // complete
-        aCtxImpl.iUmac.MgmtDataReceiveComplete( metaHdr, 1 );
+        const TDataBuffer* KMetaHdr ( metaHdr );
+        aCtxImpl.iUmac.MgmtDataReceiveComplete( KMetaHdr, 1 );
         }
     else
         {

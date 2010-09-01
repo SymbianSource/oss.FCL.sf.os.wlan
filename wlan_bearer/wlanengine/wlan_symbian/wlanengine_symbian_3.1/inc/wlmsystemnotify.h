@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2002-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2002-2006 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -20,7 +20,6 @@
 #define WLMSYSTEMNOTIFY_H
 
 #include "wlmclientserver.h"
-#include "wlanerrorcodes.h"
 
 enum TWlmIconStatus
     {
@@ -28,18 +27,6 @@ enum TWlmIconStatus
     EWlmIconStatusAvailable,
     EWlmIconStatusConnected,
     EWlmIconStatusConnectedSecure
-    };
-
-/**
- * WLAN on/off states are used as status codes for status
- * requests and therefore they are mapped directly to
- * corresponding error codes.
- */
-enum TWlanOnOffState
-    {
-    EWlanOff = KErrWlanOff,
-    EWlanForceOff = KErrWlanForceOff,
-    EWlanOn = 0
     };
 
 /** 
@@ -80,16 +67,6 @@ class MWlmSystemNotify
         * BT connection has been disconnected.        
         */
         virtual void BtConnectionDisabled() = 0;
-        
-        /**
-         * WLAN has been set ON.
-         */
-        virtual void WlanOn() = 0;
-        
-        /**
-         * WLAN has been set OFF.
-         */
-        virtual void WlanOff() = 0;
     };
 
 #endif // WLMSYSTEMNOTIFY_H

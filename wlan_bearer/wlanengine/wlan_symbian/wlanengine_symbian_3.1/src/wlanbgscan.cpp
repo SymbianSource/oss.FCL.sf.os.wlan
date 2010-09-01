@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 18 %
+* %version: 16 %
 */
 
 #include <e32base.h>
@@ -156,15 +156,15 @@ void CWlanBgScan::ScanComplete()
 
 // ---------------------------------------------------------------------------
 // From class MWlanBgScanProvider.
-// CWlanBgScan::WlanSetBgScanState
+// CWlanBgScan::WlanStateChanged
 // ---------------------------------------------------------------------------
 //
-void CWlanBgScan::SetBgScanState( const MWlanBgScanProvider::TWlanBgScanState &aState )
+void CWlanBgScan::WlanStateChanged( const MWlanBgScanProvider::TWlanBgScanWlanState &aState )
     {
-    DEBUG2( "CWlanBgScan::SetBgScanState() - old state: %u, new state: %u", iWlanBgScanState, aState );
+    DEBUG2( "CWlanBgScan::WlanStateChanged() - old state: %u, new state: %u", iWlanState, aState );
     
     // store state
-    iWlanBgScanState = aState;
+    iWlanState = aState;
 
     RefreshUsedInterval();
 

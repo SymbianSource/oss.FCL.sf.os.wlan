@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2009-2010 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2009 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of the License "Eclipse Public License v1.0"
@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 3 %
+* %version: 2 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -41,8 +41,7 @@ DWlanLogicalChannelBase::~DWlanLogicalChannelBase()
     }
 
 // ---------------------------------------------------------------------------
-// Note! This method is executed in the context of the user mode client 
-// thread, but in supervisor mode
+// 
 // ---------------------------------------------------------------------------
 //
 TInt DWlanLogicalChannelBase::Request( TInt aReqNo, TAny* a1, TAny* a2 )

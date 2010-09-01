@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 25 %
+* %version: 24 %
 */
 
 #include "WlLddWlanLddConfig.h"
@@ -170,7 +170,8 @@ DEthernetFrameMemMngr::~DEthernetFrameMemMngr()
     {
     MarkMemFree();
     
-    iFrameXferBlockBase = NULL;
+    iFrameXferBlock = NULL;
+    iTxDataBuffer = NULL;
     iRxDataChunk = NULL;
     }
 
@@ -180,11 +181,79 @@ DEthernetFrameMemMngr::~DEthernetFrameMemMngr()
 //
 TDataBuffer* DEthernetFrameMemMngr::OnWriteEthernetFrame() const
     {
+    if ( iTxDataBuffer->GetLength() >= sizeof( SEthernetHeader ) )
+        {
+        return iTxDataBuffer;
+        }
+    else
+        {
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        return NULL;
+        }
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+TBool DEthernetFrameMemMngr::OnReadRequest()
+    {
+    TBool ret( EFalse );
+
+    if ( IsMemInUse() )
+        {
+        if ( iCountCompleted )
+            {
+            // free relevant buffers
+            DoFreeRxBuffers();
+            iCountCompleted = 0; // no buffers anymore in process in user mode
+            
+            // make sure that the same buffers are not tried to be
+            // freed again thru the incremental freeing method
+            iFrameXferBlock->KeAllUserSideRxBuffersFreed();
+            }
+
+        if ( iCountTobeCompleted )
+            {
+            // there are Rx buffers to be completed
+            
+            iFrameXferBlock->KeRxComplete( DoGetTobeCompletedBuffersStart(), 
+                iCountTobeCompleted );  
+            // mark the completed buffers
+            assign( DoGetTobeCompletedBuffersStart(), 
+                DoGetCompletedBuffersStart(), 
+                iCountTobeCompleted );
+            iCountCompleted = iCountTobeCompleted;
+            iCountTobeCompleted = 0;
+
+            ret = ETrue;
+             // the frame Rx request won't be pending as the callee shall 
+             // complete it
+            iReadStatus = ENotPending;
+            }
+        else
+            {
+            // there are no Rx buffers to be completed. The Rx request is
+            // left pending
+            iReadStatus = EPending;
+            }
+        }
+    else
+        {
+        os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
+        }
+
+    return ret;
+    }
+
+// ---------------------------------------------------------------------------
+// 
+// ---------------------------------------------------------------------------
+//
+void DEthernetFrameMemMngr::DoMarkRxBufFree( TUint8* /*aBufferToFree*/ )
+    {
     // not supported in default handler
-#ifndef NDEBUG    
     os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif        
-    return NULL;
     }
 
 // ---------------------------------------------------------------------------
@@ -196,9 +265,9 @@ void DEthernetFrameMemMngr::SetTxOffsets(
     TUint32 aDot11FrameTxOffset,
     TUint32 aSnapFrameTxOffset )
     {
-    if ( IsMemInUse() && iFrameXferBlockBase )
+    if ( IsMemInUse() )
         {
-        iFrameXferBlockBase->KeSetTxOffsets(
+        iFrameXferBlock->KeSetTxOffsets(
             aEthernetFrameTxOffset,
             aDot11FrameTxOffset,
             aSnapFrameTxOffset );
@@ -221,7 +290,7 @@ TUint8* DEthernetFrameMemMngr::OnGetEthernetFrameRxBuffer(
     else
         {
         // we are trying to acquire an Rx buffer but our user mode client 
-        // has not asked for the memory buffer pool to be initialized. In this
+        // has not asked for the memorybuffer pool to be initialized. In this
         // case NULL is returned, as no buffers are available
          TraceDump(RX_FRAME, 
             ("WLANLDD: DEthernetFrameMemMngr::OnGetEthernetFrameRxBuffer: not initialized => failed"));       
@@ -238,7 +307,7 @@ TDataBuffer* DEthernetFrameMemMngr::GetRxFrameMetaHeader()
     {
     TDataBuffer* buffer ( NULL );
 
-    if ( IsMemInUse() && iRxFrameMemoryPool )
+    if ( IsMemInUse() )
         {
         buffer = reinterpret_cast<TDataBuffer*>(
             iRxFrameMemoryPool->Alloc( sizeof( TDataBuffer ), ETrue ) );
@@ -266,13 +335,8 @@ TDataBuffer* DEthernetFrameMemMngr::GetRxFrameMetaHeader()
 //
 void DEthernetFrameMemMngr::FreeRxFrameMetaHeader( TDataBuffer* aMetaHeader )
     {
-    if ( IsMemInUse() && iRxFrameMemoryPool )
+    if ( IsMemInUse() )
         {
-        TraceDump( RX_FRAME, 
-            (("WLANLDD: DEthernetFrameMemMngr::FreeRxFrameMetaHeader: "
-              "at addr: 0x%08x"),
-            reinterpret_cast<TUint32>(aMetaHeader)) );
-        
         iRxFrameMemoryPool->Free( aMetaHeader );
         }
     else
@@ -280,66 +344,8 @@ void DEthernetFrameMemMngr::FreeRxFrameMetaHeader( TDataBuffer* aMetaHeader )
         // the whole Rx memory pool - including aMetaHeader - has already
         // been deallocated, so nothing is done in this case
         TraceDump( RX_FRAME, 
-            ("WLANLDD: MgmtFrameMemMngr::FreeRxFrameMetaHeader: Rx memory "
-             "pool already deallocated; no action needed") );                
+            ("WLANLDD: MgmtFrameMemMngr::FreeRxFrameMetaHeader: Rx memory pool already deallocated; no action needed") );                
         }    
-    }
-
-// ---------------------------------------------------------------------------
-// Note! This method is executed in the context of the user mode client 
-// thread, but in supervisor mode
-// ---------------------------------------------------------------------------
-//
-void DEthernetFrameMemMngr::FreeRxPacket( 
-    TDataBuffer* aFrameToFreeInUserSpace )
-    {
-    if ( IsMemInUse() && 
-         aFrameToFreeInUserSpace && 
-         iFrameXferBlockBase &&
-         iRxFrameMemoryPool )
-        {
-        TDataBuffer* frameToFreeInKernSpace ( 
-            reinterpret_cast<TDataBuffer*>(
-                reinterpret_cast<TUint8*>(
-                    aFrameToFreeInUserSpace) + 
-                iFrameXferBlockBase->UserToKernAddrOffset()) );
-        
-        // first free the actual Rx frame buffer if relevant
-        if ( frameToFreeInKernSpace->KeFlags() & 
-             TDataBuffer::KDontReleaseBuffer )
-            {
-            // this buffer shall not be freed yet, so no action here
-            
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DEthernetFrameMemMngr::FreeRxPacket: don't free "
-                  "yet Rx buf at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(
-                    frameToFreeInKernSpace->KeGetBufferStart()) ) );            
-            }
-        else
-            {
-            TraceDump( RX_FRAME, 
-                (("WLANLDD: DEthernetFrameMemMngr::FreeRxPacket: free Rx buf "
-                  "at addr: 0x%08x"),
-                reinterpret_cast<TUint32>(
-                    frameToFreeInKernSpace->KeGetBufferStart()) ) );
-    
-            iRxFrameMemoryPool->Free( 
-                frameToFreeInKernSpace->KeGetBufferStart()
-                // take into account the alignment padding 
-                - iRxBufAlignmentPadding );
-            }
-        
-        // free the Rx frame meta header
-        
-        TraceDump( RX_FRAME, 
-            (("WLANLDD: DEthernetFrameMemMngr::FreeRxPacket: "
-              "free metahdr at addr: 0x%08x"),
-            reinterpret_cast<TUint32>(frameToFreeInKernSpace)) );
-        
-        iRxFrameMemoryPool->Free( frameToFreeInKernSpace );
-        aFrameToFreeInUserSpace = NULL;
-        }
     }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +353,7 @@ void DEthernetFrameMemMngr::FreeRxPacket(
 // ---------------------------------------------------------------------------
 //
 TBool DEthernetFrameMemMngr::OnEthernetFrameRxComplete( 
-    TDataBuffer*& aBufferStart, 
+    const TDataBuffer*& aBufferStart, 
     TUint32 aNumOfBuffers )
     {
     TBool ret( EFalse );
@@ -388,22 +394,10 @@ TUint8* DEthernetFrameMemMngr::DoGetNextFreeRxBuffer(
     }
 
 // ---------------------------------------------------------------------------
-// 
-// ---------------------------------------------------------------------------
-//
-void DEthernetFrameMemMngr::DoMarkRxBufFree( TUint8* /*aBufferToFree*/ )
-    {
-    // not suported in this default implementation 
-#ifndef NDEBUG    
-    os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif    
-    }
-
-// ---------------------------------------------------------------------------
 // This default implementation always returns NULL
 // ---------------------------------------------------------------------------
 //
-TDataBuffer* DEthernetFrameMemMngr::AllocTxBuffer( TUint /*aLength*/ )
+TDataBuffer* DEthernetFrameMemMngr::AllocTxBuffer( TUint aLength )
     {
     return NULL;
     }
@@ -413,16 +407,22 @@ TDataBuffer* DEthernetFrameMemMngr::AllocTxBuffer( TUint /*aLength*/ )
 // ---------------------------------------------------------------------------
 //
 TBool DEthernetFrameMemMngr::AddTxFrame( 
-    TDataBuffer* /*aPacketInUserSpace*/, 
-    TDataBuffer*& /*aPacketInKernSpace*/,
-    TBool /*aUserDataTxEnabled*/ )
+    TDataBuffer* aPacketInUserSpace, 
+    TDataBuffer*& aPacketInKernSpace,
+    TBool aUserDataTxEnabled )
     {
-    // not suported in this default implementation 
-#ifndef NDEBUG    
-    os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif
-    
-    return EFalse;
+    if ( IsMemInUse() )
+        {
+        return (static_cast<RFrameXferBlockProtocolStack*>(
+            iFrameXferBlock))->AddTxFrame( 
+                aPacketInUserSpace, 
+                aPacketInKernSpace,
+                aUserDataTxEnabled );
+        }
+    else
+        {
+        return EFalse;
+        }
     }
 
 // ---------------------------------------------------------------------------
@@ -430,15 +430,18 @@ TBool DEthernetFrameMemMngr::AddTxFrame(
 // ---------------------------------------------------------------------------
 //
 TDataBuffer* DEthernetFrameMemMngr::GetTxFrame( 
-    const TWhaTxQueueState& /*aTxQueueState*/,
-    TBool& /*aMore*/ )
+    const TWhaTxQueueState& aTxQueueState,
+    TBool& aMore )
     {
-    // not suported in this default implementation 
-#ifndef NDEBUG    
-    os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif
-    
-    return NULL;
+    if ( IsMemInUse() && iFrameXferBlock )
+        {
+        return (static_cast<RFrameXferBlockProtocolStack*>(
+            iFrameXferBlock))->GetTxFrame( aTxQueueState, aMore );
+        }
+    else
+        {
+        return NULL;
+        }
     }
 
 // ---------------------------------------------------------------------------
@@ -448,24 +451,17 @@ TDataBuffer* DEthernetFrameMemMngr::GetTxFrame(
 void DEthernetFrameMemMngr::FreeTxPacket( TDataBuffer*& /*aPacket*/ )
     {
     // not suported in this default implementation 
-#ifndef NDEBUG    
     os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif
     }
 
 // ---------------------------------------------------------------------------
 // 
 // ---------------------------------------------------------------------------
 //
-TBool DEthernetFrameMemMngr::ResumeClientTx( 
-    TBool /*aUserDataTxEnabled*/ ) const 
+TBool DEthernetFrameMemMngr::ResumeClientTx( TBool aUserDataTxEnabled ) const 
     {
-    // not suported in this default implementation 
-#ifndef NDEBUG    
-    os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif
-    
-    return EFalse;
+    return (static_cast<RFrameXferBlockProtocolStack*>(
+        iFrameXferBlock))->ResumeClientTx( aUserDataTxEnabled );
     }
 
 // ---------------------------------------------------------------------------
@@ -474,10 +470,6 @@ TBool DEthernetFrameMemMngr::ResumeClientTx(
 //
 TBool DEthernetFrameMemMngr::AllTxQueuesEmpty() const
     {
-    // not suported in this default implementation 
-#ifndef NDEBUG    
-    os_assert( (TUint8*)("WLANLDD: panic"), (TUint8*)(WLAN_FILE), __LINE__ );
-#endif
-    
-    return EFalse;
+    return (static_cast<RFrameXferBlockProtocolStack*>(
+            iFrameXferBlock))->AllTxQueuesEmpty();
     }

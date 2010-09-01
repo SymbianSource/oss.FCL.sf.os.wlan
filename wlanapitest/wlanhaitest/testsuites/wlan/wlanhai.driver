@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<driver:driver xmlns:driver="http://www.symbian.com/TestDriver">
+	<task name="wlanhai" timeout="0">
+		<transferToSymbian>
+		</transferToSymbian>
+		<task name="wlan">
+			<executeOnPC>
+				<build testBuild="true" URI="${sourceroot}\group\">
+					<componentName>t_wlan</componentName>
+				</build>
+			</executeOnPC>
+			<transferToSymbian>
+				<transfer move="false" PCPath="${epocroot}\epoc32\data\c\nt\wlan\t_wlan.ini" SymbianPath="$:\nt\wlan\t_wlan.ini"/>
+				<transfer move="false" PCPath="${epocroot}\epoc32\data\c\nt\wlan\t_wlan_environment.ini" SymbianPath="$:\nt\wlan\t_wlan_environment.ini"/>		
+			</transferToSymbian>
+			<task name="validation">
+				<task name="manual">
+				</task>
+				<task name="automated">
+					<task name="networking-wlan-validation-automated-instantiate" timeout="1000">
+						<transferToSymbian>
+							<transfer move="false" PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-instantiate.ini" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-instantiate.ini"/>
+						</transferToSymbian>
+						<executeOnSymbian>
+							<testExecuteScript PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-instantiate.script" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-instantiate.script">
+								<testCasesList operator="exclude">
+									<testCase target="${epocroot}\epoc32\data\c\nt\wlan\t_wlan.tcs"/>
+								</testCasesList>
+							</testExecuteScript>
+						</executeOnSymbian>
+					</task>
+					<task name="networking-wlan-validation-automated-connection" timeout="1000">
+						<transferToSymbian>
+							<transfer move="false" PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-connection.ini" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-connection.ini"/>
+						</transferToSymbian>
+						<executeOnSymbian>
+							<testExecuteScript PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-connection.script" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-connection.script">
+								<testCasesList operator="exclude">
+									<testCase target="${epocroot}\epoc32\data\c\nt\wlan\t_wlan.tcs"/>
+								</testCasesList>
+							</testExecuteScript>
+						</executeOnSymbian>
+					</task>
+					<task name="networking-wlan-validation-automated-transfer" timeout="1000">
+						<transferToSymbian>
+							<transfer move="false" PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-transfer.ini" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-transfer.ini"/>
+						</transferToSymbian>
+						<executeOnSymbian>
+							<testExecuteScript PCPath="${epocroot}\epoc32\data\c\nt\wlan\networking-wlan-validation-automated-transfer.script" SymbianPath="$:\nt\wlan\networking-wlan-validation-automated-transfer.script">
+								<testCasesList operator="exclude">
+									<testCase target="${epocroot}\epoc32\data\c\nt\wlan\t_wlan.tcs"/>
+								</testCasesList>
+							</testExecuteScript>
+						</executeOnSymbian>
+					</task>
+				</task>
+			</task>
+			<task name="performance">
+				<task name="manual">
+				</task>
+				<task name="automated">
+				</task>
+			</task>
+			<task name="conformance" timeout="0">
+				<task name="manual">
+				</task>
+				<task name="automated">
+				</task>
+			</task>
+			<task name="stress">
+				<task name="manual">
+				</task>
+				<task name="automated">
+				</task>
+			</task>
+		</task>
+	</task>
+</driver:driver>

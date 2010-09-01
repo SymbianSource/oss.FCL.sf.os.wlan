@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 23 %
+* %version: 21.1.1 %
 */
 
 #ifndef WLANMGMTIMPL_H
@@ -307,20 +307,15 @@ class CWlanMgmtImpl : public CWlanMgmtClient, public MWLMNotify
         /**
          * (From MWlanMgmtInterface)
          * Start Protected Setup.
-         *
          * @param aStatus Status of the calling active object. On successful
          *                completion contains KErrNone, otherwise one of the
          *                system-wide error codes.
-         * @param aSsid SSID of the network to configure.
-         * @param aWpsPin PIN value to be used. "00000000" (string of eight zeros)
-         *                if push button method is used.
+         * @param aId Service ID of network which user has selected to be configured.
          * @param aCredentials Results of a successful Protected Setup operation.
-         * @sa \link psetup Protected Setup-specific error codes \endlink.
-         */
+        */
         virtual void RunProtectedSetup(
             TRequestStatus& aStatus,
-            const TWlanSsid& aSsid,
-            const TWlanWpsPin& aWpsPin,
+            TUint32 aId,
             CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& aCredentials );
 
         /**
@@ -833,8 +828,7 @@ class CProtectedSetupRequest : public CActive
         CProtectedSetupRequest(
             CWlanMgmtImpl& aCallback,
             RWLMServer& aServer,
-            const TWlanSsid& aSsid,
-            const TWlanWpsPin& aWpsPin,
+            TUint32 aId,
             CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& aCredentials );
 
         /**
@@ -880,11 +874,8 @@ class CProtectedSetupRequest : public CActive
         // Interface to RWLMServer
         RWLMServer& iServer;
 
-        // SSID of the network to configure.
-        TWlanSsid iSsid;
-
-        // PIN value to be used. 
-        TWlanWpsPin iWpsPin;
+        // Service ID of network which user has selected to be configured.
+        TUint32 iServiceId;
 
         // Results of a successful Protected Setup operation.
         CArrayFixSeg<TWlanProtectedSetupCredentialAttribute>& iCredentials;

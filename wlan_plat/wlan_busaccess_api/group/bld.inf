@@ -12,12 +12,12 @@
 * Contributors:
 *
 * Description:  File that exports the files belonging to 
-*                WLAN SPIA API
+*                WLAN bus access API
 *
 */
 
 /*
-* %version: 5 %
+* %version: 6 %
 */
 
 #if defined(RD_WLAN_DDK)
@@ -35,5 +35,10 @@ PRJ_EXPORTS
 ../inc/wlanspiaclient.h        OS_LAYER_PLATFORM_EXPORT_PATH(wlanspiaclient.h)
 ../inc/wlanspianamespace.h     OS_LAYER_PLATFORM_EXPORT_PATH(wlanspianamespace.h)
 ../inc/wlanspiatypes.h         OS_LAYER_PLATFORM_EXPORT_PATH(wlanspiatypes.h)
+../inc/wlansdioa.h             OS_LAYER_PLATFORM_EXPORT_PATH(wlansdioa.h)
+../inc/wlansdioa.inl           OS_LAYER_PLATFORM_EXPORT_PATH(wlansdioa.inl)
+../inc/wlansdioaclient.h       OS_LAYER_PLATFORM_EXPORT_PATH(wlansdioaclient.h)
+../inc/wlansdioanamespace.h    OS_LAYER_PLATFORM_EXPORT_PATH(wlansdioanamespace.h)
+../inc/wlansdioatypes.h        OS_LAYER_PLATFORM_EXPORT_PATH(wlansdioatypes.h)
 
 #endif

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2007 Nokia Corporation and/or its subsidiary(-ies).
+* Copyright (c) 2006-2010 Nokia Corporation and/or its subsidiary(-ies).
 * All rights reserved.
 * This component and the accompanying materials are made available
 * under the terms of "Eclipse Public License v1.0"
@@ -17,7 +17,7 @@
 */
 
 /*
-* %version: tr1cfwln#6 %
+* %version: tr1cfwln#7 %
 */
 
 #include "../wlan_dbif_api/group/bld.inf"
@@ -30,7 +30,7 @@
 #include "../wlan_info_api/group/bld.inf"
 #include "../wlan_agent_hotspot_plugin_api/group/bld.inf"
 #include "../wlan_osa_api/group/bld.inf"
-#include "../wlan_spia_api/group/bld.inf"
+#include "../wlan_busaccess_api/group/bld.inf"
 #include "../wlan_hpa_api/group/bld.inf"
 #include "../wlan_eapol_plugin_api/group/bld.inf"
 #include "../wlan_generic_plugin_api/group/bld.inf"

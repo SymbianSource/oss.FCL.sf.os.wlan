@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 61.1.1 %
+* %version: 59 %
 */
 
 #include "core_sub_operation_wpa_connect.h"
@@ -309,14 +309,6 @@ core_error_e core_sub_operation_wpa_connect_c::next_state()
                     DEBUG( "core_sub_operation_wpa_connect_c::next_state() - using encryption mode core_security_mode_wapi" );
                     key_management = core_key_management_wapi_psk;
                     encryption_mode = core_encryption_mode_wpi;
-                    break;                    
-                    }
-                case wlan_eapol_if_eapol_key_authentication_type_802_1x_unencrypted:
-                    {
-                    DEBUG( "core_sub_operation_wpa_connect_c::next_state() - using key management core_key_management_none" );
-                    DEBUG( "core_sub_operation_wpa_connect_c::next_state() - using encryption mode core_encryption_mode_disabled" );
-                    key_management = core_key_management_none;
-                    encryption_mode = core_encryption_mode_disabled;
                     break;                    
                     }
                 default:

@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 86.1.3 %
+* %version: 86.1.4 %
 */
 
 #include "config.h"
@@ -4999,6 +4999,10 @@ TBool WlanDot11State::HandleDot11n(
     TBool status ( ETrue ); 
     
     if ( ( aCtxImpl.PairwiseCipher() == EWlanCipherSuiteTkip ) || 
+         ( aCtxImpl.PairwiseCipher() == EWlanCipherSuiteWep ) ||
+         ( aCtxImpl.EncryptionStatus() == EEncryption802dot1xMixed ) ||
+         ( aCtxImpl.EncryptionStatus() == EEncryptionWep ) ||
+         ( aCtxImpl.EncryptionStatus() == EEncryptionWepMixed ) ||
          !( aCtxImpl.QosEnabled() ) ||
          !( aCtxImpl.FeaturesAllowed() & KWlanHtOperation ) )
         {
@@ -5006,6 +5010,8 @@ TBool WlanDot11State::HandleDot11n(
         // - the WLAN vendor implementation
         // supports HT AND EITHER
         // - TKIP will be used as the pairwise cipher OR
+        // - WEP will be used as the pairwise cipher OR
+        // - WEP will be used as the only cipher OR
         // - the target nw doesn't support WMM OR
         // - HT use has been denied by WLAN Mgmt client
         // In these cases we must not use HT functionality, even if the target 
@@ -5017,8 +5023,9 @@ TBool WlanDot11State::HandleDot11n(
         aCtxImpl.RemoveBssMembershipFeature( E802Dot11HtPhy );
         
         OsTracePrint( KInfoLevel, (TUint8*)
-            ("UMAC: WlanDot11State::HandleDot11n: TKIP as pairwise cipher "
-             "OR WMM not supported OR HT use denied => HT disabled") );
+            ("UMAC: WlanDot11State::HandleDot11n: TKIP as pairwise cipher OR "
+             "WEP as cipher OR WMM not supported OR HT use denied => HT "
+             "disabled") );
         }
     else
         {

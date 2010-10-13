@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 17.1.1 %
+* %version: 17.1.2 %
 */
 
 // -----------------------------------------------------------------------------
@@ -63,14 +63,19 @@ inline TInt RWlanLogicalChannel::Open(
 //
 inline void RWlanLogicalChannel::CloseChannel()
     {
-    // request WLAN system resources to be released
-    //
-    TRequestStatus status;
-    DoRequest( EWlanFinitSystem, status );
-    User::WaitForRequest(status);
+    if ( Handle() > KNullHandle )
+        {
+        // we have a valid handle to the kernel side object
     
-    // internally call close
-    Close();
+        // request WLAN system resources to be released
+        //
+        TRequestStatus status;
+        DoRequest( EWlanFinitSystem, status );
+        User::WaitForRequest(status);
+        
+        // internally call close
+        Close();
+        }
     }
 
 // -----------------------------------------------------------------------------

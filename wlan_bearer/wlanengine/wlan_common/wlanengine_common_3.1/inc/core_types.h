@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 100 %
+* %version: 99 %
 */
 
 #ifndef CORE_TYPES_H
@@ -189,9 +189,7 @@ typedef enum _core_security_mode_e
     /** Use Wi-Fi Protected Setup, keys are negotiated by EAPOL. */
     core_security_mode_protected_setup,
     /** Use WAPI, keys are negotiated by EAPOL. */
-    core_security_mode_wapi,
-    /** Use EAP authentication without encryption. */
-    core_security_mode_802dot1x_unencrypted
+    core_security_mode_wapi
     } core_security_mode_e;
 
 /**
@@ -2026,8 +2024,7 @@ typedef enum _wlan_eapol_if_eapol_key_authentication_type_e
     wlan_eapol_if_eapol_key_authentication_type_wpx_fast_roam,
     wlan_eapol_if_eapol_key_authentication_type_wfa_sc,
     wlan_eapol_if_eapol_key_authentication_type_wapi_psk,
-    wlan_eapol_if_eapol_key_authentication_type_wapi,
-    wlan_eapol_if_eapol_key_authentication_type_802_1x_unencrypted
+    wlan_eapol_if_eapol_key_authentication_type_wapi
     } wlan_eapol_if_eapol_key_authentication_type_e;
 
 typedef enum _wlan_eapol_if_eapol_key_type_e

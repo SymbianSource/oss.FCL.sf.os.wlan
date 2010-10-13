@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 35 %
+* %version: 36 %
 */
 
 #include <connectprog.h>
@@ -577,7 +577,8 @@ CWlanOpenState::~CWlanOpenState()
 // -----------------------------------------------------------------------------
 //
 CWlanDisconnectState::CWlanDisconnectState(CWlanSM* aWlanSM, RWLMServer& aWLMServer) :
-	CWlanStateBase(aWlanSM, aWLMServer)
+	CWlanStateBase(aWlanSM, aWLMServer),
+    iAgtHotSpotClient( NULL )
     {
     DEBUG( "CWlanDisconnectState constructor" );
     }
@@ -604,28 +605,22 @@ void CWlanDisconnectState::StartState()
     {
     DEBUG( "CWlanDisconnectState::StartState()" );
     // check if plug-in is available
-   TRAPD( ret, iAgtHotSpotClient = CWlanAgtHotSpotClient::NewL() );
+    if ( iWlanSM->IsHotSpotAP() )
+        {
+        TRAPD( ret, iAgtHotSpotClient = CWlanAgtHotSpotClient::NewL() );
+        if( ret == KErrNone )
+	        {
+	        DEBUG( "CWlanDisconnectState::StartState(), AgtHotSpot plugin is available" );
 
-    if( ret == KErrNone )
-	{
-	DEBUG( "CWlanDisconnectState::StartState(), AgtHotSpot plugin is available" );
-
-	if ( iWlanSM->IsHotSpotAP() )
-	    {
-	    // talk to hospot server	
-	    DEBUG( "CWlanDisconnectState::StartState(), Sending CloseConnection message to HotSpot Server" );
-	    iAgtHotSpotClient->HotSpotCloseConnection( iWlanSM->IapId(), iStatus );
-	    SetActive();
-	    return;
+	        // talk to hospot server	
+	        DEBUG( "CWlanDisconnectState::StartState(), Sending CloseConnection message to HotSpot Server" );
+	        iAgtHotSpotClient->HotSpotCloseConnection( iWlanSM->IapId(), iStatus );
+	        SetActive();
+	        return;
+	        }
 	    }
-	}
-    else 
-	{
-	iAgtHotSpotClient = NULL;
-	}
     JumpToRunl( KErrNone );
     }
-
 
 // -----------------------------------------------------------------------------
 // CWlanDisconnectState::NextStateL

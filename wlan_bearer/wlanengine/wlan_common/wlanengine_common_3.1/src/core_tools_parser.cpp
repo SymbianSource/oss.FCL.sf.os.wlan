@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 37 %
+* %version: 35 %
 */
 
 #include "core_tools_parser.h"
@@ -146,8 +146,6 @@ core_connect_status_e core_tools_parser_c::is_ap_compatible_with_iap(
                 }
 
             break;
-        case core_security_mode_802dot1x_unencrypted:
-            /** Falls through on purpose. */
         case core_security_mode_802dot1x:
             /**
              * Check WPX requirements.
@@ -375,7 +373,6 @@ core_connect_status_e core_tools_parser_c::is_ap_compatible_with_iap(
 
             break;
             }
-
         }
 
     DEBUG( "core_tools_parser_c::is_ap_compatible_with_iap() - OK" );

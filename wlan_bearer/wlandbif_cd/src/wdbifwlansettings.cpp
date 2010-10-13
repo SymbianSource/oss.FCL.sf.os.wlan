@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 14 %
+* %version: 12.1.1 %
 */
 
 //  INCLUDE FILES
@@ -167,13 +167,7 @@ void CWLanSettings::GetDataL( SWLANSettings& aSettings)
         ReadWepKeysL(aSettings);           
         TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL, Wep keys succesfully read")));
         }
-    else if( aSettings.SecurityMode == Wlan8021x )
-        {
-        aSettings.WPAKeyLength = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanWpaKeyLength));
-        TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.WPAKeyLength: %d"),
-            aSettings.WPAKeyLength));
-        }
-    else if( aSettings.SecurityMode > Wlan8021x )
+    else if( aSettings.SecurityMode > Wep)
         {
         aSettings.WPAKeyLength = *((CMDBField<TUint32>*)iWLANRecord->GetFieldByIdL(KCDTIdWlanWpaKeyLength));
         TraceDump(WARNING_LEVEL,(_L("CWlanSettings::GetDataL() - aSettings.WPAKeyLength: %d"),

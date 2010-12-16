@@ -16,7 +16,7 @@
 */
 
 /*
-* %version: 23 %
+* %version: 23.1.1 %
 */
 
 #include "core_operation_check_rcpi.h"
@@ -349,7 +349,7 @@ core_error_e core_operation_check_rcpi_c::next_state()
                 {
                 weak_trigger_level = server_m->get_device_settings().rcpi_trigger;
                 }
-            weak_trigger_level = weak_trigger_level - 20;
+            weak_trigger_level = weak_trigger_level - 26;
             
             DEBUG1( "core_operation_check_rcpi_c::next_state() - weak_trigger_level (%u)",
                                weak_trigger_level );

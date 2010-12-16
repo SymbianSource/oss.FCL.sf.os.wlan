@@ -1,0 +1,31 @@
+/*
+* ==============================================================================
+*  Name        : bld.inf
+*  Part of     : WLAN Engine
+*  Description : project specification file for the WlanEng with WPX
+*  Version     : %version: 1 %
+*
+*  Copyright © 2002-2009 Nokia. All rights reserved.
+*  This material, including documentation and any related 
+*  computer programs, is protected by copyright controlled by 
+*  Nokia. All rights are reserved. Copying, including 
+*  reproducing, storing, adapting or translating, any 
+*  or all of this material requires the prior written consent of 
+*  Nokia. This material also contains confidential 
+*  information which may not be disclosed to others without the 
+*  prior written consent of Nokia.
+* ==============================================================================
+*/
+
+#include <platform_paths.hrh>
+
+PRJ_PLATFORMS
+DEFAULT
+
+PRJ_EXPORTS
+// DOMAIN EXPORTS
+
+// INTERNAL EXPORTS
+
+PRJ_MMPFILES
+wlmserversrv_wpx.mmp
